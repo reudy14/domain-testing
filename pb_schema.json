@@ -1,0 +1,162 @@
+[
+  {
+    "id": "pbc_pages000001",
+    "name": "pages",
+    "type": "base",
+    "system": false,
+    "listRule": "published = true || @request.auth.id != ''",
+    "viewRule": "published = true || @request.auth.id != ''",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "@request.auth.id != ''",
+    "deleteRule": "@request.auth.id != ''",
+    "fields": [
+      {
+        "id": "text_slug00001",
+        "name": "slug",
+        "type": "text",
+        "system": false,
+        "required": true,
+        "presentable": true,
+        "unique": true,
+        "options": {
+          "min": null,
+          "max": 120,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "text_title0001",
+        "name": "title",
+        "type": "text",
+        "system": false,
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 180,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "json_blocks001",
+        "name": "blocks",
+        "type": "json",
+        "system": false,
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSize": 2000000
+        }
+      },
+      {
+        "id": "bool_published",
+        "name": "published",
+        "type": "bool",
+        "system": false,
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
+      }
+    ],
+    "indexes": [],
+    "options": {}
+  },
+  {
+    "id": "pbc_globals0001",
+    "name": "globals",
+    "type": "base",
+    "system": false,
+    "listRule": "",
+    "viewRule": "",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "@request.auth.id != ''",
+    "deleteRule": "@request.auth.id != ''",
+    "fields": [
+      {
+        "id": "text_key000001",
+        "name": "key",
+        "type": "text",
+        "system": false,
+        "required": true,
+        "presentable": true,
+        "unique": true,
+        "options": {
+          "min": null,
+          "max": 80,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "json_data00001",
+        "name": "data",
+        "type": "json",
+        "system": false,
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSize": 1000000
+        }
+      }
+    ],
+    "indexes": [],
+    "options": {}
+  },
+  {
+    "id": "pbc_media00001",
+    "name": "media",
+    "type": "base",
+    "system": false,
+    "listRule": "",
+    "viewRule": "",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "@request.auth.id != ''",
+    "deleteRule": "@request.auth.id != ''",
+    "fields": [
+      {
+        "id": "file_file00001",
+        "name": "file",
+        "type": "file",
+        "system": false,
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "mimeTypes": [
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "image/gif",
+            "image/svg+xml"
+          ],
+          "thumbs": [
+            "300x300",
+            "1200x0"
+          ],
+          "maxSelect": 1,
+          "maxSize": 10485760,
+          "protected": false
+        }
+      },
+      {
+        "id": "text_alt000001",
+        "name": "alt",
+        "type": "text",
+        "system": false,
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 180,
+          "pattern": ""
+        }
+      }
+    ],
+    "indexes": [],
+    "options": {}
+  }
+]
