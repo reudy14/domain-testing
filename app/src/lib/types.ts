@@ -7,7 +7,28 @@ export type BlockType =
 	| 'services'
 	| 'cta'
 	| 'spacer'
-	| 'horizontal_cards';
+	| 'horizontal_cards'
+	| 'hero'
+	| 'columns'
+	| 'pricing_table'
+	| 'newsletter'
+	| 'articles_list'
+	| 'profile_card'
+	| 'features_list';
+
+export type BlockBackground = {
+	type: 'none' | 'color' | 'image';
+	color: string;
+	imageUrl: string;
+	attachment: 'scroll' | 'fixed';
+	overlay: boolean;
+	overlayOpacity: number; // 0–100
+};
+
+export type BlockForeground = {
+	headingColor: string;
+	bodyColor: string;
+};
 
 export type ContentBlock = {
 	id: string;

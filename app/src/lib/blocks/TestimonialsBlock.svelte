@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { scrollReveal } from '$lib/scrollReveal';
 	import { onMount } from 'svelte';
 
 	type Testimonial = { name: string; text: string; rating: number };
@@ -26,7 +27,7 @@
 	});
 </script>
 
-<section class="bg-white/45 py-16 md:py-20" onmouseenter={() => (paused = true)} onmouseleave={() => (paused = false)} role="region" aria-label="Testimonials carousel">
+<section use:scrollReveal class="reveal bg-white/45 py-16 md:py-20" onmouseenter={() => (paused = true)} onmouseleave={() => (paused = false)} role="region" aria-label="Testimonials carousel">
 	<div class="mx-auto max-w-5xl px-6">
 		<div class="mb-10 flex flex-col justify-between gap-4 md:flex-row md:items-end">
 			<div>
@@ -44,7 +45,7 @@
 				<div class="carousel-item w-full transition-transform duration-500" style={`transform: translateX(-${index * 100}%);`}>
 					<article class="w-full p-8 md:p-12">
 						<div class="mb-5 text-xl text-terracotta" aria-label={`${item.rating} stars`}>{'★'.repeat(Math.max(1, Math.min(5, item.rating || 5)))}</div>
-						<p class="text-2xl leading-relaxed text-charcoal/80 md:text-3xl">“{item.text}”</p>
+						<p class="text-2xl leading-relaxed text-fg-body/80 md:text-3xl">“{item.text}”</p>
 						<p class="mt-6 font-semibold text-sage-dark">— {item.name}</p>
 					</article>
 				</div>

@@ -94,6 +94,164 @@
 				</div>
 			{/each}
 			<button class="btn" type="button" onclick={() => addArrayItem('items', { title: '', description: '', url: '', link: '' })}>Add card</button>
+		{:else if block.type === 'hero'}
+			{#each ['heading', 'subheading', 'buttonLabel', 'buttonUrl', 'backgroundImage'] as field}
+				<label class="form-control"><span class="label-text capitalize">{field.replace(/([A-Z])/g, ' $1')}</span><input class="input input-bordered" value={block.data[field] || ''} oninput={(e) => updateData({ [field]: e.currentTarget.value })} /></label>
+			{/each}
+		{:else if block.type === 'columns'}
+			{#each ['heading'] as field}
+				<label class="form-control"><span class="label-text capitalize">{field}</span><input class="input input-bordered" value={block.data[field] || ''} oninput={(e) => updateData({ [field]: e.currentTarget.value })} /></label>
+			{/each}
+			<h3 class="mt-4 font-bold">Columns</h3>
+			{#each block.data.items || [] as item, i}
+				<div class="rounded-box mb-3 border border-base-300 p-3">
+					<input class="input input-bordered mb-2 w-full" placeholder="Title" value={item.title} oninput={(e) => updateArray('items', i, { title: e.currentTarget.value })} />
+					<input class="input input-bordered mb-2 w-full" placeholder="Icon (emoji)" value={item.icon || ''} oninput={(e) => updateArray('items', i, { icon: e.currentTarget.value })} />
+					<textarea class="textarea textarea-bordered w-full" placeholder="HTML Content" value={item.content} oninput={(e) => updateArray('items', i, { content: e.currentTarget.value })}></textarea>
+					<button class="btn btn-error btn-sm mt-2" type="button" onclick={() => removeArrayItem('items', i)}>Remove</button>
+				</div>
+			{/each}
+			<button class="btn" type="button" onclick={() => addArrayItem('items', { title: '', icon: '', content: '' })}>Add column</button>
+		{:else if block.type === 'pricing_table'}
+			{#each ['heading'] as field}
+				<label class="form-control"><span class="label-text capitalize">{field}</span><input class="input input-bordered" value={block.data[field] || ''} oninput={(e) => updateData({ [field]: e.currentTarget.value })} /></label>
+			{/each}
+			<h3 class="mt-4 font-bold">Price rows</h3>
+			{#each block.data.items || [] as item, i}
+				<div class="rounded-box mb-3 border border-base-300 p-3">
+					<input class="input input-bordered mb-2 w-full" placeholder="Duration" value={item.duration} oninput={(e) => updateArray('items', i, { duration: e.currentTarget.value })} />
+					<input class="input input-bordered w-full" placeholder="Price" value={item.price} oninput={(e) => updateArray('items', i, { price: e.currentTarget.value })} />
+					<button class="btn btn-error btn-sm mt-2" type="button" onclick={() => removeArrayItem('items', i)}>Remove</button>
+				</div>
+			{/each}
+			<button class="btn" type="button" onclick={() => addArrayItem('items', { duration: '', price: '' })}>Add row</button>
+		{:else if block.type === 'newsletter'}
+			{#each ['heading', 'subtext', 'buttonLabel', 'placeholder'] as field}
+				<label class="form-control"><span class="label-text capitalize">{field}</span><input class="input input-bordered" value={block.data[field] || ''} oninput={(e) => updateData({ [field]: e.currentTarget.value })} /></label>
+			{/each}
+		{:else if block.type === 'articles_list'}
+			{#each ['heading'] as field}
+				<label class="form-control"><span class="label-text capitalize">{field}</span><input class="input input-bordered" value={block.data[field] || ''} oninput={(e) => updateData({ [field]: e.currentTarget.value })} /></label>
+			{/each}
+			<h3 class="mt-4 font-bold">Articles</h3>
+			{#each block.data.items || [] as item, i}
+				<div class="rounded-box mb-3 border border-base-300 p-3">
+					<input class="input input-bordered mb-2 w-full" placeholder="Title" value={item.title} oninput={(e) => updateArray('items', i, { title: e.currentTarget.value })} />
+					<input class="input input-bordered w-full" placeholder="URL" value={item.url} oninput={(e) => updateArray('items', i, { url: e.currentTarget.value })} />
+					<button class="btn btn-error btn-sm mt-2" type="button" onclick={() => removeArrayItem('items', i)}>Remove</button>
+				</div>
+			{/each}
+			<button class="btn" type="button" onclick={() => addArrayItem('items', { title: '', url: '' })}>Add article</button>
+		{:else if block.type === 'profile_card'}
+			{#each ['name', 'tagline', 'image', 'contact', 'profileUrl'] as field}
+				<label class="form-control"><span class="label-text capitalize">{field.replace(/([A-Z])/g, ' $1')}</span><input class="input input-bordered" value={block.data[field] || ''} oninput={(e) => updateData({ [field]: e.currentTarget.value })} /></label>
+			{/each}
+			<label class="form-control"><span class="label-text">Description (HTML)</span><textarea class="textarea textarea-bordered w-full" value={block.data.description || ''} oninput={(e) => updateData({ description: e.currentTarget.value })}></textarea></label>
+			<h3 class="mt-4 font-bold">Education</h3>
+			{#each block.data.education || [] as edu, i}
+				<div class="flex gap-2 mb-2">
+					<input class="input input-bordered flex-1" value={edu} oninput={(e) => {
+						const arr = [...(block.data.education || [])];
+						arr[i] = e.currentTarget.value;
+						updateData({ education: arr });
+					}} />
+					<button class="btn btn-error btn-sm" type="button" onclick={() => {
+						const arr = (block.data.education || []).filter((_: unknown, idx: number) => idx !== i);
+						updateData({ education: arr });
+					}}>×</button>
+				</div>
+			{/each}
+			<button class="btn btn-sm" type="button" onclick={() => updateData({ education: [...(block.data.education || []), ''] })}>Add education</button>
+		{:else if block.type === 'features_list'}
+			{#each ['heading'] as field}
+				<label class="form-control"><span class="label-text capitalize">{field}</span><input class="input input-bordered" value={block.data[field] || ''} oninput={(e) => updateData({ [field]: e.currentTarget.value })} /></label>
+			{/each}
+			<h3 class="mt-4 font-bold">Categories</h3>
+			{#each block.data.categories || [] as cat, ci}
+				<div class="rounded-box mb-3 border border-base-300 p-3">
+					<input class="input input-bordered mb-2 w-full" placeholder="Category title" value={cat.title} oninput={(e) => updateArray('categories', ci, { title: e.currentTarget.value })} />
+					<p class="text-xs text-base-content/60 mb-1">Items (one per line)</p>
+					<textarea class="textarea textarea-bordered w-full" rows="4" value={(cat.items || []).join('\n')} oninput={(e) => updateArray('categories', ci, { items: e.currentTarget.value.split('\n').filter((s) => s.trim()) })}></textarea>
+					<button class="btn btn-error btn-sm" type="button" onclick={() => removeArrayItem('categories', ci)}>Remove</button>
+				</div>
+			{/each}
+			<button class="btn" type="button" onclick={() => addArrayItem('categories', { title: '', items: [] })}>Add category</button>
 		{/if}
+
+		<hr class="my-6" />
+
+		<details class="rounded-box border border-base-300 p-3">
+			<summary class="cursor-pointer font-semibold text-base-content/70">Background settings</summary>
+			<div class="mt-4 space-y-3">
+				<label class="form-control">
+					<span class="label-text">Background type</span>
+					<select class="select select-bordered" value={block.data._background?.type || 'none'} onchange={(e) => updateData({ _background: { ...(block.data._background || {}), type: e.currentTarget.value } })}>
+						<option value="none">None</option>
+						<option value="color">Solid color</option>
+						<option value="image">Image</option>
+					</select>
+				</label>
+
+				{#if (block.data._background?.type) === 'color'}
+					<label class="form-control">
+						<span class="label-text">Color</span>
+						<input class="input input-bordered" type="color" value={block.data._background?.color || '#66755d'} oninput={(e) => updateData({ _background: { ...(block.data._background || {}), color: e.currentTarget.value } })} />
+					</label>
+					<label class="form-control">
+						<span class="label-text">Or type a CSS color</span>
+						<input class="input input-bordered" placeholder="#66755d or rgba(…) or sage" value={block.data._background?.color || ''} oninput={(e) => updateData({ _background: { ...(block.data._background || {}), color: e.currentTarget.value } })} />
+					</label>
+				{/if}
+
+				{#if (block.data._background?.type) === 'image'}
+					<label class="form-control">
+						<span class="label-text">Image URL</span>
+						<input class="input input-bordered" placeholder="https://…" value={block.data._background?.imageUrl || ''} oninput={(e) => updateData({ _background: { ...(block.data._background || {}), imageUrl: e.currentTarget.value } })} />
+					</label>
+					<label class="form-control">
+						<span class="label-text">Attachment</span>
+						<select class="select select-bordered" value={block.data._background?.attachment || 'scroll'} onchange={(e) => updateData({ _background: { ...(block.data._background || {}), attachment: e.currentTarget.value } })}>
+							<option value="scroll">Scroll with page</option>
+							<option value="fixed">Fixed (parallax)</option>
+						</select>
+					</label>
+					<label class="form-control">
+						<span class="label-text">Dark overlay</span>
+						<select class="select select-bordered" value={block.data._background?.overlay ? 'yes' : 'no'} onchange={(e) => updateData({ _background: { ...(block.data._background || {}), overlay: e.currentTarget.value === 'yes' } })}>
+							<option value="no">No</option>
+							<option value="yes">Yes</option>
+						</select>
+					</label>
+					{#if block.data._background?.overlay}
+						<label class="form-control">
+							<span class="label-text">Overlay opacity ({block.data._background?.overlayOpacity ?? 40}%)</span>
+							<input class="range range-sm" type="range" min="0" max="100" value={block.data._background?.overlayOpacity ?? 40} oninput={(e) => updateData({ _background: { ...(block.data._background || {}), overlayOpacity: Number(e.currentTarget.value) } })} />
+						</label>
+					{/if}
+				{/if}
+			</div>
+		</details>
+
+		<details class="mt-3 rounded-box border border-base-300 p-3">
+			<summary class="cursor-pointer font-semibold text-base-content/70">Foreground settings</summary>
+			<div class="mt-4 space-y-3">
+				<label class="form-control">
+					<span class="label-text">Heading color</span>
+					<input class="input input-bordered w-full" type="color" value={block.data._foreground?.headingColor || '#2c2c2c'} oninput={(e) => updateData({ _foreground: { ...(block.data._foreground || {}), headingColor: e.currentTarget.value } })} />
+				</label>
+				<label class="form-control">
+					<span class="label-text">Or type a CSS color</span>
+					<input class="input input-bordered" placeholder="#2c2c2c or rgba(…) or charcoal" value={block.data._foreground?.headingColor || ''} oninput={(e) => updateData({ _foreground: { ...(block.data._foreground || {}), headingColor: e.currentTarget.value } })} />
+				</label>
+				<label class="form-control">
+					<span class="label-text">Body text color</span>
+					<input class="input input-bordered w-full" type="color" value={block.data._foreground?.bodyColor || '#2c2c2c'} oninput={(e) => updateData({ _foreground: { ...(block.data._foreground || {}), bodyColor: e.currentTarget.value } })} />
+				</label>
+				<label class="form-control">
+					<span class="label-text">Or type a CSS color</span>
+					<input class="input input-bordered" placeholder="#2c2c2c or rgba(…) or charcoal" value={block.data._foreground?.bodyColor || ''} oninput={(e) => updateData({ _foreground: { ...(block.data._foreground || {}), bodyColor: e.currentTarget.value } })} />
+				</label>
+			</div>
+		</details>
 	</div>
 {/if}

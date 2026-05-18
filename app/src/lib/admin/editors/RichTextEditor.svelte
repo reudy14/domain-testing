@@ -13,6 +13,16 @@
 		}
 	});
 
+	// Sync content from props when a different block is selected,
+	// without overwriting content while the user is actively editing.
+	$effect(() => {
+		if (mounted && editorEl && value !== undefined) {
+			if (editorEl.innerHTML !== value) {
+				editorEl.innerHTML = value || '';
+			}
+		}
+	});
+
 	function exec(cmd: string, val?: string) {
 		if (!browser) return;
 		editorEl?.focus();
