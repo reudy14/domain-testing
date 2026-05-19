@@ -42,7 +42,10 @@
 		<input type="hidden" name="data" value={JSON.stringify(footer)} />
 		<h2 class="mb-4 text-2xl font-bold">Footer</h2>
 		{#each ['businessName', 'tagline', 'address', 'phone', 'email', 'copyrightText'] as field}
-			<label class="form-control"><span class="label-text">{field}</span><input class="input input-bordered" bind:value={footer[field]} /></label>
+			<label class="form-control w-full">
+				<div class="label"><span class="label-text">{field}</span></div>
+				<input class="input input-bordered w-full" bind:value={footer[field]} />
+			</label>
 		{/each}
 		<h3 class="mt-6 font-bold">Social links</h3>
 		{#each footer.socialLinks || [] as link, i}

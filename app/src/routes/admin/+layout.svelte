@@ -10,7 +10,7 @@
 		<div class="flex-none gap-2">
 			<a class="btn btn-ghost" href="/admin/pages">Pages</a>
 			<a class="btn btn-ghost" href="/admin/globals">Globals</a>
-			<form method="POST" action="/admin/login?/logout">
+			<form class="inline" method="POST" action="/admin/login?/logout">
 				<button class="btn btn-outline" type="submit">Logout</button>
 			</form>
 		</div>

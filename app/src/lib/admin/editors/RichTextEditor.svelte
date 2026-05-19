@@ -39,6 +39,14 @@
 		if (url) exec('createLink', url);
 	}
 
+	function clearFormatting() {
+		if (!browser) return;
+		editorEl?.focus();
+		document.execCommand('formatBlock', false, '<p>');
+		document.execCommand('removeFormat');
+		emit();
+	}
+
 	function handleInput() {
 		emit();
 	}
@@ -53,6 +61,7 @@
 			<button class="btn btn-xs" onclick={() => exec('formatBlock', '<h3>')} type="button">H3</button>
 			<button class="btn btn-xs" onclick={() => exec('insertUnorderedList')} type="button">List</button>
 			<button class="btn btn-xs" onclick={setLink} type="button">Link</button>
+			<button class="btn btn-xs" onclick={clearFormatting} type="button">Clear</button>
 		</div>
 		<div
 			bind:this={editorEl}

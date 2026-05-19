@@ -6,7 +6,7 @@ services:
     ports:
       - "8090:80"
     volumes:
-      - ./pocketbase/pb_data:/pb/pb_data
+      - pocketbase:/pb/pb_data
 
   app:
     build:
@@ -22,3 +22,7 @@ services:
       ORIGIN: http://localhost:3000
     ports:
       - "3000:3000"
+
+volumes:
+  pocketbase:
+  
