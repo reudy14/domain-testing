@@ -21,7 +21,7 @@
 		</nav>
 
 		{#if header.ctaButton?.label}
-			<a class="btn rounded-full border-0 bg-sage px-6 text-white hover:bg-sage-dark" href={header.ctaButton.href}>{header.ctaButton.label}</a>
+			<a class="btn rounded-full border-0 px-6 text-white hover:opacity-90" style="background-color: var(--color-primary, #8a9a7b);" href={header.ctaButton.href}>{header.ctaButton.label}</a>
 		{/if}
 	</div>
 </header>

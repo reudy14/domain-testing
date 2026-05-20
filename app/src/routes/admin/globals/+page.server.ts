@@ -1,4 +1,4 @@
-import { defaultFooter, defaultHeader } from '$lib/types';
+import { defaultColors, defaultFooter, defaultHeader } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
 
 async function getGlobal(pb: App.Locals['pb'], key: string, fallback: unknown) {
@@ -10,11 +10,12 @@ async function getGlobal(pb: App.Locals['pb'], key: string, fallback: unknown) {
 }
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const [header, footer] = await Promise.all([
+	const [header, footer, colors] = await Promise.all([
 		getGlobal(locals.pb, 'header', defaultHeader),
-		getGlobal(locals.pb, 'footer', defaultFooter)
+		getGlobal(locals.pb, 'footer', defaultFooter),
+		getGlobal(locals.pb, 'colors', defaultColors)
 	]);
-	return { header, footer };
+	return { header, footer, colors };
 };
 
 export const actions: Actions = {

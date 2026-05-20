@@ -7,11 +7,11 @@
 @theme {
 	--font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
 	--font-serif: 'Playfair Display', Georgia, serif;
-	--color-warm: #faf8f5;
-	--color-charcoal: #2c2c2c;
-	--color-sage: #8a9a7b;
-	--color-sage-dark: #66755d;
-	--color-terracotta: #c9825f;
+	--color-warm: var(--color-bg, #faf8f5);
+	--color-charcoal: var(--color-heading, #2c2c2c);
+	--color-sage: var(--color-primary, #8a9a7b);
+	--color-sage-dark: color-mix(in srgb, var(--color-primary, #8a9a7b) 80%, #000);
+	--color-terracotta: var(--color-accent, #c9825f);
 }
 
 @keyframes shrink {
@@ -40,9 +40,9 @@
 }
 
 :root {
-	--fg-heading: #2c2c2c;
-	--fg-body: #2c2c2c;
-	background: #faf8f5;
+	--fg-heading: var(--color-heading, #2c2c2c);
+	--fg-body: var(--color-text, #2c2c2c);
+	background: var(--color-bg, #faf8f5);
 	color: var(--fg-body);
 	font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
 }
@@ -55,13 +55,14 @@
 .text-fg-body\/70 { color: color-mix(in srgb, var(--fg-body, #2c2c2c) 70%, transparent); }
 .text-fg-body\/60 { color: color-mix(in srgb, var(--fg-body, #2c2c2c) 60%, transparent); }
 .text-fg-heading { color: var(--fg-heading, #2c2c2c); }
+.text-fg-subheading { color: var(--color-subheading, #4a4a4a); }
 
 body {
 	min-height: 100vh;
 	margin: 0;
 	background:
-		radial-gradient(circle at top left, rgba(201, 130, 95, 0.1), transparent 36rem),
-		#faf8f5;
+		radial-gradient(circle at top left, rgba(var(--color-accent-rgb, 201, 130, 95), 0.1), transparent 36rem),
+		var(--color-bg, #faf8f5);
 }
 
 h1,
@@ -94,7 +95,7 @@ h4 {
 }
 
 .prose-wellness a {
-	color: #66755d;
+	color: color-mix(in srgb, var(--color-primary, #8a9a7b) 90%, #000);
 	text-decoration: underline;
 	text-underline-offset: 3px;
 }

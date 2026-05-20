@@ -69,3 +69,21 @@ export const defaultFooter: FooterGlobal = {
 	socialLinks: [{ platform: 'instagram', url: '' }],
 	copyrightText: `© ${new Date().getFullYear()} Demo Studio. All rights reserved.`
 };
+
+export type ColorsGlobal = {
+	background: string;
+	heading: string;
+	subheading: string;
+	text: string;
+	primary: string;
+	accent: string;
+};
+
+export const defaultColors: ColorsGlobal = {
+	background: '#faf8f5',
+	heading: '#2c2c2c',
+	subheading: '#4a4a4a',
+	text: '#2c2c2c',
+	primary: '#8a9a7b',
+	accent: '#c9825f'
+};

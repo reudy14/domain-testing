@@ -120,8 +120,8 @@
 					<div class="flex items-center justify-between">
 					<span class="label-text w-24">Color</span>
 					<div class="flex flex-1 items-center gap-2">
-						<input class="input input-bordered w-10 h-10 p-1 cursor-pointer" type="color" value={block.data.color || '#66755d'} oninput={(e) => updateData({ color: e.currentTarget.value })} />
-						<input class="input input-bordered flex-1" placeholder="#66755d or color name" value={block.data.color || ''} oninput={(e) => updateData({ color: e.currentTarget.value })} />
+						<input class="input input-bordered w-10 h-10 p-1 cursor-pointer" type="color" value={block.data.color || 'var(--color-primary)'} oninput={(e) => updateData({ color: e.currentTarget.value })} />
+						<input class="input input-bordered flex-1" placeholder="Leave empty to use global primary" value={block.data.color || ''} oninput={(e) => updateData({ color: e.currentTarget.value })} />
 					</div>
 					</div>
 				</div>

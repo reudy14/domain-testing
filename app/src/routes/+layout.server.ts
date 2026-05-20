@@ -1,4 +1,4 @@
-import { defaultFooter, defaultHeader } from '$lib/types';
+import { defaultColors, defaultFooter, defaultHeader } from '$lib/types';
 import type { LayoutServerLoad } from './$types';
 
 async function getGlobal(pb: App.Locals['pb'], key: string, fallback: unknown) {
@@ -11,10 +11,11 @@ async function getGlobal(pb: App.Locals['pb'], key: string, fallback: unknown) {
 }
 
 export const load: LayoutServerLoad = async ({ locals, url }) => {
-	const [header, footer] = await Promise.all([
+	const [header, footer, colors] = await Promise.all([
 		getGlobal(locals.pb, 'header', defaultHeader),
-		getGlobal(locals.pb, 'footer', defaultFooter)
+		getGlobal(locals.pb, 'footer', defaultFooter),
+		getGlobal(locals.pb, 'colors', defaultColors)
 	]);
 
-	return { header, footer, user: locals.user, url: { pathname: url.pathname } };
+	return { header, footer, colors, user: locals.user, url: { pathname: url.pathname } };
 };

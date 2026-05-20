@@ -3,9 +3,22 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
+	import { onMount } from 'svelte';
 
 	let { children, data } = $props();
 	let isAdmin = $derived(data.url?.pathname?.startsWith('/admin'));
+
+	onMount(() => {
+		if (data.colors && !isAdmin) {
+			const root = document.documentElement;
+			root.style.setProperty('--color-bg', data.colors.background);
+			root.style.setProperty('--color-heading', data.colors.heading);
+			root.style.setProperty('--color-subheading', data.colors.subheading);
+			root.style.setProperty('--color-text', data.colors.text);
+			root.style.setProperty('--color-primary', data.colors.primary);
+			root.style.setProperty('--color-accent', data.colors.accent);
+		}
+	});
 </script>
 
 <svelte:head>
