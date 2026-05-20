@@ -22,7 +22,7 @@ export function createBlock(type: BlockType): ContentBlock {
 			base.data = { url: '', alt: '', content: '<h2>Image and text</h2><p>Add content here.</p>', imagePosition: 'left' };
 			break;
 		case 'timeline':
-			base.data = { items: [{ year: '2026', title: 'Milestone', description: 'Describe this moment.' }] };
+			base.data = { items: [{ title: 'Milestone', description: 'Describe this moment.' }] };
 			break;
 		case 'hero':
 			base.data = {

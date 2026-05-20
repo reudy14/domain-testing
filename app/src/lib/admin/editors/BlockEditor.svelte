@@ -56,13 +56,12 @@
 		{:else if block.type === 'timeline'}
 			{#each block.data.items || [] as item, i}
 				<div class="rounded-box mb-3 border border-base-300 p-3">
-					<input class="input input-bordered mb-2 w-full" placeholder="Year" value={item.year} oninput={(e) => updateArray('items', i, { year: e.currentTarget.value })} />
 					<input class="input input-bordered mb-2 w-full" placeholder="Title" value={item.title} oninput={(e) => updateArray('items', i, { title: e.currentTarget.value })} />
 					<textarea class="textarea textarea-bordered w-full" placeholder="Description" value={item.description} oninput={(e) => updateArray('items', i, { description: e.currentTarget.value })}></textarea>
 					<button class="btn btn-error btn-sm mt-2" type="button" onclick={() => removeArrayItem('items', i)}>Remove</button>
 				</div>
 			{/each}
-			<button class="btn" type="button" onclick={() => addArrayItem('items', { year: '', title: '', description: '' })}>Add item</button>
+			<button class="btn" type="button" onclick={() => addArrayItem('items', { title: '', description: '' })}>Add item</button>
 		{:else if block.type === 'hero'}
 			<label class="form-control w-full">
 				<div class="label"><span class="label-text">Heading</span></div>
