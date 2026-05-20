@@ -50,7 +50,7 @@
 <div class="grid grid-cols-[1fr_1.5fr] gap-4">
 	<!-- Drop zone / upload area -->
 	<div
-		class="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-box border-2 border-dashed p-3 transition-colors hover:border-primary {localUrl ? 'border-success/40' : 'border-base-300'}"
+		class="flex h-32 cursor-pointer flex-col items-center justify-center rounded-box border-2 border-dashed p-3 transition-colors hover:border-primary {localUrl ? 'border-success/40' : 'border-base-300'}"
 		role="button"
 		tabindex="0"
 		onclick={() => fileInput?.click()}
@@ -61,7 +61,7 @@
 			<p class="mt-3 text-sm text-base-content/60">Uploading…</p>
 		{:else if localUrl}
 			<div class="relative w-full">
-				<img class="max-h-40 w-full rounded-box object-cover shadow" src={localUrl} alt={localAlt} />
+				<img class="max-h-28 w-full rounded-box object-cover shadow" src={localUrl} alt={localAlt} />
 				<button
 					class="btn btn-circle btn-error btn-outline btn-xs absolute right-1 top-1"
 					type="button"

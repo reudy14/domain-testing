@@ -45,6 +45,6 @@ export function createBlock(type: BlockType): ContentBlock {
 			base.data = { height: 64 };
 			break;
 	}
-	base.data._background = { type: 'none', color: '', imageUrl: '', attachment: 'scroll', overlay: false, overlayOpacity: 40 };
+	base.data._background = { type: 'none', color: '', attachment: 'scroll', overlay: false, overlayOpacity: 40 };
 	return base;
 }
