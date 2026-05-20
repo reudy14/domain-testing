@@ -50,7 +50,7 @@ All components use Svelte 5 runes syntax — **never** `export let`, `$:`, or `o
 Pages are composed of `ContentBlock[]`. Each block has `{ id, type, data }`. Block types are defined in `$lib/types.ts`:
 `text | image | image_text | timeline | testimonials | services | cta | spacer | horizontal_cards`
 
-- **Public renderers**: `$lib/blocks/<Type>Block.svelte` — one per type, receives `data` prop
+- **Public renderers**: `$lib/blocks/<Type>Block.svelte` — one per type, receives `data` prop. Currently active: `TextBlock`, `ImageTextBlock`, `TimelineBlock`, `HeroBlock`.
 - **Admin editors**: `$lib/admin/editors/BlockEditor.svelte` — switches editor UI by type
 - **Defaults**: `$lib/admin/blockDefaults.ts` — `createBlock(type)` generates a new block with sensible defaults
 - **Block list**: `$lib/admin/BlockList.svelte` — draggable reorder, select, delete

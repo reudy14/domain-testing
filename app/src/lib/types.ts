@@ -1,20 +1,8 @@
 export type BlockType =
 	| 'text'
-	| 'image'
 	| 'image_text'
 	| 'timeline'
-	| 'testimonials'
-	| 'services'
-	| 'cta'
-	| 'spacer'
-	| 'horizontal_cards'
-	| 'hero'
-	| 'columns'
-	| 'pricing_table'
-	| 'newsletter'
-	| 'articles_list'
-	| 'profile_card'
-	| 'features_list';
+	| 'hero';
 
 export type BlockBackground = {
 	type: 'none' | 'color' | 'image';
