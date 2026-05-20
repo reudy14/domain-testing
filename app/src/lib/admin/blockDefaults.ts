@@ -5,7 +5,9 @@ export const blockLabels: Record<BlockType, string> = {
 	text: 'Text',
 	image_text: 'Image + Text',
 	timeline: 'Timeline',
-	hero: 'Hero'
+	hero: 'Hero',
+	button: 'Button',
+	spacer: 'Spacer'
 };
 
 export const blockTypes = Object.keys(blockLabels) as BlockType[];
@@ -27,9 +29,20 @@ export function createBlock(type: BlockType): ContentBlock {
 				heading: 'Welcome to our studio',
 				subheading: 'Classes, workshops and events',
 				buttonLabel: 'BOOK NOW',
-				buttonUrl: '/book',
-				backgroundImage: ''
+				buttonUrl: '/book'
 			};
+			break;
+		case 'button':
+			base.data = {
+				label: 'Learn More',
+				href: '/',
+				variant: 'primary',
+				size: 'md',
+				alignment: 'center'
+			};
+			break;
+		case 'spacer':
+			base.data = { height: 64 };
 			break;
 	}
 	base.data._background = { type: 'none', color: '', imageUrl: '', attachment: 'scroll', overlay: false, overlayOpacity: 40 };

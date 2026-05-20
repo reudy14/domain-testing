@@ -14,6 +14,31 @@
 	--color-terracotta: #c9825f;
 }
 
+@keyframes shrink {
+	from { scale: 0 1; }
+	to { scale: 1 1; }
+}
+
+.delete-fill {
+	position: absolute;
+	inset: 0;
+	background: transparent;
+	transform-origin: left;
+}
+
+.delete-fill.animating {
+	animation: shrink 1s ease-in-out forwards;
+	background: var(--error, #f43f5e);
+}
+
+.btn.delete-holding {
+	color: white !important;
+}
+
+.btn.delete-holding .text-error {
+	color: white !important;
+}
+
 :root {
 	--fg-heading: #2c2c2c;
 	--fg-body: #2c2c2c;

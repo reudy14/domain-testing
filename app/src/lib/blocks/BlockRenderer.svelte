@@ -5,6 +5,8 @@
 	import ImageTextBlock from './ImageTextBlock.svelte';
 	import TimelineBlock from './TimelineBlock.svelte';
 	import HeroBlock from './HeroBlock.svelte';
+	import ButtonBlock from './ButtonBlock.svelte';
+	import SpacerBlock from './SpacerBlock.svelte';
 
 	let { blocks = [] } = $props<{ blocks: ContentBlock[] }>();
 
@@ -27,6 +29,10 @@
 			<TimelineBlock data={block.data} />
 		{:else if block.type === 'hero'}
 			<HeroBlock data={block.data} />
+		{:else if block.type === 'button'}
+			<ButtonBlock data={block.data} />
+		{:else if block.type === 'spacer'}
+			<SpacerBlock data={block.data} />
 		{/if}
 	</BackgroundWrapper>
 {/each}

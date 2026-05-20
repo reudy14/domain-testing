@@ -2,7 +2,9 @@ export type BlockType =
 	| 'text'
 	| 'image_text'
 	| 'timeline'
-	| 'hero';
+	| 'hero'
+	| 'button'
+	| 'spacer';
 
 export type BlockBackground = {
 	type: 'none' | 'color' | 'image';

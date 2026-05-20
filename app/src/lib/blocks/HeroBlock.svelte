@@ -5,16 +5,11 @@
 			subheading?: string;
 			buttonLabel?: string;
 			buttonUrl?: string;
-			backgroundImage?: string;
 		};
 	}>();
 </script>
 
 <section class="relative flex min-h-[80vh] items-center justify-center overflow-hidden px-6 py-20 md:min-h-[90vh]">
-	{#if data.backgroundImage}
-		<img class="absolute inset-0 h-full w-full object-cover" src={data.backgroundImage} alt="" />
-		<div class="absolute inset-0 bg-charcoal/50"></div>
-	{/if}
 	<div class="relative z-10 mx-auto max-w-4xl text-center">
 		<h1 class="animate-fade-in text-5xl leading-tight md:text-7xl lg:text-8xl" style="font-family: 'Playfair Display', Georgia, serif;">
 			{data.heading || 'Welcome to our studio'}

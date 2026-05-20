@@ -49,13 +49,13 @@
 <dialog id="new-page" class="modal">
 	<form class="modal-box" method="POST" action="?/create">
 		<h2 class="text-2xl font-bold">Create page</h2>
-		<label class="form-control mt-4">
-			<span class="label-text">Slug</span>
-			<input class="input input-bordered" name="slug" placeholder="about" required />
+		<label class="form-control w-full mt-4">
+			<div class="label"><span class="label-text">Slug</span></div>
+			<input class="input input-bordered w-full" name="slug" placeholder="about" required />
 		</label>
-		<label class="form-control">
-			<span class="label-text">Title</span>
-			<input class="input input-bordered" name="title" placeholder="About" required />
+		<label class="form-control w-full">
+			<div class="label"><span class="label-text">Title</span></div>
+			<input class="input input-bordered w-full" name="title" placeholder="About" required />
 		</label>
 		<div class="modal-action">
 			<button class="btn" type="button" onclick={() => (document.getElementById('new-page') as HTMLDialogElement)?.close()}>Cancel</button>

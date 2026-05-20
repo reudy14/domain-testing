@@ -69,8 +69,8 @@
 	{#if form?.message}<div class="alert alert-error">{form.message}</div>{/if}
 
 	<div class="grid gap-4 md:grid-cols-2">
-		<label class="form-control"><span class="label-text">Slug</span><input class="input input-bordered" name="slug" bind:value={page.slug} /></label>
-		<label class="form-control"><span class="label-text">Title</span><input class="input input-bordered" name="title" bind:value={page.title} /></label>
+		<label class="form-control w-full"><div class="label"><span class="label-text">Slug</span></div><input class="input input-bordered w-full" name="slug" bind:value={page.slug} /></label>
+		<label class="form-control w-full"><div class="label"><span class="label-text">Title</span></div><input class="input input-bordered w-full" name="title" bind:value={page.title} /></label>
 	</div>
 
 	<div class="grid gap-6 lg:grid-cols-[22rem_1fr]">
