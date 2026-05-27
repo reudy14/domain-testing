@@ -5,7 +5,6 @@
 	let header = $state(structuredClone(data.header.data));
 	let footer = $state(structuredClone(data.footer.data));
 	let colors = $state(structuredClone(data.colors.data));
-
 	function addHeaderLink() { header.navLinks = [...(header.navLinks || []), { label: '', href: '' }]; }
 	function addSocial() { footer.socialLinks = [...(footer.socialLinks || []), { platform: '', url: '' }]; }
 </script>

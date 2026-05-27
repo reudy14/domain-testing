@@ -1,0 +1,71 @@
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import {
+	extractImageUrls,
+	fetchImageAsBase64,
+	replaceUrlsWithKeys,
+	urlToKey,
+	type SiteExport
+} from '$lib/exportImport';
+
+export const GET: RequestHandler = async ({ locals }) => {
+	// Fetch all pages
+	const pages = await locals.pb.collection('pages').getFullList({ sort: 'slug' });
+
+	// Fetch all globals
+	const globals = await locals.pb.collection('globals').getFullList();
+
+	// Collect all image URLs from pages and globals
+	const allUrls = new Set<string>();
+	for (const page of pages) {
+		for (const url of extractImageUrls(page)) allUrls.add(url);
+	}
+	for (const g of globals) {
+		for (const url of extractImageUrls(g)) allUrls.add(url);
+	}
+
+	// Fetch each image as base64
+	const images: Record<string, string> = {};
+	for (const url of allUrls) {
+		try {
+			const key = urlToKey(url);
+			images[key] = await fetchImageAsBase64(url);
+		} catch (e) {
+			console.warn(`Could not fetch image: ${url}`, e);
+		}
+	}
+
+	// Build URL → key mapping
+	const urlToKeyMap = new Map<string, string>();
+	for (const url of allUrls) {
+		urlToKeyMap.set(url, urlToKey(url));
+	}
+
+	// Replace URLs with placeholders in pages
+	const exportPages = pages.map((p) => ({
+		slug: p.slug,
+		title: p.title,
+		blocks: replaceUrlsWithKeys(p.blocks, urlToKeyMap) as typeof p.blocks,
+		published: p.published
+	}));
+
+	// Replace URLs with placeholders in globals
+	const exportGlobals = globals.map((g) => ({
+		key: g.key,
+		data: replaceUrlsWithKeys(g.data, urlToKeyMap) as Record<string, unknown>
+	}));
+
+	const exportData: SiteExport = {
+		version: 1,
+		exportedAt: new Date().toISOString(),
+		pages: exportPages,
+		globals: exportGlobals,
+		images
+	};
+
+	return json(exportData, {
+		headers: {
+			'Content-Disposition': `attachment; filename="cms-export-${new Date().toISOString().slice(0, 10)}.json"`
+		}
+	});
+};
