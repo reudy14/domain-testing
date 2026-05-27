@@ -41,6 +41,7 @@
 
 :root {
 	--fg-heading: var(--color-heading, #2c2c2c);
+	--fg-subheading: var(--color-subheading, #4a4a4a);
 	--fg-body: var(--color-text, #2c2c2c);
 	background: var(--color-bg, #faf8f5);
 	color: var(--fg-body);
@@ -55,7 +56,12 @@
 .text-fg-body\/70 { color: color-mix(in srgb, var(--fg-body, #2c2c2c) 70%, transparent); }
 .text-fg-body\/60 { color: color-mix(in srgb, var(--fg-body, #2c2c2c) 60%, transparent); }
 .text-fg-heading { color: var(--fg-heading, #2c2c2c); }
-.text-fg-subheading { color: var(--color-subheading, #4a4a4a); }
+.text-fg-subheading { color: var(--fg-subheading, #4a4a4a); }
+.text-fg-subheading\/85 { color: color-mix(in srgb, var(--fg-subheading, #4a4a4a) 85%, transparent); }
+.text-fg-subheading\/80 { color: color-mix(in srgb, var(--fg-subheading, #4a4a4a) 80%, transparent); }
+.text-fg-subheading\/75 { color: color-mix(in srgb, var(--fg-subheading, #4a4a4a) 75%, transparent); }
+.text-fg-subheading\/70 { color: color-mix(in srgb, var(--fg-subheading, #4a4a4a) 70%, transparent); }
+.text-fg-subheading\/60 { color: color-mix(in srgb, var(--fg-subheading, #4a4a4a) 60%, transparent); }
 
 body {
 	min-height: 100vh;

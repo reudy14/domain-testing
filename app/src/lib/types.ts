@@ -16,8 +16,10 @@ export type BlockBackground = {
 };
 
 export type BlockForeground = {
+	mode: 'default' | 'custom';
 	headingColor: string;
-	bodyColor: string;
+	subheadingColor: string;
+	textColor: string;
 };
 
 export type ContentBlock = {

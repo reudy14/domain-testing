@@ -31,8 +31,11 @@
 		if (foreground.headingColor) {
 			parts.push(`--fg-heading: ${foreground.headingColor};`);
 		}
-		if (foreground.bodyColor) {
-			parts.push(`--fg-body: ${foreground.bodyColor};`);
+		if (foreground.textColor) {
+			parts.push(`--fg-body: ${foreground.textColor};`);
+		}
+		if (foreground.subheadingColor) {
+			parts.push(`--fg-subheading: ${foreground.subheadingColor};`);
 		}
 		return parts.join(' ');
 	}

@@ -11,11 +11,11 @@
 
 <section class="relative flex min-h-[80vh] items-center justify-center overflow-hidden px-6 py-20 md:min-h-[90vh]">
 	<div class="relative z-10 mx-auto max-w-4xl text-center">
-		<h1 class="animate-fade-in text-5xl leading-tight md:text-7xl lg:text-8xl" style="font-family: 'Playfair Display', Georgia, serif;">
+		<h1 class="animate-fade-in text-5xl leading-tight text-fg-heading md:text-7xl lg:text-8xl" style="font-family: 'Playfair Display', Georgia, serif;">
 			{data.heading || 'Welcome to our studio'}
 		</h1>
 		{#if data.subheading}
-			<p class="animate-fade-in mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-fg-body/70 md:text-xl" style="animation-delay: 0.15s;">
+			<p class="animate-fade-in mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-fg-subheading/70 md:text-xl" style="animation-delay: 0.15s;">
 				{data.subheading}
 			</p>
 		{/if}
