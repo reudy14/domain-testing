@@ -15,7 +15,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 		getGlobal(locals.pb, 'footer', defaultFooter),
 		getGlobal(locals.pb, 'colors', defaultColors)
 	]);
-	return { header, footer, colors };
+
+	// Fetch all pages for the home page selector
+	const pages = await locals.pb.collection('pages').getFullList({ sort: 'slug' });
+
+	return { header, footer, colors, pages };
 };
 
 export const actions: Actions = {

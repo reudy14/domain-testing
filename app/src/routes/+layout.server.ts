@@ -17,5 +17,7 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 		getGlobal(locals.pb, 'colors', defaultColors)
 	]);
 
+	if (!header.homePage) header.homePage = defaultHeader.homePage;
+
 	return { header, footer, colors, user: locals.user, url: { pathname: url.pathname } };
 };

@@ -40,6 +40,7 @@ export type HeaderGlobal = {
 	logo: { url: string; alt: string };
 	navLinks: { label: string; href: string }[];
 	ctaButton: { label: string; href: string };
+	homePage: string;
 };
 
 export type FooterGlobal = {
@@ -59,7 +60,8 @@ export const defaultHeader: HeaderGlobal = {
 		{ label: 'About', href: '/about' },
 		{ label: 'Services', href: '/services' }
 	],
-	ctaButton: { label: 'Book Now', href: '/book' }
+	ctaButton: { label: 'Book Now', href: '/book' },
+	homePage: 'home'
 };
 
 export const defaultFooter: FooterGlobal = {

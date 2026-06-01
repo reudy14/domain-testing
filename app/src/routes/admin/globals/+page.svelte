@@ -34,6 +34,14 @@
 		<h3 class="mt-6 font-bold">CTA button</h3>
 		<input class="input input-bordered mb-2 w-full" bind:value={header.ctaButton.label} placeholder="Label" />
 		<input class="input input-bordered w-full" bind:value={header.ctaButton.href} placeholder="Href" />
+		<h3 class="mt-6 font-bold">Home page</h3>
+		<select class="select select-bordered w-full" bind:value={header.homePage}>
+			<option value="">— Select a page —</option>
+			{#each data.pages as page}
+				<option value={page.slug}>{page.title} [{page.slug}]</option>
+			{/each}
+		</select>
+		<p class="text-sm text-base-content/60 mt-1">The page that "/" will redirect to.</p>
 		<div class="flex-grow"></div>
 		<button class="btn btn-primary mt-6 block w-full" type="submit">Save header</button>
 	</form>

@@ -20,6 +20,7 @@ services:
       POCKETBASE_INTERNAL_URL: http://pocketbase:80
       PUBLIC_POCKETBASE_URL: http://localhost:8090
       ORIGIN: http://localhost:3000
+      BODY_SIZE_LIMIT: 5242880 # 5MB
     ports:
       - "3000:3000"
 
