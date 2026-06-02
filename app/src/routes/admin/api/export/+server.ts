@@ -7,6 +7,7 @@ import {
 	urlToKey,
 	type SiteExport
 } from '$lib/exportImport';
+import { normalizeEvent } from '$lib/calendar';
 
 export const GET: RequestHandler = async ({ locals }) => {
 	// Fetch all pages
@@ -14,6 +15,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 
 	// Fetch all globals
 	const globals = await locals.pb.collection('globals').getFullList();
+	const events = await locals.pb.collection('events').getFullList({ sort: 'start' }).catch(() => []);
 
 	// Collect all image URLs from pages and globals
 	const allUrls = new Set<string>();
@@ -55,11 +57,27 @@ export const GET: RequestHandler = async ({ locals }) => {
 		data: replaceUrlsWithKeys(g.data, urlToKeyMap) as Record<string, unknown>
 	}));
 
+	const exportEvents = events.map((record) => {
+		const event = normalizeEvent(record);
+		return {
+			name: event.name,
+			start: event.start,
+			end: event.end,
+			description: event.description,
+			color: event.color,
+			link: event.link,
+			categories: event.categories,
+			published: event.published,
+			allDay: event.allDay
+		};
+	});
+
 	const exportData: SiteExport = {
 		version: 1,
 		exportedAt: new Date().toISOString(),
 		pages: exportPages,
 		globals: exportGlobals,
+		events: exportEvents,
 		images
 	};
 

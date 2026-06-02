@@ -7,4 +7,4 @@
 	<title>{data.page.title}</title>
 </svelte:head>
 
-<BlockRenderer blocks={data.page.blocks || []} />
+<BlockRenderer blocks={data.page.blocks || []} calendarEvents={data.calendarEvents || []} />

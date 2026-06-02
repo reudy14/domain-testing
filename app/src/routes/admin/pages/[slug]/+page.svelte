@@ -87,7 +87,7 @@
 			</div>
 			<BlockList {blocks} {selectedId} onSelect={(id) => (selectedId = id)} onDelete={deleteBlock} onMove={moveBlock} />
 		</aside>
-		<BlockEditor block={selectedBlock} onChange={updateBlock} />
+		<BlockEditor block={selectedBlock} eventCategories={data.eventCategories || []} onChange={updateBlock} />
 	</div>
 </form>
 

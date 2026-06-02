@@ -7,7 +7,9 @@ export const blockLabels: Record<BlockType, string> = {
 	timeline: 'Timeline',
 	hero: 'Hero',
 	button: 'Button',
-	spacer: 'Spacer'
+	spacer: 'Spacer',
+	testimonials: 'Testimonials',
+	upcoming_calendar: 'Upcoming Calendar'
 };
 
 export const blockTypes = Object.keys(blockLabels) as BlockType[];
@@ -43,6 +45,23 @@ export function createBlock(type: BlockType): ContentBlock {
 			break;
 		case 'spacer':
 			base.data = { height: 64 };
+			break;
+		case 'testimonials':
+			base.data = {
+				title: 'What people say',
+				items: [
+					{ text: 'Placeholder testimonial: the first class was wonderful.', title: 'Customer one' },
+					{ text: 'Placeholder testimonial: friendly teachers and great music.', title: 'Customer two' },
+					{ text: 'Placeholder testimonial: I look forward to it every week.', title: 'Customer three' },
+					{ text: 'Placeholder testimonial: I never thought I could learn this.', title: 'Customer four' }
+				]
+			};
+			break;
+		case 'upcoming_calendar':
+			base.data = {
+				title: 'Upcoming Events',
+				categories: []
+			};
 			break;
 	}
 	base.data._background = { type: 'none', color: '', attachment: 'scroll', overlay: false, overlayOpacity: 40 };

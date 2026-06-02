@@ -158,5 +158,137 @@
     ],
     "indexes": [],
     "options": {}
+  },
+  {
+    "id": "pbc_events0001",
+    "name": "events",
+    "type": "base",
+    "system": false,
+    "listRule": "published = true || @request.auth.id != ''",
+    "viewRule": "published = true || @request.auth.id != ''",
+    "createRule": "@request.auth.id != ''",
+    "updateRule": "@request.auth.id != ''",
+    "deleteRule": "@request.auth.id != ''",
+    "fields": [
+      {
+        "id": "text_eventname",
+        "name": "name",
+        "type": "text",
+        "system": false,
+        "required": true,
+        "presentable": true,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 180,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "date_eventstart",
+        "name": "start",
+        "type": "date",
+        "system": false,
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": "",
+          "max": ""
+        }
+      },
+      {
+        "id": "date_eventend",
+        "name": "end",
+        "type": "date",
+        "system": false,
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": "",
+          "max": ""
+        }
+      },
+      {
+        "id": "text_eventdesc",
+        "name": "description",
+        "type": "text",
+        "system": false,
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 2000,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "text_eventcolor",
+        "name": "color",
+        "type": "text",
+        "system": false,
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 32,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "url_eventlink",
+        "name": "link",
+        "type": "text",
+        "system": false,
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 500,
+          "pattern": ""
+        }
+      },
+      {
+        "id": "json_eventcats",
+        "name": "categories",
+        "type": "json",
+        "system": false,
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSize": 200000
+        }
+      },
+      {
+        "id": "bool_eventpub",
+        "name": "published",
+        "type": "bool",
+        "system": false,
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
+      },
+      {
+        "id": "bool_eventallday",
+        "name": "allDay",
+        "type": "bool",
+        "system": false,
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
+      }
+    ],
+    "indexes": [
+      "CREATE INDEX `idx_events_start` ON `events` (`start`)",
+      "CREATE INDEX `idx_events_published` ON `events` (`published`)"
+    ],
+    "options": {}
   }
 ]

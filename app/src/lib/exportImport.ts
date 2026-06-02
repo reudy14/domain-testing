@@ -1,4 +1,4 @@
-import type { ContentBlock, PageRecord } from '$lib/types';
+import type { CalendarEventRecord, ContentBlock } from '$lib/types';
 
 /**
  * The portable export format.
@@ -17,6 +17,7 @@ export type SiteExport = {
 		key: string;
 		data: Record<string, unknown>;
 	}[];
+	events?: Omit<CalendarEventRecord, 'id'>[];
 	/** Maps original PocketBase file URLs → base64 data-URI */
 	images: Record<string, string>;
 };

@@ -4,7 +4,9 @@ export type BlockType =
 	| 'timeline'
 	| 'hero'
 	| 'button'
-	| 'spacer';
+	| 'spacer'
+	| 'testimonials'
+	| 'upcoming_calendar';
 
 export type BlockBackground = {
 	type: 'none' | 'color' | 'image';
@@ -34,6 +36,24 @@ export type PageRecord = {
 	title: string;
 	blocks: ContentBlock[];
 	published: boolean;
+};
+
+export type CalendarEventRecord = {
+	id: string;
+	name: string;
+	start: string;
+	end?: string;
+	description?: string;
+	color: string;
+	link?: string;
+	categories: string[];
+	published: boolean;
+	allDay: boolean;
+};
+
+export type UpcomingCalendarBlockData = {
+	title?: string;
+	categories?: string[];
 };
 
 export type HeaderGlobal = {

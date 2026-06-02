@@ -6,7 +6,7 @@
 	let items = $derived(data.items?.length ? data.items : [
 		{ title: 'Your story here', description: 'Add milestones, training, or the journey behind the practice.' }
 	]);
-	let widths = $derived(items.map((_, i) => {
+	let widths = $derived(items.map((_: TimelineItem, i: number) => {
 		const opts = ['w-[78%]', 'w-[85%]', 'w-[90%]', 'w-[95%]', 'w-[98%]'];
 		return opts[(i * 7 + 3) % opts.length];
 	}));

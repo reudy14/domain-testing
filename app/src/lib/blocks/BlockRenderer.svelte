@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ContentBlock, BlockBackground, BlockForeground } from '$lib/types';
+	import type { CalendarEventRecord, ContentBlock, BlockBackground, BlockForeground } from '$lib/types';
 	import BackgroundWrapper from './BackgroundWrapper.svelte';
 	import TextBlock from './TextBlock.svelte';
 	import ImageTextBlock from './ImageTextBlock.svelte';
@@ -7,8 +7,10 @@
 	import HeroBlock from './HeroBlock.svelte';
 	import ButtonBlock from './ButtonBlock.svelte';
 	import SpacerBlock from './SpacerBlock.svelte';
+	import TestimonialsBlock from './TestimonialsBlock.svelte';
+	import UpcomingCalendarBlock from './UpcomingCalendarBlock.svelte';
 
-	let { blocks = [] } = $props<{ blocks: ContentBlock[] }>();
+	let { blocks = [], calendarEvents = [] } = $props<{ blocks: ContentBlock[]; calendarEvents?: CalendarEventRecord[] }>();
 
 	function getBg(block: ContentBlock): BlockBackground {
 		return (block.data._background as BlockBackground) || { type: 'none', color: '', imageUrl: '', attachment: 'scroll', overlay: false, overlayOpacity: 40 };
@@ -33,6 +35,10 @@
 			<ButtonBlock data={block.data} />
 		{:else if block.type === 'spacer'}
 			<SpacerBlock data={block.data} />
+		{:else if block.type === 'testimonials'}
+			<TestimonialsBlock data={block.data} />
+		{:else if block.type === 'upcoming_calendar'}
+			<UpcomingCalendarBlock data={block.data} events={calendarEvents} />
 		{/if}
 	</BackgroundWrapper>
 {/each}

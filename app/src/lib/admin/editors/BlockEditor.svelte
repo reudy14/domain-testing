@@ -4,10 +4,10 @@
 	import RichTextEditor from './RichTextEditor.svelte';
 	import ImageUploader from './ImageUploader.svelte';
 	import SegmentedControl from './SegmentedControl.svelte';
-    import SpacerBlock from '../../blocks/SpacerBlock.svelte';
 
-	let { block, onChange = (block: ContentBlock) => {} } = $props<{
+	let { block, eventCategories = [], onChange = (block: ContentBlock) => {} } = $props<{
 		block: ContentBlock | null;
+		eventCategories?: string[];
 		onChange?: (block: ContentBlock) => void;
 	}>();
 
@@ -32,6 +32,21 @@
 	function removeArrayItem(key: string, index: number) {
 		if (!block) return;
 		updateData({ [key]: (block.data[key] || []).filter((_: unknown, i: number) => i !== index) });
+	}
+
+	function toggleCategory(category: string) {
+		if (!block) return;
+		const categories = block.data.categories || [];
+		updateData({
+			categories: categories.includes(category)
+				? categories.filter((item: string) => item !== category)
+				: [...categories, category]
+		});
+	}
+
+	function titleCase(value: string | number) {
+		const text = String(value);
+		return text.charAt(0).toUpperCase() + text.slice(1);
 	}
 </script>
 
@@ -103,7 +118,7 @@
 						options={['left', 'center', 'right']}
 						value={block.data.alignment || 'left'}
 						onChange={(v) => updateData({ alignment: v })}
-						formatLabel={(v) => v.charAt(0).toUpperCase() + v.slice(1)}
+						formatLabel={titleCase}
 					/>
 				</div>
 				<div class="form-control">
@@ -112,7 +127,7 @@
 						options={['xs', 'sm', 'md', 'lg']}
 						value={block.data.size || 'md'}
 						onChange={(v) => updateData({ size: v })}
-						formatLabel={(v) => ({ xs: 'Extra Small', sm: 'Small', md: 'Medium', lg: 'Large' }[v] || v)}
+						formatLabel={(v) => String({ xs: 'Extra Small', sm: 'Small', md: 'Medium', lg: 'Large' }[String(v)] || v)}
 					/>
 				</div>
 				<div class="form-control">
@@ -131,6 +146,59 @@
 					<div class="label"><span class="label-text">Height (px)</span></div>
 					<input type="number" class="input input-bordered w-full" value={block.data.height || 64} oninput={(e) => updateData({ height: parseInt(e.currentTarget.value) || 64 })} />
 				</label>
+			</div>
+		{:else if block.type === 'testimonials'}
+			<div class="space-y-4">
+				<label class="form-control w-full">
+					<div class="label"><span class="label-text">Section Title</span></div>
+					<input class="input input-bordered w-full" value={block.data.title || ''} oninput={(e) => updateData({ title: e.currentTarget.value })} />
+				</label>
+
+				{#each block.data.items || [] as item, i}
+					<div class="rounded-box mb-3 border border-base-300 p-4">
+						<textarea
+							class="textarea textarea-bordered w-full mb-2"
+							placeholder="Testimonial text"
+							rows="3"
+							value={item.text}
+							oninput={(e) => updateArray('items', i, { text: e.currentTarget.value })}
+						></textarea>
+						<input
+							class="input input-bordered w-full"
+							placeholder="Author name"
+							value={item.title}
+							oninput={(e) => updateArray('items', i, { title: e.currentTarget.value })}
+						/>
+						<button class="btn btn-error btn-sm mt-2" type="button" onclick={() => removeArrayItem('items', i)}>Remove</button>
+					</div>
+				{/each}
+				<button class="btn" type="button" onclick={() => addArrayItem('items', { text: '', title: '' })}>Add testimonial</button>
+			</div>
+		{:else if block.type === 'upcoming_calendar'}
+			<div class="space-y-4">
+				<label class="form-control w-full">
+					<div class="label"><span class="label-text">Section title</span></div>
+					<input class="input input-bordered w-full" value={block.data.title || ''} oninput={(e) => updateData({ title: e.currentTarget.value })} />
+				</label>
+
+				<div class="rounded-box border border-base-300 p-4">
+					<div class="mb-3">
+						<h3 class="font-semibold">Category filters</h3>
+						<p class="text-sm text-base-content/60">Choose categories to show in this block. Leave all unchecked to show every published event.</p>
+					</div>
+					{#if eventCategories?.length}
+						<div class="flex flex-wrap gap-2">
+							{#each eventCategories as category}
+								<label class="btn btn-sm" class:btn-primary={(block.data.categories || []).includes(category)}>
+									<input class="hidden" type="checkbox" checked={(block.data.categories || []).includes(category)} onchange={() => toggleCategory(category)} />
+									{category}
+								</label>
+							{/each}
+						</div>
+					{:else}
+						<p class="text-sm text-base-content/60">No event categories exist yet. Create events in the Calendar admin page first.</p>
+					{/if}
+				</div>
 			</div>
 		{/if}
 

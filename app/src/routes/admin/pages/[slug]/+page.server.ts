@@ -1,9 +1,12 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { extractCategories, normalizeEvent } from '$lib/calendar';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const page = await locals.pb.collection('pages').getFirstListItem(`slug = "${params.slug}"`);
-	return { page };
+	const events = await locals.pb.collection('events').getFullList({ sort: 'start' }).catch(() => []);
+	const eventCategories = extractCategories(events.map((event) => normalizeEvent(event)));
+	return { page, eventCategories };
 };
 
 export const actions: Actions = {

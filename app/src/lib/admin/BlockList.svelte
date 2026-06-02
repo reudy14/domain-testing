@@ -17,7 +17,7 @@
 	function startHold(id: string) {
 		holdingId = id;
 		holdTimer = setTimeout(() => {
-			const idx = blocks.findIndex((b) => b.id === id);
+			const idx = blocks.findIndex((b: ContentBlock) => b.id === id);
 			onDelete(id);
 			onSelect(blocks[idx + 1]?.id || blocks[idx - 1]?.id || '');
 			holdingId = '';

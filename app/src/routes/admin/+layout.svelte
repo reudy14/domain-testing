@@ -39,7 +39,7 @@
 				throw new Error(err?.message || `Import failed (${res.status})`);
 			}
 			const result = await res.json();
-			const msg = `Imported ${result.pagesImported} page(s), ${result.globalsImported} global(s), ${result.imagesUploaded} image(s).`;
+			const msg = `Imported ${result.pagesImported} page(s), ${result.globalsImported} global(s), ${result.eventsImported || 0} event(s), ${result.imagesUploaded} image(s).`;
 			importStatus = { ok: true, message: result.errors?.length ? msg + ` ${result.errors.length} error(s).` : msg };
 			setTimeout(() => location.reload(), 1500);
 		} catch (e) {
@@ -58,6 +58,7 @@
 		</div>
 		<div class="flex-none gap-2">
 			<a class="btn btn-ghost" href="/admin/pages">Pages</a>
+			<a class="btn btn-ghost" href="/admin/calendar">Calendar</a>
 			<a class="btn btn-ghost" href="/admin/globals">Globals</a>
 			<div class="dropdown dropdown-end">
 				<button class="btn btn-ghost btn-sm" type="button" tabindex="0">

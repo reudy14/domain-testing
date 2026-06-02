@@ -18,6 +18,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		imagesUploaded: 0,
 		pagesImported: 0,
 		globalsImported: 0,
+		eventsImported: 0,
 		errors: [] as string[]
 	};
 
@@ -99,6 +100,39 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			results.globalsImported++;
 		} catch (e) {
 			results.errors.push(`Failed to import global "${g.key}": ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	// 4. Import events
+	for (const event of body.events || []) {
+		try {
+			let existing;
+			try {
+				existing = await locals.pb.collection('events').getFirstListItem(`name = "${event.name}" && start = "${event.start}"`);
+			} catch {
+				existing = null;
+			}
+
+			const payload = {
+				name: event.name,
+				start: event.start,
+				end: event.end || null,
+				description: event.description || '',
+				color: event.color || '#8a9a7b',
+				link: event.link || '',
+				categories: event.categories || [],
+				published: Boolean(event.published),
+				allDay: event.allDay !== false
+			};
+
+			if (existing) {
+				await locals.pb.collection('events').update(existing.id, payload);
+			} else {
+				await locals.pb.collection('events').create(payload);
+			}
+			results.eventsImported++;
+		} catch (e) {
+			results.errors.push(`Failed to import event "${event.name}": ${e instanceof Error ? e.message : String(e)}`);
 		}
 	}
 

@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
-import { defaultHeader } from '$lib/types';
+import { defaultHeader, type CalendarEventRecord } from '$lib/types';
+import { eventOverlapsRange, getUpcomingCalendarRange, hasUpcomingCalendarBlock, normalizeEvent } from '$lib/calendar';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -16,7 +17,16 @@ export const load: PageServerLoad = async ({ locals }) => {
 		const page = await locals.pb
 			.collection('pages')
 			.getFirstListItem(`slug = "${homeSlug}" && published = true`);
-		return { page };
+		let calendarEvents: CalendarEventRecord[] = [];
+		if (hasUpcomingCalendarBlock(page.blocks || [])) {
+			const range = getUpcomingCalendarRange();
+			const events = await locals.pb.collection('events').getFullList({
+				filter: `published = true && start <= "${range.end.toISOString()}"`,
+				sort: 'start'
+			});
+			calendarEvents = events.map((event) => normalizeEvent(event)).filter((event) => eventOverlapsRange(event, range.start, range.end));
+		}
+		return { page, calendarEvents };
 	} catch {
 		throw error(404, 'Page not found');
 	}
