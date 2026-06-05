@@ -53,8 +53,7 @@
 
 <section class="mx-auto max-w-7xl px-6 py-16">
 	<div class="mb-10 text-center">
-		<p class="text-sm uppercase tracking-[0.3em] text-sage-dark/75">Calendar</p>
-		<h2 class="font-display mt-2 text-4xl text-charcoal md:text-5xl">{data.title || 'Upcoming Events'}</h2>
+		<h2 class="font-display mt-2 text-4xl text-charcoal md:text-5xl">{data.title}</h2>
 	</div>
 
 	{#if visibleEvents.length === 0}

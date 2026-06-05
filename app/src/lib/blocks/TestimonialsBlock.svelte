@@ -61,7 +61,7 @@
 			</button>
 
 				<!-- Dots/bullets -->
-            <div class="flex gap-3">
+            <div class="flex text-fg-heading gap-3">
                 {#each testimonials as _, i}
                     <button
                         type="button"

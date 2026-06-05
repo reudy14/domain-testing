@@ -7,7 +7,7 @@ services:
     expose:
       - "80"
     volumes:
-      - pocketbase:/pb/pb_data
+      - pocketbase:/pb_data
 
   app:
     build:
