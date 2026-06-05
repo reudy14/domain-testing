@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import {
@@ -27,11 +28,17 @@ export const GET: RequestHandler = async ({ locals }) => {
 	}
 
 	// Fetch each image as base64
+	// Inside Docker, stored PUBLIC_POCKETBASE_URL (http://localhost:8080) doesn't resolve
+	// from the app container, so we translate to the internal URL for fetching.
+	const publicBase = env.PUBLIC_POCKETBASE_URL || 'http://localhost:8080';
+	const internalBase = env.POCKETBASE_INTERNAL_URL || publicBase;
+
 	const images: Record<string, string> = {};
 	for (const url of allUrls) {
 		try {
+			const fetchUrl = url.startsWith(publicBase) ? url.replace(publicBase, internalBase) : url;
 			const key = urlToKey(url);
-			images[key] = await fetchImageAsBase64(url);
+			images[key] = await fetchImageAsBase64(fetchUrl);
 		} catch (e) {
 			console.warn(`Could not fetch image: ${url}`, e);
 		}
