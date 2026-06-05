@@ -3,8 +3,9 @@ services:
     image: spectado/pocketbase:latest
     container_name: massage-pocketbase
     restart: unless-stopped
-    ports:
-      - "8090:80"
+    # Internal only — accessed via the caddy reverse proxy
+    expose:
+      - "80"
     volumes:
       - pocketbase:/pb/pb_data
 
@@ -18,11 +19,24 @@ services:
       - pocketbase
     environment:
       POCKETBASE_INTERNAL_URL: http://pocketbase:80
-      PUBLIC_POCKETBASE_URL: http://localhost:8090
-      ORIGIN: http://localhost:3000
+      PUBLIC_POCKETBASE_URL: http://localhost:8080
+      ORIGIN: http://localhost:8080
       BODY_SIZE_LIMIT: 5242880 # 5MB
+    # Internal only — served via the caddy reverse proxy
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: massage-caddy
+    restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "8080:8080"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - app
+      - pocketbase
 
 volumes:
   pocketbase:

@@ -2,7 +2,7 @@ import PocketBase from 'pocketbase';
 import { env } from '$env/dynamic/public';
 import { browser } from '$app/environment';
 
-export const pbUrl = env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
+export const pbUrl = env.PUBLIC_POCKETBASE_URL || 'http://localhost:8080';
 
 export function createPocketBase(authCookie?: string, url = pbUrl) {
 	const pb = new PocketBase(url);

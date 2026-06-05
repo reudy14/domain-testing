@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	try {
 		const record = await locals.pb.collection('media').create(uploadForm);
-		const publicUrl = env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
+		const publicUrl = env.PUBLIC_POCKETBASE_URL || 'http://localhost:8080';
 		const url = `${publicUrl}/api/files/${record.collectionId}/${record.id}/${record.file}`;
 		return json({ record, url });
 	} catch (e) {

@@ -1,0 +1,17 @@
+# Reverse proxy — single port for both the SvelteKit app and PocketBase
+# Route:  /api/* and /_/* → PocketBase
+#         everything else → SvelteKit app
+
+:8080 {
+	handle /api/* {
+		reverse_proxy pocketbase:80
+	}
+
+	handle /_/* {
+		reverse_proxy pocketbase:80
+	}
+
+	handle {
+		reverse_proxy app:3000
+	}
+}

@@ -7,7 +7,7 @@ A full-stack SvelteKit CMS for a single-operator massage studio. PocketBase prov
 - SvelteKit + SSR
 - PocketBase REST API via the `pocketbase` SDK
 - Tailwind CSS v4 + DaisyUI
-- Docker Compose with two services: `app` and `pocketbase`
+- Docker Compose with three services: `app`, `pocketbase`, and `caddy` (reverse proxy)
 
 ## Local development
 
@@ -28,6 +28,8 @@ A full-stack SvelteKit CMS for a single-operator massage studio. PocketBase prov
    ```
 5. Visit `http://localhost:5173`.
 
+> **Note:** During local development (outside Docker), PocketBase is accessed directly at `http://localhost:8090`. When running the full Docker stack, everything goes through the Caddy reverse proxy on port `8080`.
+
 ## Docker Compose
 
 Run the full stack:
@@ -45,19 +47,20 @@ docker compose up
 
 Subsequent builds reuse the npm cache declared in the `Dockerfile`.
 
-- Public SvelteKit app: `http://localhost:3000`
-- PocketBase admin UI: `http://localhost:8090/_/`
+- Single entry point (Caddy reverse proxy): **`http://localhost:8080`**
+  - SvelteKit app: `http://localhost:8080/` (or any non-API path)
+  - PocketBase admin UI: `http://localhost:8080/_/`
+  - PocketBase REST API: `http://localhost:8080/api/`
+- PocketBase direct access (internal only, not exposed): `http://localhost:8090`
 
 The app container uses two PocketBase URLs:
 
 - `POCKETBASE_INTERNAL_URL=http://pocketbase:80` for server-side SvelteKit calls from the app container when using the included `spectado/pocketbase` image.
-- `PUBLIC_POCKETBASE_URL=http://localhost:8090` for browser-side admin uploads and public file URLs during local Docker development.
-
-In production, set `PUBLIC_POCKETBASE_URL` to the browser-accessible PocketBase URL, or to the reverse-proxied PocketBase path/origin you expose publicly.
+- `PUBLIC_POCKETBASE_URL=http://localhost:8080` for browser-side admin uploads and public file URLs. Since the Caddy reverse proxy routes `/api/*` to PocketBase, the public URL points to the proxy.
 
 ## PocketBase setup
 
-1. Open `http://localhost:8090/_/`.
+1. Open `http://localhost:8080/_/` (or `http://localhost:8090/_/` for direct access).
 2. Create the first PocketBase admin user when prompted.
 3. Import `pb_schema.json` from the PocketBase admin UI collection settings/import flow. This file uses the newer PocketBase `fields` schema format; if PocketBase still reports `Invalid collections configuration`, create the three collections manually using the fields below.
 4. Create starter records:

@@ -5,7 +5,7 @@
 - **SvelteKit 2** (SSR, Svelte 5 runes mode) — all `.svelte` files use `$state`, `$derived`, `$props()` etc.
 - **PocketBase** — REST API via the `pocketbase` SDK (v0.26). Auth, DB, and image storage.
 - **Tailwind CSS v4** + **DaisyUI 5** — utility-first CSS with DaisyUI components for admin; custom theme for the public site.
-- **Docker Compose** — two services: `app` (SvelteKit) and `pocketbase`.
+- **Docker Compose** — three services: `app` (SvelteKit), `pocketbase`, and `caddy` (reverse proxy).
 
 ## Project Structure
 
@@ -88,18 +88,19 @@ npm run build
 # Type checking
 npm run check
 
-# Docker full stack
+# Docker full stack (single entry point on port 8080)
 docker compose up --build
-# App: http://localhost:3000
-# PocketBase admin: http://localhost:8090/_/
+# App + PocketBase via Caddy: http://localhost:8080
+# PocketBase admin:          http://localhost:8080/_/
 
-# PocketBase only (for local dev)
+# PocketBase only (for local dev outside Docker)
 docker compose up pocketbase
+# Direct access:             http://localhost:8090/_/
 ```
 
 ## Environment
 
-- `PUBLIC_POCKETBASE_URL` — public-facing PocketBase URL (default `http://localhost:8090`)
+- `PUBLIC_POCKETBASE_URL` — public-facing PocketBase URL, now accessed through the Caddy reverse proxy (default `http://localhost:8080`)
 - `POCKETBASE_INTERNAL_URL` — internal Docker network URL (`http://pocketbase:80`)
-- `ORIGIN` — SvelteKit origin for SSR (`http://localhost:3000`)
+- `ORIGIN` — SvelteKit origin for SSR (`http://localhost:8080`)
 - Copy `app/.env.example` → `app/.env` for local dev

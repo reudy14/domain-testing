@@ -37,7 +37,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			formData.append('alt', filename.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
 
 			const record = await locals.pb.collection('media').create(formData);
-			const publicUrl = env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
+			const publicUrl = env.PUBLIC_POCKETBASE_URL || 'http://localhost:8080';
 			const newUrl = `${publicUrl}/api/files/${record.collectionId}/${record.id}/${record.file}`;
 
 			keyToUrl.set(key, newUrl);
