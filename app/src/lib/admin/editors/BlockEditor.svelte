@@ -4,10 +4,13 @@
 	import RichTextEditor from './RichTextEditor.svelte';
 	import ImageUploader from './ImageUploader.svelte';
 	import SegmentedControl from './SegmentedControl.svelte';
+	import ShopBlockEditor from './ShopBlockEditor.svelte';
+	import CheckoutBlockEditor from './CheckoutBlockEditor.svelte';
 
-	let { block, eventCategories = [], onChange = (block: ContentBlock) => {} } = $props<{
+	let { block, eventCategories = [], items = [], onChange = (block: ContentBlock) => {} } = $props<{
 		block: ContentBlock | null;
 		eventCategories?: string[];
+		items?: { id: string; name: string; type: string }[];
 		onChange?: (block: ContentBlock) => void;
 	}>();
 
@@ -200,6 +203,10 @@
 					{/if}
 				</div>
 			</div>
+		{:else if block.type === 'shop'}
+			<ShopBlockEditor {block} {items} {onChange} />
+		{:else if block.type === 'checkout'}
+			<CheckoutBlockEditor {block} {onChange} />
 		{/if}
 
 		<div class="rounded-box border border-base-300 p-4 mt-4">

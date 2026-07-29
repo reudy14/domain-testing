@@ -59,6 +59,9 @@
 		<div class="flex-none gap-2">
 			<a class="btn btn-ghost" href="/admin/pages">Pages</a>
 			<a class="btn btn-ghost" href="/admin/calendar">Calendar</a>
+			<a class="btn btn-ghost" href="/admin/items">Items</a>
+			<a class="btn btn-ghost" href="/admin/slots">Slots</a>
+			<a class="btn btn-ghost" href="/admin/orders">Orders</a>
 			<a class="btn btn-ghost" href="/admin/globals">Globals</a>
 			<div class="dropdown dropdown-end">
 				<button class="btn btn-ghost btn-sm" type="button" tabindex="0">

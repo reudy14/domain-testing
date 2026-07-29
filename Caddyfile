@@ -1,16 +1,34 @@
 # Reverse proxy — single port for both the SvelteKit app and PocketBase
-# Route:  /api/* and /_/* → PocketBase
+# Route:  /api/basket, /api/checkout/*, /api/webhooks/* → SvelteKit app (commerce endpoints)
+#         /api/* and /_/* → PocketBase
 #         everything else → SvelteKit app
 
 :8080 {
+	# SvelteKit commerce endpoints must reach the app, not PocketBase.
+	# These matchers are more specific than the generic /api/* handle below.
+	handle /api/basket {
+		reverse_proxy app:3000
+	}
+
+	handle /api/checkout/* {
+		reverse_proxy app:3000
+	}
+
+	handle /api/webhooks/* {
+		reverse_proxy app:3000
+	}
+
+	# PocketBase REST API (collections, records, files, health)
 	handle /api/* {
 		reverse_proxy pocketbase:80
 	}
 
+	# PocketBase admin UI
 	handle /_/* {
 		reverse_proxy pocketbase:80
 	}
 
+	# Public site + SSR pages
 	handle {
 		reverse_proxy app:3000
 	}

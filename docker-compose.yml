@@ -21,7 +21,14 @@ services:
       POCKETBASE_INTERNAL_URL: http://pocketbase:80
       PUBLIC_POCKETBASE_URL: http://localhost:8080
       ORIGIN: http://localhost:8080
-      BODY_SIZE_LIMIT: 5242880 # 5MB
+      BODY_SIZE_LIMIT: 52428800 # 50MB — import payload embeds all images as base64
+      # Commerce (reservation & payment system) — set these in a root-level .env
+      POCKETBASE_ADMIN_EMAIL: ${POCKETBASE_ADMIN_EMAIL:-}
+      POCKETBASE_ADMIN_PASSWORD: ${POCKETBASE_ADMIN_PASSWORD:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      PUBLIC_STRIPE_PUBLISHABLE_KEY: ${PUBLIC_STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_CURRENCY: ${STRIPE_CURRENCY:-eur}
     # Internal only — served via the caddy reverse proxy
     expose:
       - "3000"
@@ -33,7 +40,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro,Z
     depends_on:
       - app
       - pocketbase

@@ -6,7 +6,12 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	const page = await locals.pb.collection('pages').getFirstListItem(`slug = "${params.slug}"`);
 	const events = await locals.pb.collection('events').getFullList({ sort: 'start' }).catch(() => []);
 	const eventCategories = extractCategories(events.map((event) => normalizeEvent(event)));
-	return { page, eventCategories };
+	const items = await locals.pb
+		.collection('items')
+		.getFullList({ sort: 'name' })
+		.then((records) => records.map(({ id, name, type }) => ({ id, name, type })))
+		.catch(() => []);
+	return { page, eventCategories, items };
 };
 
 export const actions: Actions = {

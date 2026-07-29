@@ -9,7 +9,9 @@ export const blockLabels: Record<BlockType, string> = {
 	button: 'Button',
 	spacer: 'Spacer',
 	testimonials: 'Testimonials',
-	upcoming_calendar: 'Upcoming Calendar'
+	upcoming_calendar: 'Upcoming Calendar',
+	shop: 'Shop',
+	checkout: 'Checkout'
 };
 
 export const blockTypes = Object.keys(blockLabels) as BlockType[];
@@ -61,6 +63,21 @@ export function createBlock(type: BlockType): ContentBlock {
 			base.data = {
 				title: 'Upcoming Events',
 				categories: []
+			};
+			break;
+		case 'shop':
+			base.data = {
+				title: 'Our Services',
+				itemTypeFilter: 'all',
+				itemIds: [],
+				layout: 'grid'
+			};
+			break;
+		case 'checkout':
+			base.data = {
+				title: 'Checkout',
+				heading: 'Complete your booking',
+				notesLabel: 'Notes or special requests'
 			};
 			break;
 	}
