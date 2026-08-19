@@ -77,30 +77,22 @@ To add a new block type: add to `BlockType` union in `types.ts`, create renderer
 ## Build & Dev Commands
 
 ```sh
-# Development (from app/)
-cd app
-npm install
-npm run dev          # http://localhost:5173
-
-# Production build
-npm run build
-
-# Type checking
-npm run check
-
-# Docker full stack (single entry point on port 8080)
+# Full stack (single entry point on port 8080) — the only supported way to run/develop
+# Source changes require rebuilding; the container runs `node build`, not a dev server.
 docker compose up --build
 # App + PocketBase via Caddy: http://localhost:8080
 # PocketBase admin:          http://localhost:8080/_/
 
-# PocketBase only (for local dev outside Docker)
-docker compose up pocketbase
-# Direct access:             http://localhost:8090/_/
+# Type checking (can run on the host with node_modules present, or inside the container)
+cd app && npm run check
+
+# Production build only (run by the Dockerfile)
+cd app && npm run build
 ```
 
 ## Environment
 
-- `PUBLIC_POCKETBASE_URL` — public-facing PocketBase URL, now accessed through the Caddy reverse proxy (default `http://localhost:8080`)
-- `POCKETBASE_INTERNAL_URL` — internal Docker network URL (`http://pocketbase:80`)
-- `ORIGIN` — SvelteKit origin for SSR (`http://localhost:8080`)
-- Copy `app/.env.example` → `app/.env` for local dev
+- `PUBLIC_POCKETBASE_URL` — public-facing PocketBase URL, accessed through the Caddy reverse proxy (`http://localhost:8080`). Set directly in `docker-compose.yml`.
+- `POCKETBASE_INTERNAL_URL` — internal Docker network URL (`http://pocketbase:80`). Set directly in `docker-compose.yml`.
+- `ORIGIN` — SvelteKit origin for SSR (`http://localhost:8080`). Set directly in `docker-compose.yml`.
+- Stripe + PocketBase admin secrets are read from a root-level `.env` next to `docker-compose.yml`; see `.env.example`.

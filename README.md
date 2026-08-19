@@ -9,26 +9,21 @@ A full-stack SvelteKit CMS for a single-operator massage studio. PocketBase prov
 - Tailwind CSS v4 + DaisyUI
 - Docker Compose with three services: `app`, `pocketbase`, and `caddy` (reverse proxy)
 
-## Local development
+## Development
 
-1. Install Node.js `22.x` or another version accepted by SvelteKit's Vite plugin.
-2. Copy the app env file:
-   ```sh
-   cp app/.env.example app/.env
-   ```
-3. Start PocketBase on port `8090`. With Docker:
-   ```sh
-   docker compose up pocketbase
-   ```
-4. In another terminal:
-   ```sh
-   cd app
-   npm install
-   npm run dev
-   ```
-5. Visit `http://localhost:5173`.
+The project runs exclusively through Docker Compose. There is no bare host dev mode.
 
-> **Note:** During local development (outside Docker), PocketBase is accessed directly at `http://localhost:8090`. When running the full Docker stack, everything goes through the Caddy reverse proxy on port `8080`.
+1. Copy the env file and fill in the secrets:
+   ```sh
+   cp .env.example .env
+   ```
+2. Build and start the full stack:
+   ```sh
+   docker compose up --build
+   ```
+3. Visit `http://localhost:8080`.
+
+The single Caddy entry point on port `8080` fronts both the SvelteKit app and PocketBase. Source changes require rebuilding (`docker compose up --build`); the container runs the production build (`node build`), not a dev server.
 
 ## Docker Compose
 
@@ -51,7 +46,6 @@ Subsequent builds reuse the npm cache declared in the `Dockerfile`.
   - SvelteKit app: `http://localhost:8080/` (or any non-API path)
   - PocketBase admin UI: `http://localhost:8080/_/`
   - PocketBase REST API: `http://localhost:8080/api/`
-- PocketBase direct access (internal only, not exposed): `http://localhost:8090`
 
 The app container uses two PocketBase URLs:
 
@@ -60,7 +54,7 @@ The app container uses two PocketBase URLs:
 
 ## PocketBase setup
 
-1. Open `http://localhost:8080/_/` (or `http://localhost:8090/_/` for direct access).
+1. Open `http://localhost:8080/_/`.
 2. Create the first PocketBase admin user when prompted.
 3. Import `pb_schema.json` from the PocketBase admin UI collection settings/import flow. This file uses the newer PocketBase `fields` schema format; if PocketBase still reports `Invalid collections configuration`, create the three collections manually using the fields below.
 4. Create starter records:
@@ -123,7 +117,7 @@ The shop/checkout blocks implement a basket-based booking flow: visitors add ser
 
 Setup:
 
-1. Add the Stripe + PocketBase-admin vars from `app/.env.example` to `app/.env` (local dev) or a root-level `.env` next to `docker-compose.yml` (Docker).
+1. Add the Stripe + PocketBase-admin vars from `.env.example` to `.env` at the project root.
 2. `POCKETBASE_ADMIN_EMAIL` / `POCKETBASE_ADMIN_PASSWORD` are the credentials of the PocketBase superuser you created — the basket/checkout/webhook APIs use a server-side admin client so collection rules can stay admin-only.
 3. For local webhook testing, forward Stripe events with the CLI:
    ```sh

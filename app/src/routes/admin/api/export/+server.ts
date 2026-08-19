@@ -27,11 +27,10 @@ export const GET: RequestHandler = async ({ locals }) => {
 		for (const url of extractImageUrls(g)) allUrls.add(url);
 	}
 
-	// Fetch each image as base64
-	// Inside Docker, stored PUBLIC_POCKETBASE_URL (http://localhost:8080) doesn't resolve
-	// from the app container, so we translate to the internal URL for fetching.
-	const publicBase = env.PUBLIC_POCKETBASE_URL || 'http://localhost:8080';
-	const internalBase = env.POCKETBASE_INTERNAL_URL || publicBase;
+	// Fetch each image as base64. Stored image URLs are public (http://localhost:8080)
+	// but the app container must fetch them via the internal Docker network URL.
+	const publicBase = env.PUBLIC_POCKETBASE_URL!;
+	const internalBase = env.POCKETBASE_INTERNAL_URL!;
 
 	const images: Record<string, string> = {};
 	for (const url of allUrls) {

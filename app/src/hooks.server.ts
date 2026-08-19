@@ -5,7 +5,7 @@ import { createPocketBase } from '$lib/pb';
 export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.pb = createPocketBase(
 		event.request.headers.get('cookie') ?? '',
-		env.POCKETBASE_INTERNAL_URL || env.PUBLIC_POCKETBASE_URL || 'http://localhost:8080'
+		env.POCKETBASE_INTERNAL_URL
 	);
 	event.locals.user = event.locals.pb.authStore.record;
 

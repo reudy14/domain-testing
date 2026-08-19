@@ -5,7 +5,7 @@ let adminPb: PocketBase | null = null;
 let authPromise: Promise<PocketBase> | null = null;
 
 async function authenticate(): Promise<PocketBase> {
-	const url = env.POCKETBASE_INTERNAL_URL || env.PUBLIC_POCKETBASE_URL || 'http://localhost:8080';
+	const url = env.POCKETBASE_INTERNAL_URL;
 	const pb = new PocketBase(url);
 	pb.autoCancellation(false);
 
