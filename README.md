@@ -4,10 +4,20 @@ A full-stack SvelteKit CMS for a single-operator massage studio. PocketBase prov
 
 ## Stack
 
-- SvelteKit + SSR
+- SvelteKit + SSR (two apps: admin and public)
 - PocketBase REST API via the `pocketbase` SDK
 - Tailwind CSS v4 + DaisyUI
-- Docker Compose with three services: `app`, `pocketbase`, and `caddy` (reverse proxy)
+- Docker Compose with four services: `app-admin`, `app-public`, `pocketbase`, and `caddy` (reverse proxy)
+
+## Architecture
+
+The project is split into two independent SvelteKit apps, each serving its own subdomain:
+
+- **`app-admin`** — serves `admin.<domain>` (admin UI, page editor, CRUD)
+- **`app-public`** — serves `*.<domain>` (public CMS pages, shop, checkout)
+- **PocketBase** — serves `db.<domain>` (auth, DB, image storage)
+
+Shared types and calendar utilities live in `packages/shared/` and are imported via the `$shared` alias declared in each app's `svelte.config.js`.
 
 ## Development
 
@@ -19,42 +29,45 @@ The project runs exclusively through Docker Compose. There is no bare host dev m
    ```
 2. Build and start the full stack:
    ```sh
-   docker compose up --build
+   DOMAIN=localhost docker compose up --build
    ```
-3. Visit `http://localhost:8080`.
+3. Visit:
+   - Admin app: `http://admin.localhost:8080`
+   - Public app: `http://www.localhost:8080`
+   - PocketBase admin: `http://db.localhost:8080/_/`
 
-The single Caddy entry point on port `8080` fronts both the SvelteKit app and PocketBase. Source changes require rebuilding (`docker compose up --build`); the container runs the production build (`node build`), not a dev server.
+Caddy's `.localhost` handling works without DNS or hosts-file changes. Source changes require rebuilding (`docker compose up --build`); the containers run the production build (`node build`), not a dev server.
 
 ## Docker Compose
 
 Run the full stack:
 
 ```sh
-docker compose up --build
+DOMAIN=localhost docker compose up --build
 ```
 
 If dependency installation is slow on the first build, enable BuildKit explicitly:
 
 ```sh
-DOCKER_BUILDKIT=1 docker compose build --progress=plain app
+DOCKER_BUILDKIT=1 docker compose build --progress=plain app-admin app-public
 docker compose up
 ```
 
-Subsequent builds reuse the npm cache declared in the `Dockerfile`.
+Subsequent builds reuse the npm cache declared in each app's `Dockerfile`.
 
-- Single entry point (Caddy reverse proxy): **`http://localhost:8080`**
-  - SvelteKit app: `http://localhost:8080/` (or any non-API path)
-  - PocketBase admin UI: `http://localhost:8080/_/`
-  - PocketBase REST API: `http://localhost:8080/api/`
+- **Admin app**: `http://admin.localhost:8080` → `app-admin:3001`
+- **Public app**: `http://www.localhost:8080` → `app-public:3000`
+- **PocketBase admin UI**: `http://db.localhost:8080/_/` (redirects `/` to `/_/`)
+- **PocketBase REST API**: `http://db.localhost:8080/api/`
 
-The app container uses two PocketBase URLs:
+The app containers use two PocketBase URLs:
 
-- `POCKETBASE_INTERNAL_URL=http://pocketbase:80` for server-side SvelteKit calls from the app container when using the included `spectado/pocketbase` image.
-- `PUBLIC_POCKETBASE_URL=http://localhost:8080` for browser-side admin uploads and public file URLs. Since the Caddy reverse proxy routes `/api/*` to PocketBase, the public URL points to the proxy.
+- `POCKETBASE_INTERNAL_URL=http://pocketbase:80` for server-side SvelteKit calls from the app containers when using the included `spectado/pocketbase` image.
+- `PUBLIC_POCKETBASE_URL=http://db.${DOMAIN}:8080` for browser-side admin uploads and public file URLs. Points to the Caddy reverse proxy so browsers reach PocketBase via the `db` subdomain.
 
 ## PocketBase setup
 
-1. Open `http://localhost:8080/_/`.
+1. Open `http://db.localhost:8080/_/`.
 2. Create the first PocketBase admin user when prompted.
 3. Import `pb_schema.json` from the PocketBase admin UI collection settings/import flow. This file uses the newer PocketBase `fields` schema format; if PocketBase still reports `Invalid collections configuration`, create the three collections manually using the fields below.
 4. Create starter records:
@@ -93,23 +106,23 @@ Commerce collections (see the Stripe section above for context):
 
 ## Authentication
 
-Admin routes live under `/admin`. Login accepts either:
+Admin routes live in the `app-admin` app. Login accepts either:
 
 - a PocketBase admin account, or
 - a record from a `users` auth collection if you create one.
 
-All `/admin` routes except `/admin/login` are guarded in `src/hooks.server.ts`.
+All routes in `app-admin` except `/login` are guarded in `src/hooks.server.ts`.
 
-## CMS routes
+## CMS routes (admin app)
 
-- `/admin/login` — sign in
-- `/admin/pages` — list/create pages
-- `/admin/pages/[slug]` — block editor with draft preview
-- `/admin/calendar` — events shown by Upcoming Calendar blocks
-- `/admin/items` — services and products shown in Shop blocks
-- `/admin/slots` — manually created bookable time slots for services
-- `/admin/orders` — read-only list of confirmed bookings and purchases
-- `/admin/globals` — header/footer editor
+- `/login` — sign in
+- `/pages` — list/create pages
+- `/pages/[slug]` — block editor with draft preview
+- `/calendar` — events shown by Upcoming Calendar blocks
+- `/items` — services and products shown in Shop blocks
+- `/slots` — manually created bookable time slots for services
+- `/orders` — read-only list of confirmed bookings and purchases
+- `/globals` — header/footer/colors editor
 
 ## Reservations & payments (Stripe)
 
@@ -121,13 +134,13 @@ Setup:
 2. `POCKETBASE_ADMIN_EMAIL` / `POCKETBASE_ADMIN_PASSWORD` are the credentials of the PocketBase superuser you created — the basket/checkout/webhook APIs use a server-side admin client so collection rules can stay admin-only.
 3. For local webhook testing, forward Stripe events with the CLI:
    ```sh
-   stripe listen --forward-to localhost:8080/api/webhooks/stripe
+   stripe listen --forward-to www.localhost:8080/api/webhooks/stripe
    ```
    Copy the printed `whsec_…` signing secret into `STRIPE_WEBHOOK_SECRET`.
 4. Import the updated `pb_schema.json` (adds `items`, `slots`, `baskets`, `basket_lines`, `orders`, `order_lines`). The `basket_lines.slot` partial unique index guarantees two visitors can't hold the same slot.
 5. Create a published page (e.g. slug `book`) with a `shop` block and a `checkout` block, and point the header CTA at it.
 
-## Public routes
+## Public routes (public app)
 
 - `/` renders `pages.slug = "home"`
 - `/[slug]` renders any other published page
@@ -136,5 +149,5 @@ Setup:
 ## Notes
 
 - Admin image uploads create records in the `media` collection and store PocketBase file URLs in block JSON.
-- Draft preview writes current blocks to `sessionStorage` and opens `/preview` in an iframe.
+- Draft preview writes current blocks to `sessionStorage` and opens `/preview` in an iframe (same-origin on the admin subdomain).
 - The page editor includes draggable reordering using native HTML drag events for compatibility; the requested DnD packages are installed and can be swapped in later if desired.

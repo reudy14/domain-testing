@@ -9,19 +9,41 @@ services:
     volumes:
       - pocketbase:/pb_data
 
-  app:
+  app-admin:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: massage-app
+      dockerfile: app-admin/Dockerfile
+    container_name: massage-app-admin
     restart: unless-stopped
     depends_on:
       - pocketbase
     environment:
+      PORT: 3001
       POCKETBASE_INTERNAL_URL: http://pocketbase:80
-      PUBLIC_POCKETBASE_URL: http://localhost:8080
-      ORIGIN: http://localhost:8080
+      PUBLIC_POCKETBASE_URL: http://db.${DOMAIN:-localhost}:8080
+      ORIGIN: http://admin.${DOMAIN:-localhost}:8080
+      PUBLIC_SITE_URL: http://www.${DOMAIN:-localhost}:8080
       BODY_SIZE_LIMIT: 52428800 # 50MB — import payload embeds all images as base64
+      # Commerce (reservation & payment system) — set these in a root-level .env
+      POCKETBASE_ADMIN_EMAIL: ${POCKETBASE_ADMIN_EMAIL:-}
+      POCKETBASE_ADMIN_PASSWORD: ${POCKETBASE_ADMIN_PASSWORD:-}
+    # Internal only — served via the caddy reverse proxy
+    expose:
+      - "3001"
+
+  app-public:
+    build:
+      context: .
+      dockerfile: app-public/Dockerfile
+    container_name: massage-app-public
+    restart: unless-stopped
+    depends_on:
+      - pocketbase
+    environment:
+      PORT: 3000
+      POCKETBASE_INTERNAL_URL: http://pocketbase:80
+      PUBLIC_POCKETBASE_URL: http://db.${DOMAIN:-localhost}:8080
+      ORIGIN: http://www.${DOMAIN:-localhost}:8080
       # Commerce (reservation & payment system) — set these in a root-level .env
       POCKETBASE_ADMIN_EMAIL: ${POCKETBASE_ADMIN_EMAIL:-}
       POCKETBASE_ADMIN_PASSWORD: ${POCKETBASE_ADMIN_PASSWORD:-}
@@ -39,12 +61,14 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro,Z
     depends_on:
-      - app
+      - app-admin
+      - app-public
       - pocketbase
 
 volumes:
   pocketbase:
-  

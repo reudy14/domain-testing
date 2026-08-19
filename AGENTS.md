@@ -5,35 +5,77 @@
 - **SvelteKit 2** (SSR, Svelte 5 runes mode) — all `.svelte` files use `$state`, `$derived`, `$props()` etc.
 - **PocketBase** — REST API via the `pocketbase` SDK (v0.26). Auth, DB, and image storage.
 - **Tailwind CSS v4** + **DaisyUI 5** — utility-first CSS with DaisyUI components for admin; custom theme for the public site.
-- **Docker Compose** — three services: `app` (SvelteKit), `pocketbase`, and `caddy` (reverse proxy).
+- **Docker Compose** — four services: `app-admin`, `app-public`, `pocketbase`, and `caddy` (reverse proxy).
 
 ## Project Structure
 
 ```
-app/                          # SvelteKit application
+packages/shared/src/          # Shared code (types, calendar utils)
+app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 ├── src/
 │   ├── lib/
 │   │   ├── admin/            # Admin UI components (BlockList, editors)
-│   │   ├── blocks/           # Public block renderers (one per BlockType)
-│   │   ├── components/       # Header.svelte, Footer.svelte
+│   │   ├── blocks/           # Block renderers (duplicated from public — needed for preview iframe)
 │   │   ├── pb.ts             # PocketBase client factory + helpers
-│   │   └── types.ts          # ContentBlock, PageRecord, HeaderGlobal, FooterGlobal
+│   │   ├── types.ts          # Re-exports from $shared
+│   │   ├── calendar.ts       # Re-exports from $shared
+│   │   └── server/           # Server-only modules (pb-admin)
 │   ├── routes/
-│   │   ├── +layout.svelte    # Root layout (admin vs public shell)
-│   │   ├── +page.svelte      # Home page (slug=home)
-│   │   ├── [slug]/           # Dynamic CMS pages
-│   │   ├── admin/            # Admin area (login, pages, globals)
-│   │   └── preview/          # Draft preview via sessionStorage
+│   │   ├── +layout.svelte    # Root layout (admin shell: navbar, export/import, logout)
+│   │   ├── login/            # Admin login
+│   │   ├── pages/            # Page CRUD + block editor
+│   │   ├── calendar/         # Event CRUD
+│   │   ├── items/            # Service/product CRUD
+│   │   ├── slots/            # Bookable time slot CRUD
+│   │   ├── orders/           # Read-only order list
+│   │   ├── globals/          # Header/footer/colors editor
+│   │   ├── preview/          # Draft preview via sessionStorage (same-origin)
+│   │   └── api/              # upload, export, import endpoints
+│   ├── hooks.server.ts       # Auth guard — all routes except /login
 │   └── app.css               # Tailwind + DaisyUI + custom theme
 ├── static/                   # Static assets
 ├── build/                    # Production build output
-├── svelte.config.js          # Adapter-node, runes mode forced
+├── svelte.config.js          # Adapter-node, runes mode forced, $shared alias
 ├── vite.config.ts            # Tailwind v4 + SvelteKit plugins
 └── package.json
-pocketbase/pb_data/           # PocketBase data (mounted volume-mounted)
-docker-compose.yml            # app + pocketbase services
-Dockerfile                    # Multi-stage Node 22 build
+app-public/                   # SvelteKit public app (serves *.<domain>)
+├── src/
+│   ├── lib/
+│   │   ├── blocks/           # Block renderers (one per BlockType)
+│   │   ├── components/       # Header.svelte, Footer.svelte
+│   │   ├── pb.ts             # PocketBase client factory + helpers
+│   │   ├── types.ts          # Re-exports from $shared
+│   │   ├── calendar.ts       # Re-exports from $shared
+│   │   ├── basket.svelte.ts  # Basket store (client-side state)
+│   │   ├── stripe-client.ts  # Stripe.js loader
+│   │   └── server/           # Server-only modules (pb-admin, basket, stripe)
+│   ├── routes/
+│   │   ├── +layout.svelte    # Root layout (always renders Header/Footer)
+│   │   ├── +page.svelte      # Home page (slug=home)
+│   │   ├── [slug]/           # Dynamic CMS pages
+│   │   ├── api/              # basket, checkout, webhooks endpoints
+│   │   └── checkout/return/  # Stripe return URL
+│   ├── hooks.server.ts       # Creates PB client in locals (no auth guard)
+│   └── app.css               # Tailwind + DaisyUI + custom theme
+├── static/                   # Static assets
+├── build/                    # Production build output
+├── svelte.config.js          # Adapter-node, runes mode forced, $shared alias
+├── vite.config.ts            # Tailwind v4 + SvelteKit plugins
+└── package.json
+pocketbase/pb_data/           # PocketBase data (volume-mounted)
+docker-compose.yml            # app-admin + app-public + pocketbase + caddy services
+Caddyfile                     # Subdomain-based routing
 ```
+
+## Subdomain Routing
+
+Caddy routes by `Host` header — no path stripping:
+
+- `admin.{$DOMAIN}:8080` → `app-admin:3001` (admin app)
+- `db.{$DOMAIN}:8080` → `pocketbase:80` (redirects `/` to `/_/`)
+- `www.{$DOMAIN}:8080`, `*.{$DOMAIN}:8080` → `app-public:3000` (public app)
+
+For local dev, `DOMAIN` defaults to `localhost`, so Caddy serves `admin.localhost:8080`, `db.localhost:8080`, `www.localhost:8080`. Caddy's `.localhost` handling works without DNS or hosts-file changes.
 
 ## Key Conventions
 
@@ -47,15 +89,22 @@ All components use Svelte 5 runes syntax — **never** `export let`, `$:`, or `o
 - `onclick={handler}` (not `on:click`)
 
 ### Block System
-Pages are composed of `ContentBlock[]`. Each block has `{ id, type, data }`. Block types are defined in `$lib/types.ts`:
-`text | image | image_text | timeline | testimonials | services | cta | spacer | horizontal_cards`
+Pages are composed of `ContentBlock[]`. Each block has `{ id, type, data }`. Block types are defined in `packages/shared/src/types.ts` (re-exported via `$lib/types` in each app):
+`text | image_text | timeline | hero | button | spacer | testimonials | upcoming_calendar | shop | checkout`
 
-- **Public renderers**: `$lib/blocks/<Type>Block.svelte` — one per type, receives `data` prop. Currently active: `TextBlock`, `ImageTextBlock`, `TimelineBlock`, `HeroBlock`.
-- **Admin editors**: `$lib/admin/editors/BlockEditor.svelte` — switches editor UI by type
-- **Defaults**: `$lib/admin/blockDefaults.ts` — `createBlock(type)` generates a new block with sensible defaults
-- **Block list**: `$lib/admin/BlockList.svelte` — draggable reorder, select, delete
+- **Public renderers**: `app-public/src/lib/blocks/<Type>Block.svelte` — one per type, receives `data` prop.
+- **Admin renderers (for preview)**: `app-admin/src/lib/blocks/<Type>Block.svelte` — duplicated from public so the preview iframe works.
+- **Admin editors**: `app-admin/src/lib/admin/editors/BlockEditor.svelte` — switches editor UI by type
+- **Defaults**: `app-admin/src/lib/admin/blockDefaults.ts` — `createBlock(type)` generates a new block with sensible defaults
+- **Block list**: `app-admin/src/lib/admin/BlockList.svelte` — draggable reorder, select, delete
 
-To add a new block type: add to `BlockType` union in `types.ts`, create renderer in `$lib/blocks/`, add editor case in `BlockEditor.svelte`, add default in `blockDefaults.ts`, add import in `BlockRenderer.svelte`.
+To add a new block type: add to `BlockType` union in `packages/shared/src/types.ts`, create renderer in both `app-public/src/lib/blocks/` and `app-admin/src/lib/blocks/`, add editor case in `app-admin/src/lib/admin/editors/BlockEditor.svelte`, add default in `app-admin/src/lib/admin/blockDefaults.ts`, add import in both `BlockRenderer.svelte` files.
+
+### Shared Code
+- `packages/shared/src/types.ts` — all type definitions
+- `packages/shared/src/calendar.ts` — calendar utilities (used by admin calendar editor and public upcoming calendar block)
+- Each app's `svelte.config.js` declares `kit.alias.$shared → '../packages/shared/src'`
+- Each app's `src/lib/types.ts` and `src/lib/calendar.ts` re-export from `$shared` so existing `$lib/types` and `$lib/calendar` imports work
 
 ### PocketBase Integration
 - Client created in `hooks.server.ts` (`event.locals.pb`) — injected per-request with auth cookie
@@ -69,30 +118,35 @@ To add a new block type: add to `BlockType` union in `types.ts`, create renderer
 - **Prose**: `.prose-wellness` class for rich text content styling
 
 ### Routing
-- `+layout.server.ts` fetches header/footer globals for every public page
+- **Admin app** (`app-admin`): All routes except `/login` are auth-guarded in `hooks.server.ts`. The root layout renders the admin shell (navbar, export/import, logout). The `/preview` route reads `sessionStorage` set by the page editor (same-origin, so it works).
+- **Public app** (`app-public`): No auth guard. The root layout always renders Header/Footer. `+layout.server.ts` fetches header/footer/colors globals + basket/items/slots for every page.
 - `+page.server.ts` for home fetches `slug = "home" && published = true`
 - `[slug]/+page.server.ts` fetches by dynamic slug
-- Admin routes protected in `hooks.server.ts` — redirects to `/admin/login` if unauthenticated
 
 ## Build & Dev Commands
 
 ```sh
 # Full stack (single entry point on port 8080) — the only supported way to run/develop
 # Source changes require rebuilding; the container runs `node build`, not a dev server.
-docker compose up --build
-# App + PocketBase via Caddy: http://localhost:8080
-# PocketBase admin:          http://localhost:8080/_/
+DOMAIN=localhost docker compose up --build
+# Admin app:    http://admin.localhost:8080
+# Public app:   http://www.localhost:8080
+# PocketBase:   http://db.localhost:8080/_/
 
-# Type checking (can run on the host with node_modules present, or inside the container)
-cd app && npm run check
+# Type checking (can run on the host with node_modules present)
+cd app-admin && npm run check
+cd app-public && npm run check
 
-# Production build only (run by the Dockerfile)
-cd app && npm run build
+# Production build only (run by each app's Dockerfile)
+cd app-admin && npm run build
+cd app-public && npm run build
 ```
 
 ## Environment
 
-- `PUBLIC_POCKETBASE_URL` — public-facing PocketBase URL, accessed through the Caddy reverse proxy (`http://localhost:8080`). Set directly in `docker-compose.yml`.
-- `POCKETBASE_INTERNAL_URL` — internal Docker network URL (`http://pocketbase:80`). Set directly in `docker-compose.yml`.
-- `ORIGIN` — SvelteKit origin for SSR (`http://localhost:8080`). Set directly in `docker-compose.yml`.
+- `DOMAIN` — base domain for subdomain routing. Defaults to `localhost` for local dev. Set in `docker-compose.yml` or `.env`.
+- `PUBLIC_POCKETBASE_URL` — public-facing PocketBase URL (`http://db.${DOMAIN}:8080`). Set in `docker-compose.yml`.
+- `POCKETBASE_INTERNAL_URL` — internal Docker network URL (`http://pocketbase:80`). Set in `docker-compose.yml`.
+- `ORIGIN` — SvelteKit origin for SSR. Differs per app: `http://admin.${DOMAIN}:8080` (admin), `http://www.${DOMAIN}:8080` (public).
+- `PUBLIC_SITE_URL` — public site URL used by the admin app for cross-subdomain preview links (`http://www.${DOMAIN}:8080`).
 - Stripe + PocketBase admin secrets are read from a root-level `.env` next to `docker-compose.yml`; see `.env.example`.

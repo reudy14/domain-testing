@@ -1,6 +1,10 @@
 node_modules
-app/node_modules
-app/.svelte-kit
-app/build
+app-admin/node_modules
+app-admin/.svelte-kit
+app-admin/build
+app-public/node_modules
+app-public/.svelte-kit
+app-public/build
+packages/shared/node_modules
 .git
 pocketbase/pb_data

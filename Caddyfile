@@ -1,35 +1,23 @@
-# Reverse proxy — single port for both the SvelteKit app and PocketBase
-# Route:  /api/basket, /api/checkout/*, /api/webhooks/* → SvelteKit app (commerce endpoints)
-#         /api/* and /_/* → PocketBase
-#         everything else → SvelteKit app
+# Reverse proxy — subdomain-based routing (plain HTTP on port 8080)
+# admin.{$DOMAIN}  → app-admin (SvelteKit admin app)
+# db.{$DOMAIN}     → PocketBase (redirects / to /_/)
+# *.{$DOMAIN}      → app-public (SvelteKit public app)
+#
+# The `http://` prefix disables Caddy's automatic HTTPS so the site is served
+# as plain HTTP on port 8080. This matches the ORIGIN env vars in
+# docker-compose.yml (http://admin.${DOMAIN}:8080 etc.) so SvelteKit's CSRF
+# protection accepts form POSTs.
 
-:8080 {
-	# SvelteKit commerce endpoints must reach the app, not PocketBase.
-	# These matchers are more specific than the generic /api/* handle below.
-	handle /api/basket {
-		reverse_proxy app:3000
-	}
+http://admin.{$DOMAIN}:8080 {
+	reverse_proxy app-admin:3001
+}
 
-	handle /api/checkout/* {
-		reverse_proxy app:3000
-	}
+http://db.{$DOMAIN}:8080 {
+	# PocketBase admin UI lives at /_/ — redirect bare root there.
+	redir / /_/{path}
+	reverse_proxy pocketbase:80
+}
 
-	handle /api/webhooks/* {
-		reverse_proxy app:3000
-	}
-
-	# PocketBase REST API (collections, records, files, health)
-	handle /api/* {
-		reverse_proxy pocketbase:80
-	}
-
-	# PocketBase admin UI
-	handle /_/* {
-		reverse_proxy pocketbase:80
-	}
-
-	# Public site + SSR pages
-	handle {
-		reverse_proxy app:3000
-	}
+http://www.{$DOMAIN}:8080, http://*.{$DOMAIN}:8080 {
+	reverse_proxy app-public:3000
 }

@@ -1,0 +1,140 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
+@import 'tailwindcss';
+@plugin 'daisyui' {
+	themes: light --default;
+}
+
+@theme {
+	--font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+	--font-serif: 'Playfair Display', Georgia, serif;
+	--color-warm: var(--color-bg, #faf8f5);
+	--color-charcoal: var(--color-heading, #2c2c2c);
+	--color-sage: var(--color-primary, #8a9a7b);
+	--color-sage-dark: color-mix(in srgb, var(--color-primary, #8a9a7b) 80%, #000);
+	--color-terracotta: var(--color-accent, #c9825f);
+}
+
+@keyframes shrink {
+	from { scale: 0 1; }
+	to { scale: 1 1; }
+}
+
+.delete-fill {
+	position: absolute;
+	inset: 0;
+	background: transparent;
+	transform-origin: left;
+}
+
+.delete-fill.animating {
+	animation: shrink 1s ease-in-out forwards;
+	background: var(--error, #f43f5e);
+}
+
+.btn.delete-holding {
+	color: white !important;
+}
+
+.btn.delete-holding .text-error {
+	color: white !important;
+}
+
+:root {
+	--fg-heading: var(--color-heading, #2c2c2c);
+	--fg-subheading: var(--color-subheading, #4a4a4a);
+	--fg-body: var(--color-text, #2c2c2c);
+	background: var(--color-bg, #faf8f5);
+	color: var(--fg-body);
+	font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ── Foreground colour utilities (set per-block via BackgroundWrapper) ── */
+.text-fg-body { color: var(--fg-body, #2c2c2c); }
+.text-fg-body\/85 { color: color-mix(in srgb, var(--fg-body, #2c2c2c) 85%, transparent); }
+.text-fg-body\/80 { color: color-mix(in srgb, var(--fg-body, #2c2c2c) 80%, transparent); }
+.text-fg-body\/75 { color: color-mix(in srgb, var(--fg-body, #2c2c2c) 75%, transparent); }
+.text-fg-body\/70 { color: color-mix(in srgb, var(--fg-body, #2c2c2c) 70%, transparent); }
+.text-fg-body\/60 { color: color-mix(in srgb, var(--fg-body, #2c2c2c) 60%, transparent); }
+.text-fg-heading { color: var(--fg-heading, #2c2c2c); }
+.text-fg-subheading { color: var(--fg-subheading, #4a4a4a); }
+.text-fg-subheading\/85 { color: color-mix(in srgb, var(--fg-subheading, #4a4a4a) 85%, transparent); }
+.text-fg-subheading\/80 { color: color-mix(in srgb, var(--fg-subheading, #4a4a4a) 80%, transparent); }
+.text-fg-subheading\/75 { color: color-mix(in srgb, var(--fg-subheading, #4a4a4a) 75%, transparent); }
+.text-fg-subheading\/70 { color: color-mix(in srgb, var(--fg-subheading, #4a4a4a) 70%, transparent); }
+.text-fg-subheading\/60 { color: color-mix(in srgb, var(--fg-subheading, #4a4a4a) 60%, transparent); }
+
+body {
+	min-height: 100vh;
+	margin: 0;
+	background:
+		radial-gradient(circle at top left, rgba(var(--color-accent-rgb, 201, 130, 95), 0.1), transparent 36rem),
+		var(--color-bg, #faf8f5);
+}
+
+h1,
+h2,
+h3,
+h4 {
+	font-family: 'Playfair Display', Georgia, serif;
+	color: var(--fg-heading, #2c2c2c);
+}
+
+.prose-wellness p {
+	margin: 0.75rem 0;
+	line-height: 1.8;
+}
+
+.prose-wellness h2 {
+	margin: 1.25rem 0 0.5rem;
+	font-size: clamp(2rem, 4vw, 3.25rem);
+	line-height: 1.05;
+}
+
+.prose-wellness h3 {
+	margin: 1rem 0 0.5rem;
+	font-size: 1.6rem;
+}
+
+.prose-wellness ul {
+	list-style: disc;
+	padding-left: 1.5rem;
+}
+
+.prose-wellness a {
+	color: color-mix(in srgb, var(--color-primary, #8a9a7b) 90%, #000);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+/* ── Scroll-reveal animations ── */
+.reveal {
+	opacity: 0;
+	transform: translateY(30px);
+	transition:
+		opacity 0.7s cubic-bezier(0.25, 0.1, 0.25, 1),
+		transform 0.7s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.reveal-visible {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+/* ── Hero fade-in stagger ── */
+.animate-fade-in {
+	opacity: 0;
+	transform: translateY(20px);
+	animation: fadeInUp 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+}
+
+@keyframes fadeInUp {
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* ── Smooth scroll ── */
+html {
+	scroll-behavior: smooth;
+}

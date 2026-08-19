@@ -1,0 +1,30 @@
+{
+	"name": "app-public",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "vite build",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+	},
+	"devDependencies": {
+		"@sveltejs/kit": "^2.57.0",
+		"@sveltejs/vite-plugin-svelte": "^7.0.0",
+		"@types/node": "^25.8.0",
+		"svelte": "^5.55.2",
+		"svelte-check": "^4.4.6",
+		"typescript": "^6.0.2",
+		"vite": "^8.0.7"
+	},
+	"dependencies": {
+		"@stripe/stripe-js": "^9.12.1",
+		"@sveltejs/adapter-node": "^5.5.4",
+		"@tailwindcss/vite": "^4.3.0",
+		"daisyui": "^5.5.19",
+		"pocketbase": "^0.26.9",
+		"stripe": "^22.3.2",
+		"tailwindcss": "^4.3.0"
+	}
+}
