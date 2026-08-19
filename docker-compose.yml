@@ -63,6 +63,10 @@ services:
       - "8080:8080"
     environment:
       DOMAIN: ${DOMAIN:-localhost}
+      # Scheme used in Caddyfile site addresses. "http" = plain HTTP on :8080
+      # (matches the ORIGIN vars below). Switch to "https" only if you also
+      # update ORIGIN/PUBLIC_* URLs and provide a cert issuer.
+      CADDY_SCHEME: ${CADDY_SCHEME:-http}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro,Z
     depends_on:

@@ -1,23 +1,26 @@
-# Reverse proxy — subdomain-based routing (plain HTTP on port 8080)
+# Reverse proxy — subdomain-based routing on port 8080
 # admin.{$DOMAIN}  → app-admin (SvelteKit admin app)
 # db.{$DOMAIN}     → PocketBase (redirects / to /_/)
 # *.{$DOMAIN}      → app-public (SvelteKit public app)
 #
-# The `http://` prefix disables Caddy's automatic HTTPS so the site is served
-# as plain HTTP on port 8080. This matches the ORIGIN env vars in
-# docker-compose.yml (http://admin.${DOMAIN}:8080 etc.) so SvelteKit's CSRF
-# protection accepts form POSTs.
+# The scheme is controlled by the {$CADDY_SCHEME} env var (default: http).
+# - http  → plain HTTP (disables Caddy's automatic HTTPS). Matches the ORIGIN
+#          env vars in docker-compose.yml (http://admin.${DOMAIN}:8080 etc.)
+#          so SvelteKit's CSRF protection accepts form POSTs.
+# - https → HTTPS. On a non-standard port (8080) Caddy will issue internal
+#          self-signed certificates unless you configure a real cert issuer.
+#          Remember to also update ORIGIN/PUBLIC_* URLs in docker-compose.yml.
 
-http://admin.{$DOMAIN}:8080 {
+{$CADDY_SCHEME}://admin.{$DOMAIN}:8080 {
 	reverse_proxy app-admin:3001
 }
 
-http://db.{$DOMAIN}:8080 {
+{$CADDY_SCHEME}://db.{$DOMAIN}:8080 {
 	# PocketBase admin UI lives at /_/ — redirect bare root there.
 	redir / /_/{path}
 	reverse_proxy pocketbase:80
 }
 
-http://www.{$DOMAIN}:8080, http://*.{$DOMAIN}:8080 {
+{$CADDY_SCHEME}://www.{$DOMAIN}:8080, {$CADDY_SCHEME}://*.{$DOMAIN}:8080 {
 	reverse_proxy app-public:3000
 }
