@@ -10,16 +10,19 @@
 ## Project Structure
 
 ```
-packages/shared/src/          # Shared code (types, calendar utils)
+packages/shared/src/          # Shared code (types, calendar utils, blocks, pb, basket, stripe)
 app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 ├── src/
 │   ├── lib/
 │   │   ├── admin/            # Admin UI components (BlockList, editors)
-│   │   ├── blocks/           # Block renderers (duplicated from public — needed for preview iframe)
-│   │   ├── pb.ts             # PocketBase client factory + helpers
+│   │   ├── blocks/           # Re-exports from $shared/blocks (block renderers live in shared)
+│   │   ├── pb.ts             # Re-exports from $shared/pb + app-specific uploadMedia
 │   │   ├── types.ts          # Re-exports from $shared
 │   │   ├── calendar.ts       # Re-exports from $shared
-│   │   └── server/           # Server-only modules (pb-admin)
+│   │   ├── scrollReveal.ts   # Re-exports from $shared
+│   │   ├── stripe-client.ts # Re-exports from $shared
+│   │   ├── basket.svelte.ts # Re-exports from $shared
+│   │   └── server/           # Re-exports from $shared/server (pb-admin, basket)
 │   ├── routes/
 │   │   ├── +layout.svelte    # Root layout (admin shell: navbar, export/import, logout)
 │   │   ├── login/            # Admin login
@@ -41,14 +44,15 @@ app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 app-public/                   # SvelteKit public app (serves *.<domain>)
 ├── src/
 │   ├── lib/
-│   │   ├── blocks/           # Block renderers (one per BlockType)
+│   │   ├── blocks/           # Re-exports from $shared/blocks (block renderers live in shared)
 │   │   ├── components/       # Header.svelte, Footer.svelte
-│   │   ├── pb.ts             # PocketBase client factory + helpers
+│   │   ├── pb.ts             # Re-exports from $shared/pb
 │   │   ├── types.ts          # Re-exports from $shared
 │   │   ├── calendar.ts       # Re-exports from $shared
-│   │   ├── basket.svelte.ts  # Basket store (client-side state)
-│   │   ├── stripe-client.ts  # Stripe.js loader
-│   │   └── server/           # Server-only modules (pb-admin, basket, stripe)
+│   │   ├── scrollReveal.ts   # Re-exports from $shared
+│   │   ├── stripe-client.ts  # Re-exports from $shared
+│   │   ├── basket.svelte.ts  # Re-exports from $shared
+│   │   └── server/           # Re-exports from $shared/server (pb-admin, basket); stripe.server.ts is public-only
 │   ├── routes/
 │   │   ├── +layout.svelte    # Root layout (always renders Header/Footer)
 │   │   ├── +page.svelte      # Home page (slug=home)
@@ -92,13 +96,12 @@ All components use Svelte 5 runes syntax — **never** `export let`, `$:`, or `o
 Pages are composed of `ContentBlock[]`. Each block has `{ id, type, data }`. Block types are defined in `packages/shared/src/types.ts` (re-exported via `$lib/types` in each app):
 `text | image_text | timeline | hero | button | spacer | testimonials | upcoming_calendar | shop | checkout`
 
-- **Public renderers**: `app-public/src/lib/blocks/<Type>Block.svelte` — one per type, receives `data` prop.
-- **Admin renderers (for preview)**: `app-admin/src/lib/blocks/<Type>Block.svelte` — duplicated from public so the preview iframe works.
+- **Renderers (shared)**: `packages/shared/src/blocks/<Type>Block.svelte` — one renderer per type, imported by both apps via `$shared/blocks/...`. The admin preview iframe uses the same shared renderers.
 - **Admin editors**: `app-admin/src/lib/admin/editors/BlockEditor.svelte` — switches editor UI by type
 - **Defaults**: `app-admin/src/lib/admin/blockDefaults.ts` — `createBlock(type)` generates a new block with sensible defaults
 - **Block list**: `app-admin/src/lib/admin/BlockList.svelte` — draggable reorder, select, delete
 
-To add a new block type: add to `BlockType` union in `packages/shared/src/types.ts`, create renderer in both `app-public/src/lib/blocks/` and `app-admin/src/lib/blocks/`, add editor case in `app-admin/src/lib/admin/editors/BlockEditor.svelte`, add default in `app-admin/src/lib/admin/blockDefaults.ts`, add import in both `BlockRenderer.svelte` files.
+To add a new block type: add to `BlockType` union in `packages/shared/src/types.ts`, create renderer in `packages/shared/src/blocks/`, add editor case in `app-admin/src/lib/admin/editors/BlockEditor.svelte`, add default in `app-admin/src/lib/admin/blockDefaults.ts`, add import in `packages/shared/src/blocks/BlockRenderer.svelte`.
 
 ### Shared Code
 - `packages/shared/src/types.ts` — all type definitions

@@ -5,6 +5,17 @@
 	"type": "module",
 	"exports": {
 		"./types": "./src/types.ts",
-		"./calendar": "./src/calendar.ts"
+		"./calendar": "./src/calendar.ts",
+		"./pb": "./src/pb.ts",
+		"./scrollReveal": "./src/scrollReveal.ts",
+		"./stripe-client": "./src/stripe-client.ts",
+		"./basket.svelte": "./src/basket.svelte.ts",
+		"./blocks/BlockRenderer.svelte": "./src/blocks/BlockRenderer.svelte",
+		"./server/pb-admin": "./src/server/pb-admin.ts",
+		"./server/basket": "./src/server/basket.ts"
+	},
+	"dependencies": {
+		"pocketbase": "^0.26.9",
+		"@stripe/stripe-js": "^9.12.1"
 	}
 }

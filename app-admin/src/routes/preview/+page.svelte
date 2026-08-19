@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import BlockRenderer from '$lib/blocks/BlockRenderer.svelte';
+	import BlockRenderer from '$shared/blocks/BlockRenderer.svelte';
 	import type { ContentBlock } from '$lib/types';
 
 	let blocks = $state<ContentBlock[]>([]);

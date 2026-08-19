@@ -1,5 +1,5 @@
 <script lang="ts">
-	import BlockRenderer from '$lib/blocks/BlockRenderer.svelte';
+	import BlockRenderer from '$shared/blocks/BlockRenderer.svelte';
 	let { data } = $props();
 </script>
 
