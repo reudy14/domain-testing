@@ -22,6 +22,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({ record, url });
 	} catch (e) {
 		console.error('Media upload error:', e);
-		throw error(500, 'Upload failed');
+		// Surface PocketBase's field validation message (e.g. file too large, wrong type)
+		const fieldError = (e as { response?: { data?: Record<string, { message?: string }> } })?.response?.data?.file?.message;
+		throw error(fieldError ? 400 : 500, fieldError ? `Upload failed: ${fieldError}` : 'Upload failed');
 	}
 };

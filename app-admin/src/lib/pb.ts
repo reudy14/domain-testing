@@ -6,7 +6,7 @@ export async function uploadMedia(file: File) {
 	formData.append('file', file);
 	formData.append('alt', file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
 
-	const res = await fetch('/admin/api/upload', { method: 'POST', body: formData });
+	const res = await fetch('/api/upload', { method: 'POST', body: formData });
 	if (!res.ok) {
 		const err = await res.json().catch(() => ({}));
 		throw new Error(err?.message || `Upload failed (${res.status})`);
