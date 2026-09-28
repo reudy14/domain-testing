@@ -27,6 +27,15 @@ services:
       # Commerce (reservation & payment system) — set these in a root-level .env
       POCKETBASE_ADMIN_EMAIL: ${POCKETBASE_ADMIN_EMAIL:-}
       POCKETBASE_ADMIN_PASSWORD: ${POCKETBASE_ADMIN_PASSWORD:-}
+      STRIPE_CURRENCY: ${STRIPE_CURRENCY:-eur}
+      # Booking emails (Brevo SMTP relay) — admin needs these for resend/test sends
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-}
+      SITE_TIMEZONE: ${SITE_TIMEZONE:-Europe/Oslo}
     # Internal only — served via the caddy reverse proxy
     expose:
       - "3001"
@@ -51,6 +60,14 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       PUBLIC_STRIPE_PUBLISHABLE_KEY: ${PUBLIC_STRIPE_PUBLISHABLE_KEY:-}
       STRIPE_CURRENCY: ${STRIPE_CURRENCY:-eur}
+      # Booking emails (Brevo SMTP relay) — sent from the Stripe webhook
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-}
+      SITE_TIMEZONE: ${SITE_TIMEZONE:-Europe/Oslo}
     # Internal only — served via the caddy reverse proxy
     expose:
       - "3000"

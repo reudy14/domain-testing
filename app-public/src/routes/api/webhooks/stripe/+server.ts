@@ -5,6 +5,7 @@ import { getStripe } from '$lib/stripe.server';
 import { getAdminPb } from '$lib/server/pb-admin';
 import { getFileUrl } from '$lib/pb';
 import { SLOT_HOLD_MS, extendBasketHolds } from '$lib/server/basket';
+import { sendOrderEmails } from '$lib/server/email';
 import type PocketBase from 'pocketbase';
 
 async function handlePaymentSucceeded(pb: PocketBase, paymentIntent: any) {
@@ -14,7 +15,7 @@ async function handlePaymentSucceeded(pb: PocketBase, paymentIntent: any) {
 	// Idempotency: if an order already exists for this intent, we're done.
 	const existing = await pb
 		.collection('orders')
-		.getFirstListItem(`stripePaymentIntentId = "${paymentIntent.id}"`)
+		.getFirstListItem(pb.filter('stripePaymentIntentId = {:id}', { id: paymentIntent.id }))
 		.catch(() => null);
 	if (existing) return;
 
@@ -23,7 +24,7 @@ async function handlePaymentSucceeded(pb: PocketBase, paymentIntent: any) {
 
 	const lines = await pb
 		.collection('basket_lines')
-		.getFullList({ filter: `basket = "${basketId}"`, expand: 'item,slot' });
+		.getFullList({ filter: pb.filter('basket = {:basketId}', { basketId }), expand: 'item,slot' });
 
 	// Create the order
 	const order = await pb.collection('orders').create({
@@ -68,6 +69,11 @@ async function handlePaymentSucceeded(pb: PocketBase, paymentIntent: any) {
 		await pb.collection('basket_lines').delete(line.id).catch(() => {});
 	}
 	await pb.collection('baskets').update(basketId, { status: 'completed' }).catch(() => {});
+
+	// Confirmation to the customer + alert to the studio. Not awaited: SMTP can
+	// be slow and Stripe only needs the 2xx. sendOrderEmails never throws and
+	// records the outcome on the order, so failures can be resent from /orders.
+	void sendOrderEmails(pb, order.id);
 }
 
 async function handlePaymentFailed(pb: PocketBase, paymentIntent: any) {

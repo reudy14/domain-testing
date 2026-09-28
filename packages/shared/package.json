@@ -12,10 +12,16 @@
 		"./basket.svelte": "./src/basket.svelte.ts",
 		"./blocks/BlockRenderer.svelte": "./src/blocks/BlockRenderer.svelte",
 		"./server/pb-admin": "./src/server/pb-admin.ts",
-		"./server/basket": "./src/server/basket.ts"
+		"./server/basket": "./src/server/basket.ts",
+		"./email": "./src/email/index.ts",
+		"./server/email": "./src/server/email/index.ts"
 	},
 	"dependencies": {
-		"pocketbase": "^0.26.9",
-		"@stripe/stripe-js": "^9.12.1"
+		"@stripe/stripe-js": "^9.12.1",
+		"nodemailer": "^10.0.12",
+		"pocketbase": "^0.26.9"
+	},
+	"devDependencies": {
+		"@types/nodemailer": "^8.0.2"
 	}
 }

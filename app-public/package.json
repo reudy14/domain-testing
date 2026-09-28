@@ -13,6 +13,7 @@
 		"@sveltejs/kit": "^2.57.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@types/node": "^25.8.0",
+		"@types/nodemailer": "^8.0.2",
 		"svelte": "^5.55.2",
 		"svelte-check": "^4.4.6",
 		"typescript": "^6.0.2",
@@ -23,6 +24,7 @@
 		"@sveltejs/adapter-node": "^5.5.4",
 		"@tailwindcss/vite": "^4.3.0",
 		"daisyui": "^5.5.19",
+		"nodemailer": "^10.0.12",
 		"pocketbase": "^0.26.9",
 		"stripe": "^22.3.2",
 		"tailwindcss": "^4.3.0"

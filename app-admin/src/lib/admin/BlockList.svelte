@@ -1,9 +1,10 @@
 <script lang="ts">
-	import type { BlockType, ContentBlock } from '$lib/types';
+	import type { ContentBlock, EmailBlock } from '$lib/types';
 	import { blockLabels } from '$lib/admin/blockDefaults';
 
-	let { blocks = [], selectedId = '', onSelect = (id: string) => {}, onDelete = (id: string) => {}, onMove = (from: number, to: number) => {} } = $props<{
-		blocks: ContentBlock[];
+	let { blocks = [], labels = blockLabels, selectedId = '', onSelect = (id: string) => {}, onDelete = (id: string) => {}, onMove = (from: number, to: number) => {} } = $props<{
+		blocks: (ContentBlock | EmailBlock)[];
+		labels?: Record<string, string>;
 		selectedId?: string;
 		onSelect?: (id: string) => void;
 		onDelete?: (id: string) => void;
@@ -17,7 +18,7 @@
 	function startHold(id: string) {
 		holdingId = id;
 		holdTimer = setTimeout(() => {
-			const idx = blocks.findIndex((b: ContentBlock) => b.id === id);
+			const idx = blocks.findIndex((b: ContentBlock | EmailBlock) => b.id === id);
 			onDelete(id);
 			onSelect(blocks[idx + 1]?.id || blocks[idx - 1]?.id || '');
 			holdingId = '';
@@ -44,7 +45,7 @@
 		>
 			<div class="flex items-center gap-2">
 				<span class="cursor-grab text-xl text-base-content/40">☰</span>
-				<div class="flex-1 font-semibold">{blockLabels[block.type as BlockType]}</div>
+				<div class="flex-1 font-semibold">{labels[block.type] ?? block.type}</div>
 				<button
 					class="btn btn-xs btn-error btn-outline relative overflow-hidden"
 					class:btn-disabled={holdingId && holdingId !== block.id}

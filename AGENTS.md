@@ -30,7 +30,8 @@ app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 │   │   ├── calendar/         # Event CRUD
 │   │   ├── items/            # Service/product CRUD
 │   │   ├── slots/            # Bookable time slot CRUD
-│   │   ├── orders/           # Read-only order list
+│   │   ├── orders/           # Order list + booking-email status/resend
+│   │   ├── emails/           # Block-based booking email editor (live preview, test send)
 │   │   ├── globals/          # Header/footer/colors editor
 │   │   ├── preview/          # Draft preview via sessionStorage (same-origin)
 │   │   └── api/              # upload, export, import endpoints
@@ -103,6 +104,15 @@ Pages are composed of `ContentBlock[]`. Each block has `{ id, type, data }`. Blo
 
 To add a new block type: add to `BlockType` union in `packages/shared/src/types.ts`, create renderer in `packages/shared/src/blocks/`, add editor case in `app-admin/src/lib/admin/editors/BlockEditor.svelte`, add default in `app-admin/src/lib/admin/blockDefaults.ts`, add import in `packages/shared/src/blocks/BlockRenderer.svelte`.
 
+### Booking Emails
+Email templates use a separate `EmailBlock[]` / `EmailBlockType` (`text | image | button | spacer | divider | booking_details | customer_details | contact_info`) because email clients need table layouts with inline styles — page block renderers can't be reused.
+
+- **Rendering (pure, shared)**: `packages/shared/src/email/render.ts` — `renderEmail(template, ctx)` returns `{ subject, html, text }`. Used by the admin live preview (client-side) and by sending, so they always match. Defaults for each template key live in `email/defaults.ts`.
+- **Sending (server)**: `packages/shared/src/server/email/` — nodemailer SMTP transport (Brevo), `.ics` builder, `sendOrderEmails(pb, orderId, kinds?)` (never throws; records status on the order) and `sendTestEmail`. Called from the Stripe webhook and the admin `/orders` resend action.
+- **Admin**: `/emails/[key]` editor, `app-admin/src/lib/admin/editors/EmailBlockEditor.svelte`, `app-admin/src/lib/admin/emailBlockDefaults.ts`.
+
+To add an email block type: add to `EmailBlockType` in `packages/shared/src/types.ts`, add HTML + text cases in `render.ts`, an editor case in `EmailBlockEditor.svelte`, and a label/default in `emailBlockDefaults.ts`.
+
 ### Shared Code
 - `packages/shared/src/types.ts` — all type definitions
 - `packages/shared/src/calendar.ts` — calendar utilities (used by admin calendar editor and public upcoming calendar block)
@@ -112,7 +122,7 @@ To add a new block type: add to `BlockType` union in `packages/shared/src/types.
 ### PocketBase Integration
 - Client created in `hooks.server.ts` (`event.locals.pb`) — injected per-request with auth cookie
 - `$lib/pb.ts` exports `createPocketBase()`, `getFileUrl()`, `uploadMedia()`
-- Collections: `pages` (slug, title, blocks[], published), `globals` (key, data), `media` (file, alt)
+- Collections: `pages` (slug, title, blocks[], published), `globals` (key, data), `media` (file, alt), `email_templates` (key, subject, blocks[], recipients, enabled)
 - Server load functions use `locals.pb.collection('pages').getFirstListItem()`
 
 ### Styling
@@ -152,4 +162,6 @@ cd app-public && npm run build
 - `POCKETBASE_INTERNAL_URL` — internal Docker network URL (`http://pocketbase:80`). Set in `docker-compose.yml`.
 - `ORIGIN` — SvelteKit origin for SSR. Differs per app: `http://admin.${DOMAIN}:8080` (admin), `http://www.${DOMAIN}:8080` (public).
 - `PUBLIC_SITE_URL` — public site URL used by the admin app for cross-subdomain preview links (`http://www.${DOMAIN}:8080`).
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`, `EMAIL_FROM_NAME` — Brevo SMTP relay for booking emails (both apps). Empty `SMTP_HOST` = log emails instead of sending.
+- `SITE_TIMEZONE` — IANA timezone for booking times in emails (default `Europe/Oslo`).
 - Stripe + PocketBase admin secrets are read from a root-level `.env` next to `docker-compose.yml`; see `.env.example`.

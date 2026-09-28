@@ -91,6 +91,7 @@
 			<a class="btn btn-ghost" href="/items">Items</a>
 			<a class="btn btn-ghost" href="/slots">Slots</a>
 			<a class="btn btn-ghost" href="/orders">Orders</a>
+			<a class="btn btn-ghost" href="/emails">Emails</a>
 			<a class="btn btn-ghost" href="/globals">Globals</a>
 			<div class="dropdown dropdown-end">
 				<button class="btn btn-ghost btn-sm" type="button" tabindex="0">

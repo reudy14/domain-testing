@@ -99,8 +99,9 @@ Commerce collections (see the Stripe section above for context):
 - `slots` — `item` relation→items, `start` date, `end` date, `status` select `available|held|booked`, `heldUntil` date (nullable), `order` relation→orders (nullable), `notes` text
 - `baskets` — `status` select `active|completed|abandoned`, `expiresAt` date, `email` text, `customerDetails` json, `stripePaymentIntentId` text
 - `basket_lines` — `basket` relation→baskets, `item` relation→items, `slot` relation→slots (nullable), `quantity` number, `lineType` select `item|slot`
-- `orders` — `basket` relation→baskets, `email` text, `customerDetails` json, `total` number, `status` select `pending|paid|refunded`, `stripePaymentIntentId` text
+- `orders` — `basket` relation→baskets, `email` text, `customerDetails` json, `total` number, `status` select `pending|paid|refunded`, `stripePaymentIntentId` text, `customerEmailSentAt` date, `clientEmailSentAt` date, `emailError` text
 - `order_lines` — `order` relation→orders, `item` relation→items, `slot` relation→slots (nullable), `quantity` number, `lineType` select `item|slot`, `name` text (snapshot), `price` number (snapshot), `start` date (nullable, snapshot)
+- `email_templates` — `key` text (unique: `customer_confirmation` | `client_alert`), `subject` text, `blocks` json, `recipients` text, `enabled` bool
 
 > **Schema format note:** `pb_schema.json` targets PocketBase 0.23+ using the `fields` array (not the legacy `schema` array). Relation and select fields carry their config (`collectionId`, `cascadeDelete`, `maxSelect`, `values`) at the field top level, not nested under `options`. Importing the whole file via the PocketBase admin UI or `PUT /api/collections/import` creates or updates all collections in one pass.
 
@@ -121,7 +122,8 @@ All routes in `app-admin` except `/login` are guarded in `src/hooks.server.ts`.
 - `/calendar` — events shown by Upcoming Calendar blocks
 - `/items` — services and products shown in Shop blocks
 - `/slots` — manually created bookable time slots for services
-- `/orders` — read-only list of confirmed bookings and purchases
+- `/orders` — confirmed bookings and purchases, with booking-email status and resend buttons
+- `/emails` — block-based editor for the booking confirmation and new-booking alert emails (live preview, test send)
 - `/globals` — header/footer/colors editor
 
 ## Reservations & payments (Stripe)
@@ -139,6 +141,27 @@ Setup:
    Copy the printed `whsec_…` signing secret into `STRIPE_WEBHOOK_SECRET`.
 4. Import the updated `pb_schema.json` (adds `items`, `slots`, `baskets`, `basket_lines`, `orders`, `order_lines`). The `basket_lines.slot` partial unique index guarantees two visitors can't hold the same slot.
 5. Create a published page (e.g. slug `book`) with a `shop` block and a `checkout` block, and point the header CTA at it.
+
+## Booking emails (Brevo)
+
+After the Stripe webhook creates an order it sends two emails through an SMTP relay (Brevo) with `nodemailer`:
+
+- **Booking confirmation** to the customer, with a `booking.ics` calendar attachment for booked time slots. Reply-To is the footer email.
+- **New booking alert** to the studio (the template's recipients, or the footer email). Reply-To is the customer.
+
+Both are edited in the admin under **Emails** using email blocks (text, image, button, spacer, divider, and auto-filled booking details / customer details / contact info). Text and subjects support placeholders like `{{customer_first_name}}` and `{{booking_date}}`. Until a template is saved, a built-in default is used. Rendering lives in `packages/shared/src/email/` (pure, used by both the admin live preview and sending); sending lives in `packages/shared/src/server/email/`.
+
+The result is recorded on the order (`customerEmailSentAt`, `clientEmailSentAt`, `emailError`); a failed email never fails the webhook and can be resent from `/orders`.
+
+Setup:
+
+1. Import the updated `pb_schema.json` (adds `email_templates` and the email fields on `orders`).
+2. In Brevo: **Settings → Senders, Domains & Dedicated IPs → Domains → Add a domain**, then add the DNS records it shows (Brevo code TXT, the DKIM CNAMEs, DMARC TXT on `_dmarc`) and click *Authenticate*. Add a sender such as `bookings@yourdomain.com`.
+3. **SMTP & API → SMTP → Generate a new SMTP key**. Put the values in `.env`: `SMTP_HOST=smtp-relay.brevo.com`, `SMTP_PORT=587`, `SMTP_USER` = the SMTP *login* shown there (`…@smtp-brevo.com`, not your account email), `SMTP_PASS` = the key, `EMAIL_FROM` / `EMAIL_FROM_NAME` = the sender.
+4. Set `SITE_TIMEZONE` (IANA name, default `Europe/Oslo`) — booking times in emails are shown in this zone.
+5. Rebuild, open **Emails** in the admin, and use **Send test email**.
+
+With `SMTP_HOST` empty (local dev) emails are written to the app container logs instead of being sent.
 
 ## Public routes (public app)
 

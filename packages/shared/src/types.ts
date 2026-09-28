@@ -170,6 +170,9 @@ export type OrderRecord = {
 	stripePaymentIntentId: string;
 	createdAt: string;
 	lines?: OrderLine[];
+	customerEmailSentAt?: string;
+	clientEmailSentAt?: string;
+	emailError?: string;
 };
 
 export type OrderLine = {
@@ -197,6 +200,38 @@ export type CheckoutBlockData = {
 	title?: string;
 	heading?: string;
 	notesLabel?: string;
+};
+
+// ── Email types ───────────────────────────────────────────────────────
+
+// Email blocks are a separate, smaller set than page blocks: email clients
+// only render table layouts with inline styles, so each type has its own
+// renderer in $shared/email/render.
+export type EmailBlockType =
+	| 'text'
+	| 'image'
+	| 'button'
+	| 'spacer'
+	| 'divider'
+	| 'booking_details'
+	| 'customer_details'
+	| 'contact_info';
+
+export type EmailBlock = {
+	id: string;
+	type: EmailBlockType;
+	data: Record<string, any>;
+};
+
+export type EmailTemplateKey = 'customer_confirmation' | 'client_alert';
+
+export type EmailTemplate = {
+	key: EmailTemplateKey;
+	subject: string;
+	blocks: EmailBlock[];
+	// Comma-separated addresses; only used by client_alert (falls back to the footer email).
+	recipients: string;
+	enabled: boolean;
 };
 
 export type ColorsGlobal = {
