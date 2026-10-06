@@ -1,6 +1,6 @@
 services:
   pocketbase:
-    image: spectado/pocketbase:latest
+    image: docker.io/spectado/pocketbase:latest
     container_name: massage-pocketbase
     restart: unless-stopped
     # Internal only — accessed via the caddy reverse proxy
@@ -73,7 +73,7 @@ services:
       - "3000"
 
   caddy:
-    image: caddy:2-alpine
+    image: docker.io/library/caddy:2-alpine
     container_name: massage-caddy
     restart: unless-stopped
     ports:

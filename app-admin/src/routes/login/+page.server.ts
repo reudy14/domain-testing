@@ -9,13 +9,14 @@ export const actions: Actions = {
 
 		try {
 			try {
-				await locals.pb.admins.authWithPassword(email, password);
+				await locals.pb.collection('_superusers').authWithPassword(email, password);
 			} catch {
 				await locals.pb.collection('users').authWithPassword(email, password);
 			}
-		} catch (err) {
-			console.error('Login failed for', email, err);
-			return fail(400, { message: 'Invalid email or password.' });
+		} catch {
+			// One line per failed attempt; the full SDK error object is noise here.
+			console.warn('Admin login failed for', email);
+			return fail(400, { email, message: 'Invalid email or password.' });
 		}
 
 		throw redirect(303, '/pages');
