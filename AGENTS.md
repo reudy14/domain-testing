@@ -131,7 +131,7 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
 
 ### Styling
 - **Public site**: Custom theme via `@theme` in `app.css` — colors: `warm`, `charcoal`, `sage`, `sage-dark`, `terracotta`. Fonts: `DM Sans` (body), `Playfair Display` (headings).
-- **Admin area**: DaisyUI **5** (no `form-control` / `label-text` / `*-bordered` — those are v4). The admin has its own fixed theme in `app.css`; the site's Globals colours are applied only inside `/preview` (their CSS variables collide with DaisyUI's `--color-primary`/`--color-accent`). Conventions:
+- **Admin area**: DaisyUI **5** (no `form-control` / `label-text` / `*-bordered` — those are v4). Colours come from Site design via `$shared/theme`, rendered as a `<style>` in `<head>` (SSR, no flash): the admin gets only DaisyUI primary (= site Primary) and secondary (= site Accent) with auto-contrast text; `/preview` and the public site get all site colour variables. Never use `text-primary`/`text-secondary` for text — a light brand colour is unreadable as text; mark state with a tint/bar instead. Conventions:
   - Section card: `rounded-box bg-base-100 p-5 shadow` with an `h2.text-2xl.font-bold` title (see Site design / globals).
   - Form field: `<label class="fieldset"><span class="fieldset-legend">Label</span><input class="input w-full" /></label>`; hints in `<span class="label">`.
   - Setting rows in editors: `SegmentedControl` (choices) and `ColorField` (colours) — label column on the left, like the block Background picker.
