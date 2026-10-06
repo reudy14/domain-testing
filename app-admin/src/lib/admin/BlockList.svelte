@@ -49,10 +49,12 @@
 	}
 </script>
 
+<!-- `isolate` on each row: the delete button's z-indexed layers must stay
+     inside their row, or they paint over dropdowns like "Add block". -->
 <ul class="space-y-2">
 	{#each blocks as block, i (block.id)}
 		<li
-			class="flex items-center gap-2 rounded-box border bg-base-100 p-2 pl-3 shadow-sm transition-colors {selectedId === block.id ? 'border-primary ring-1 ring-primary' : 'border-base-300 hover:border-base-content/30'}"
+			class="isolate flex items-center gap-2 rounded-box border bg-base-100 p-2 pl-3 shadow-sm transition-colors {selectedId === block.id ? 'border-primary ring-1 ring-primary' : 'border-base-300 hover:border-base-content/30'}"
 			class:opacity-50={dragIndex === i}
 			class:border-dashed={dropIndex === i && dragIndex !== i}
 			draggable="true"

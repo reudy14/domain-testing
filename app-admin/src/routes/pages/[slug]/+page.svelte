@@ -126,7 +126,7 @@
 			<div class="rounded-box bg-base-100 p-4 shadow">
 				<div class="dropdown w-full">
 					<button class="btn btn-primary w-full" type="button" tabindex="0">Add block</button>
-					<ul class="menu dropdown-content z-10 mt-2 w-full rounded-box bg-base-100 p-2 shadow">
+					<ul class="menu dropdown-content z-20 mt-2 w-full rounded-box bg-base-100 p-2 shadow-lg">
 						{#each blockTypes as type}
 							<li><button type="button" onclick={() => addBlock(type)}>{blockLabels[type]}</button></li>
 						{/each}
