@@ -14,7 +14,7 @@ packages/shared/src/          # Shared code (types, calendar utils, blocks, pb, 
 app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 ├── src/
 │   ├── lib/
-│   │   ├── admin/            # Admin UI components (BlockList, editors)
+│   │   ├── admin/            # Admin UI components (BlockList, Modal, editors, confirm/unsaved helpers)
 │   │   ├── blocks/           # Re-exports from $shared/blocks (block renderers live in shared)
 │   │   ├── pb.ts             # Re-exports from $shared/pb + app-specific uploadMedia
 │   │   ├── types.ts          # Re-exports from $shared
@@ -22,17 +22,18 @@ app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 │   │   ├── scrollReveal.ts   # Re-exports from $shared
 │   │   ├── stripe-client.ts # Re-exports from $shared
 │   │   ├── basket.svelte.ts # Re-exports from $shared
-│   │   └── server/           # Re-exports from $shared/server (pb-admin, basket)
+│   │   └── server/           # Re-exports from $shared/server + admin helpers (actions.ts, pages.ts)
 │   ├── routes/
-│   │   ├── +layout.svelte    # Root layout (admin shell: navbar, export/import, logout)
+│   │   ├── +layout.svelte    # Root layout (admin shell: grouped sidebar; bare on /login and /preview)
 │   │   ├── login/            # Admin login
 │   │   ├── pages/            # Page CRUD + block editor
-│   │   ├── calendar/         # Event CRUD
-│   │   ├── items/            # Service/product CRUD
+│   │   ├── calendar/         # Event CRUD (menu label: Events)
+│   │   ├── items/            # Service/product CRUD (menu label: Services & products)
 │   │   ├── slots/            # Bookable time slot CRUD
 │   │   ├── orders/           # Order list + booking-email status/resend
 │   │   ├── emails/           # Block-based booking email editor (live preview, test send)
-│   │   ├── globals/          # Header/footer/colors editor
+│   │   ├── globals/          # Header/footer/colors editor (menu label: Site design)
+│   │   ├── backup/           # Export/import UI (calls api/export, api/import)
 │   │   ├── preview/          # Draft preview via sessionStorage (same-origin)
 │   │   └── api/              # upload, export, import endpoints
 │   ├── hooks.server.ts       # Auth guard — all routes except /login
@@ -67,7 +68,7 @@ app-public/                   # SvelteKit public app (serves *.<domain>)
 ├── svelte.config.js          # Adapter-node, runes mode forced, $shared alias
 ├── vite.config.ts            # Tailwind v4 + SvelteKit plugins
 └── package.json
-pocketbase/pb_data/           # PocketBase data (volume-mounted)
+pocketbase/pb_migrations/     # JS migrations, mounted at /pb_migrations; applied on PocketBase start
 docker-compose.yml            # app-admin + app-public + pocketbase + caddy services
 Caddyfile                     # Subdomain-based routing
 ```
@@ -124,14 +125,24 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
 - `$lib/pb.ts` exports `createPocketBase()`, `getFileUrl()`, `uploadMedia()`
 - Collections: `pages` (slug, title, blocks[], published), `globals` (key, data), `media` (file, alt), `email_templates` (key, subject, blocks[], recipients, enabled)
 - Server load functions use `locals.pb.collection('pages').getFirstListItem()`
+- **Always build filters with `pb.filter('slug = {:slug}', { slug })`** — never interpolate values into filter strings (quotes break them).
+- **Schema changes**: add a migration to `pocketbase/pb_migrations/` (runs once, on the next PocketBase start) **and** mirror it in `pb_schema.json` (fresh installs import that after the migrations have already run). Migrations must skip missing collections and must not throw for data problems — a failing migration stops PocketBase from starting.
+- **API rules**: CMS collections require `@request.auth.id != ''`, so `users` must never allow public sign-up (its createRule is superuser-only). Commerce writes (orders, baskets, basket_lines) are superuser-only; the public app does them server-side via `getAdminPb()`.
 
 ### Styling
 - **Public site**: Custom theme via `@theme` in `app.css` — colors: `warm`, `charcoal`, `sage`, `sage-dark`, `terracotta`. Fonts: `DM Sans` (body), `Playfair Display` (headings).
-- **Admin area**: DaisyUI utility classes (`btn`, `card`, `input`, `select`, `rounded-box`, etc.)
+- **Admin area**: DaisyUI **5** (no `form-control` / `label-text` / `*-bordered` — those are v4). The admin has its own fixed theme in `app.css`; the site's Globals colours are applied only inside `/preview` (their CSS variables collide with DaisyUI's `--color-primary`/`--color-accent`). Conventions:
+  - Section card: `rounded-box bg-base-100 p-5 shadow` with an `h2.text-2xl.font-bold` title (see Site design / globals).
+  - Form field: `<label class="fieldset"><span class="fieldset-legend">Label</span><input class="input w-full" /></label>`; hints in `<span class="label">`.
+  - Setting rows in editors: `SegmentedControl` (choices) and `ColorField` (colours) — label column on the left, like the block Background picker.
+  - Create/edit forms open in `$lib/admin/Modal.svelte`; destructive submits use `confirmSubmit()` from `$lib/admin/confirm` (returning `false` from a handler does not cancel).
+  - Server actions wrap PocketBase writes in `attempt()` from `$lib/server/actions` so failures show as an error banner, not a 500.
+  - Editors with unsaved state use `use:enhance` + `warnOnUnsavedChanges()`.
+- **Dates/times in admin**: entered and displayed in `SITE_TIMEZONE` (layout data `timezone`), via `toZonedDatetimeInput`, `zonedInputToIso`, `formatDateTime` in `$shared/calendar`. Never `new Date(localInput)` on the server — the container runs in UTC.
 - **Prose**: `.prose-wellness` class for rich text content styling
 
 ### Routing
-- **Admin app** (`app-admin`): All routes except `/login` are auth-guarded in `hooks.server.ts`. The root layout renders the admin shell (navbar, export/import, logout). The `/preview` route reads `sessionStorage` set by the page editor (same-origin, so it works).
+- **Admin app** (`app-admin`): All routes except `/login` are auth-guarded in `hooks.server.ts` (which also refreshes the token per request and sets the cookie's `Secure` flag from the real scheme). The root layout renders the admin shell (grouped sidebar) except on `/login` and `/preview`. The `/preview` route reads `sessionStorage` set by the page editor (same-origin, so it works).
 - **Public app** (`app-public`): No auth guard. The root layout always renders Header/Footer. `+layout.server.ts` fetches header/footer/colors globals + basket/items/slots for every page.
 - `+page.server.ts` for home fetches `slug = "home" && published = true`
 - `[slug]/+page.server.ts` fetches by dynamic slug

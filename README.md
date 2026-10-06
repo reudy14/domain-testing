@@ -77,6 +77,12 @@ The app containers use two PocketBase URLs:
 
 If the `globals` records do not exist, the app falls back to safe defaults and the admin globals page will create them.
 
+### Migrations
+
+`pocketbase/pb_migrations/` is mounted into the PocketBase container, which applies any new migration once when it starts (`docker compose up` / restart). The first one (`1791244800_lock_rules_dates_unique.js`) closes public sign-up on the `users` collection, makes order/basket writes superuser-only, adds `created`/`updated` dates and unique slug/key indexes. On an existing install, check the PocketBase log after restarting — if duplicate page slugs or global keys exist, the unique index is skipped with a log line.
+
+> **Security:** every CMS collection allows writes to *any* signed-in user, so the `users` collection must not allow public sign-up. The migration enforces this; if you manage PocketBase by hand, keep `users` → API rules → Create set to superuser-only.
+
 ### Manual collection fields fallback
 
 If schema import fails because of a PocketBase version mismatch, create these collections manually:
