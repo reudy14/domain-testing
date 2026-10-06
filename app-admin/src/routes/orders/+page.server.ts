@@ -3,10 +3,10 @@ import { sendOrderEmails, type EmailKind } from '$lib/server/email';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	// NOTE: there is no `created` field on orders (commerce collections were
-	// imported without autodate fields) and PocketBase ids are random, so
-	// '-id' is NOT chronological. See the polish report for the schema fix.
-	const records = await locals.pb.collection('orders').getFullList({ sort: '-id' }).catch(() => []);
+	// Newest first. `created` comes from the 1791244800 migration; orders made
+	// before it have no date and sort last (PocketBase ids are random, so they
+	// can't be ordered chronologically).
+	const records = await locals.pb.collection('orders').getFullList({ sort: '-created,-id' }).catch(() => []);
 
 	// All lines in one request (previously one request per order).
 	const lineRecords = records.length

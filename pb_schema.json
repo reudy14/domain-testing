@@ -60,9 +60,13 @@
         "presentable": false,
         "unique": false,
         "options": {}
-      }
+      },
+      {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
+      {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
-    "indexes": [],
+    "indexes": [
+      "CREATE UNIQUE INDEX `idx_pages_slug_unique` ON `pages` (`slug`)"
+    ],
     "options": {}
   },
   {
@@ -102,9 +106,13 @@
         "options": {
           "maxSize": 1000000
         }
-      }
+      },
+      {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
+      {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
-    "indexes": [],
+    "indexes": [
+      "CREATE UNIQUE INDEX `idx_globals_key_unique` ON `globals` (`key`)"
+    ],
     "options": {}
   },
   {
@@ -162,7 +170,9 @@
           "max": 180,
           "pattern": ""
         }
-      }
+      },
+      {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
+      {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
     "indexes": [],
     "options": {}
@@ -292,7 +302,9 @@
         "presentable": false,
         "unique": false,
         "options": {}
-      }
+      },
+      {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
+      {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
     "indexes": [
       "CREATE INDEX `idx_events_start` ON `events` (`start`)",
@@ -319,7 +331,9 @@
       { "id": "sel_itemtype001", "name": "type", "type": "select", "system": false, "required": true, "presentable": false, "unique": false, "maxSelect": 1, "values": ["item", "item_with_time"] },
       { "id": "num_itemstock01", "name": "stock", "type": "number", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": 0, "max": null } },
       { "id": "num_itemdur0001", "name": "duration", "type": "number", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": 1, "max": null } },
-      { "id": "bool_itemactive", "name": "active", "type": "bool", "system": false, "required": false, "presentable": false, "unique": false, "options": {} }
+      { "id": "bool_itemactive", "name": "active", "type": "bool", "system": false, "required": false, "presentable": false, "unique": false, "options": {} },
+      {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
+      {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
     "indexes": [],
     "autodate": true,
@@ -343,7 +357,9 @@
       { "id": "sel_slotstatus0", "name": "status", "type": "select", "system": false, "required": true, "presentable": false, "unique": false, "maxSelect": 1, "values": ["available", "held", "booked"] },
       { "id": "date_slotheldun0", "name": "heldUntil", "type": "date", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": "", "max": "" } },
       { "id": "rel_slotorder01", "name": "order", "type": "relation", "system": false, "required": false, "presentable": false, "unique": false, "collectionId": "pbc_orders00001", "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
-      { "id": "text_slotnotes0", "name": "notes", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 500, "pattern": "" } }
+      { "id": "text_slotnotes0", "name": "notes", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 500, "pattern": "" } },
+      {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
+      {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
     "indexes": [
       "CREATE INDEX `idx_slots_item_start` ON `slots` (`item`, `start`)",
@@ -359,8 +375,8 @@
     "system": false,
     "listRule": "@request.auth.id != ''",
     "viewRule": "@request.auth.id != ''",
-    "createRule": "",
-    "updateRule": "",
+    "createRule": null,
+    "updateRule": null,
     "deleteRule": "@request.auth.id != ''",
     "fields": [
       { "id": "text3208210256", "name": "id", "type": "text", "system": true, "required": true, "presentable": false, "hidden": false, "primaryKey": true, "autogeneratePattern": "[a-z0-9]{15}", "min": 15, "max": 15, "pattern": "^[a-z0-9]+$" },
@@ -368,7 +384,9 @@
       { "id": "date_basketexp0", "name": "expiresAt", "type": "date", "system": false, "required": true, "presentable": false, "unique": false, "options": { "min": "", "max": "" } },
       { "id": "text_basketemai", "name": "email", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 254, "pattern": "" } },
       { "id": "json_basketcust", "name": "customerDetails", "type": "json", "system": false, "required": false, "presentable": false, "unique": false, "options": { "maxSize": 100000 } },
-      { "id": "text_basketstrip", "name": "stripePaymentIntentId", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 200, "pattern": "" } }
+      { "id": "text_basketstrip", "name": "stripePaymentIntentId", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 200, "pattern": "" } },
+      {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
+      {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
     "indexes": [
       "CREATE INDEX `idx_baskets_status` ON `baskets` (`status`)"
@@ -383,16 +401,18 @@
     "system": false,
     "listRule": "@request.auth.id != ''",
     "viewRule": "@request.auth.id != ''",
-    "createRule": "",
-    "updateRule": "",
-    "deleteRule": "",
+    "createRule": null,
+    "updateRule": null,
+    "deleteRule": null,
     "fields": [
       { "id": "text3208210256", "name": "id", "type": "text", "system": true, "required": true, "presentable": false, "hidden": false, "primaryKey": true, "autogeneratePattern": "[a-z0-9]{15}", "min": 15, "max": 15, "pattern": "^[a-z0-9]+$" },
       { "id": "rel_blbasket0001", "name": "basket", "type": "relation", "system": false, "required": true, "presentable": false, "unique": false, "collectionId": "pbc_baskets0001", "cascadeDelete": true, "minSelect": 0, "maxSelect": 1, "displayFields": null },
       { "id": "rel_blitem000001", "name": "item", "type": "relation", "system": false, "required": true, "presentable": false, "unique": false, "collectionId": "pbc_items00001", "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
       { "id": "rel_blslot000001", "name": "slot", "type": "relation", "system": false, "required": false, "presentable": false, "unique": false, "collectionId": "pbc_slots00001", "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
       { "id": "num_blquantity01", "name": "quantity", "type": "number", "system": false, "required": true, "presentable": false, "unique": false, "options": { "min": 1, "max": null } },
-      { "id": "sel_bllinetype01", "name": "lineType", "type": "select", "system": false, "required": true, "presentable": false, "unique": false, "maxSelect": 1, "values": ["item", "slot"] }
+      { "id": "sel_bllinetype01", "name": "lineType", "type": "select", "system": false, "required": true, "presentable": false, "unique": false, "maxSelect": 1, "values": ["item", "slot"] },
+      {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
+      {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
     "indexes": [
       "CREATE INDEX `idx_basket_lines_basket` ON `basket_lines` (`basket`)",
@@ -408,7 +428,7 @@
     "system": false,
     "listRule": "@request.auth.id != ''",
     "viewRule": "@request.auth.id != ''",
-    "createRule": "",
+    "createRule": null,
     "updateRule": "@request.auth.id != ''",
     "deleteRule": "@request.auth.id != ''",
     "fields": [
@@ -421,7 +441,9 @@
       { "id": "text_orderstripe0", "name": "stripePaymentIntentId", "type": "text", "system": false, "required": true, "presentable": false, "unique": false, "options": { "min": null, "max": 200, "pattern": "" } },
       { "id": "date_ordcustmail", "name": "customerEmailSentAt", "type": "date", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": "", "max": "" } },
       { "id": "date_ordclntmail", "name": "clientEmailSentAt", "type": "date", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": "", "max": "" } },
-      { "id": "text_ordmailerr0", "name": "emailError", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 2000, "pattern": "" } }
+      { "id": "text_ordmailerr0", "name": "emailError", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 2000, "pattern": "" } },
+      {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
+      {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
     "indexes": [
       "CREATE INDEX `idx_orders_basket` ON `orders` (`basket`)"
@@ -448,7 +470,9 @@
       { "id": "sel_ollinetype01", "name": "lineType", "type": "select", "system": false, "required": true, "presentable": false, "unique": false, "maxSelect": 1, "values": ["item", "slot"] },
       { "id": "text_olname00001", "name": "name", "type": "text", "system": false, "required": true, "presentable": false, "unique": false, "options": { "min": null, "max": 180, "pattern": "" } },
       { "id": "num_olprice00001", "name": "price", "type": "number", "system": false, "required": true, "presentable": false, "unique": false, "options": { "min": 0, "max": null } },
-      { "id": "date_olstart0001", "name": "start", "type": "date", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": "", "max": "" } }
+      { "id": "date_olstart0001", "name": "start", "type": "date", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": "", "max": "" } },
+      {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
+      {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
     "indexes": [
       "CREATE INDEX `idx_order_lines_order` ON `order_lines` (`order`)"
@@ -472,7 +496,9 @@
       { "id": "text_etplsubject", "name": "subject", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 300, "pattern": "" } },
       { "id": "json_etplblocks0", "name": "blocks", "type": "json", "system": false, "required": false, "presentable": false, "unique": false, "options": { "maxSize": 2000000 } },
       { "id": "text_etplrecips0", "name": "recipients", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 500, "pattern": "" } },
-      { "id": "bool_etplenabled", "name": "enabled", "type": "bool", "system": false, "required": false, "presentable": false, "unique": false, "options": {} }
+      { "id": "bool_etplenabled", "name": "enabled", "type": "bool", "system": false, "required": false, "presentable": false, "unique": false, "options": {} },
+      {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
+      {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
     "indexes": [
       "CREATE UNIQUE INDEX `idx_email_templates_key` ON `email_templates` (`key`)"
