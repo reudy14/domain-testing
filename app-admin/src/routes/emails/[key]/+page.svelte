@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { beforeNavigate } from '$app/navigation';
 	import BlockList from '$lib/admin/BlockList.svelte';
 	import EmailBlockEditor from '$lib/admin/editors/EmailBlockEditor.svelte';
 	import { createEmailBlock, emailBlockLabels, emailBlockTypes } from '$lib/admin/emailBlockDefaults';
+	import { warnOnUnsavedChanges } from '$lib/admin/unsaved.svelte';
 	import { emailPlaceholders, renderEmail, sampleEmailContext } from '$lib/email';
 	import type { EmailBlock, EmailBlockType } from '$lib/types';
 
@@ -31,9 +31,7 @@
 	let rendered = $derived(renderEmail({ subject, blocks }, context));
 	let isAlert = $derived(data.key === 'client_alert');
 
-	beforeNavigate(({ cancel, type }) => {
-		if (dirty && type !== 'form' && !confirm('You have unsaved changes. Leave anyway?')) cancel();
-	});
+	warnOnUnsavedChanges(() => dirty);
 
 	function addBlock(type: EmailBlockType) {
 		const block = createEmailBlock(type);
@@ -46,8 +44,9 @@
 	}
 
 	function deleteBlock(id: string) {
+		const index = blocks.findIndex((block) => block.id === id);
 		blocks = blocks.filter((block) => block.id !== id);
-		if (selectedId === id) selectedId = blocks[0]?.id || '';
+		if (selectedId === id) selectedId = (blocks[index] ?? blocks[index - 1])?.id || '';
 	}
 
 	function moveBlock(from: number, to: number) {
@@ -100,24 +99,22 @@
 			<div class="alert" class:alert-success={form.ok} class:alert-error={!form.ok}>{form.message}</div>
 		{/if}
 
-		<div class="rounded-box space-y-4 bg-base-100 p-5 shadow">
-			<label class="label cursor-pointer justify-start gap-3">
+		<div class="space-y-2 rounded-box bg-base-100 p-5 shadow">
+			<label class="label cursor-pointer gap-3 text-base-content">
 				<input type="checkbox" class="toggle toggle-primary" bind:checked={enabled} />
-				<span class="label-text">{enabled ? 'This email is sent automatically' : 'This email is turned off'}</span>
+				{enabled ? 'This email is sent automatically' : 'This email is turned off'}
 			</label>
-			<label class="form-control w-full">
-				<div class="label"><span class="label-text">Subject</span></div>
-				<input class="input input-bordered w-full" name="subject" bind:value={subject} />
+			<label class="fieldset">
+				<span class="fieldset-legend">Subject</span>
+				<input class="input w-full" name="subject" bind:value={subject} />
 			</label>
 			{#if isAlert}
-				<label class="form-control w-full">
-					<div class="label"><span class="label-text">Send to (comma-separated)</span></div>
-					<input class="input input-bordered w-full" name="recipients" placeholder={data.settings.business.email || 'you@example.com'} bind:value={recipients} />
-					<div class="label">
-						<span class="label-text-alt text-base-content/60">
-							{#if data.settings.business.email}Leave empty to use the footer email ({data.settings.business.email}).{:else}No footer email is set — enter at least one address.{/if}
-						</span>
-					</div>
+				<label class="fieldset">
+					<span class="fieldset-legend">Send to (comma-separated)</span>
+					<input class="input w-full" name="recipients" placeholder={data.settings.business.email || 'you@example.com'} bind:value={recipients} />
+					<span class="label">
+						{#if data.settings.business.email}Leave empty to use the footer email ({data.settings.business.email}).{:else}No footer email is set — enter at least one address.{/if}
+					</span>
 				</label>
 			{:else}
 				<input type="hidden" name="recipients" value="" />
@@ -209,7 +206,7 @@
 		<input type="hidden" name="subject" value={subject} />
 		<input type="hidden" name="blocks" value={JSON.stringify(blocks)} />
 		<div class="flex flex-col gap-2 sm:flex-row">
-			<input class="input input-bordered flex-1" type="email" name="to" placeholder="you@example.com" bind:value={testTo} required />
+			<input class="input flex-1" type="email" name="to" placeholder="you@example.com" bind:value={testTo} required />
 			<button class="btn" type="submit" disabled={testing}>{testing ? 'Sending…' : 'Send test'}</button>
 		</div>
 		{#if form?.action === 'test' && form.message}
