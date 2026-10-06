@@ -4,15 +4,19 @@ import type { RequestHandler } from './$types';
 import {
 	dataUriToFile,
 	restorePlaceholders,
+	validateSiteExport,
 	type SiteExport
 } from '$lib/exportImport';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-	const body = (await request.json()) as SiteExport;
-
-	if (!body || body.version !== 1) {
-		throw error(400, 'Invalid or unsupported export file.');
+	let body: SiteExport;
+	try {
+		body = await request.json();
+	} catch {
+		throw error(400, 'The file is not valid JSON.');
 	}
+	const invalid = validateSiteExport(body);
+	if (invalid) throw error(400, invalid);
 
 	const results = {
 		imagesUploaded: 0,
@@ -55,7 +59,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			// Try to find existing page by slug
 			let existing;
 			try {
-				existing = await locals.pb.collection('pages').getFirstListItem(`slug = "${page.slug}"`);
+				existing = await locals.pb.collection('pages').getFirstListItem(locals.pb.filter('slug = {:slug}', { slug: page.slug }));
 			} catch {
 				existing = null;
 			}
@@ -87,7 +91,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 			let existing;
 			try {
-				existing = await locals.pb.collection('globals').getFirstListItem(`key = "${g.key}"`);
+				existing = await locals.pb.collection('globals').getFirstListItem(locals.pb.filter('key = {:key}', { key: g.key }));
 			} catch {
 				existing = null;
 			}
@@ -108,7 +112,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		try {
 			let existing;
 			try {
-				existing = await locals.pb.collection('events').getFirstListItem(`name = "${event.name}" && start = "${event.start}"`);
+				existing = await locals.pb
+						.collection('events')
+						.getFirstListItem(locals.pb.filter('name = {:name} && start = {:start}', { name: event.name, start: event.start }));
 			} catch {
 				existing = null;
 			}

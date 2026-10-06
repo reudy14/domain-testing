@@ -53,7 +53,7 @@ export function replaceUrlsWithKeys(
 	if (typeof value === 'string') {
 		let result = value;
 		for (const [url, key] of urlToKey) {
-			result = result.replace(url, `__IMG__${key}__`);
+			result = result.replaceAll(url, `__IMG__${key}__`);
 		}
 		return result;
 	}
@@ -80,7 +80,7 @@ export function restorePlaceholders(
 	if (typeof value === 'string') {
 		let result = value;
 		for (const [key, url] of keyToUrl) {
-			result = result.replace(`__IMG__${key}__`, url);
+			result = result.replaceAll(`__IMG__${key}__`, url);
 		}
 		return result;
 	}
@@ -122,6 +122,17 @@ export async function fetchImageAsBase64(url: string): Promise<string> {
 	}
 	const base64 = btoa(binary);
 	return `data:${blob.type};base64,${base64}`;
+}
+
+/** Shape check for an uploaded export file; returns an error message or null. */
+export function validateSiteExport(body: unknown): string | null {
+	if (!body || typeof body !== 'object') return 'The file is not a CMS export.';
+	const b = body as Partial<SiteExport>;
+	if (b.version !== 1) return 'Unsupported export version.';
+	if (!Array.isArray(b.pages) || !Array.isArray(b.globals)) return 'The export is missing pages or globals.';
+	if (b.events !== undefined && !Array.isArray(b.events)) return 'The export has an invalid events list.';
+	if (!b.images || typeof b.images !== 'object' || Array.isArray(b.images)) return 'The export is missing its images.';
+	return null;
 }
 
 /**
