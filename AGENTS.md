@@ -3,7 +3,7 @@
 ## Stack
 
 - **SvelteKit 2** (SSR, Svelte 5 runes mode) — all `.svelte` files use `$state`, `$derived`, `$props()` etc.
-- **PocketBase** — REST API via the `pocketbase` SDK (v0.26). Auth, DB, and image storage.
+- **PocketBase** — server pinned to **0.23.12** (`docker-compose.yml`), REST API via the `pocketbase` SDK (v0.26). Auth, DB, and image storage. Bump the server version deliberately (changelog, backup, test migrations).
 - **Tailwind CSS v4** + **DaisyUI 5** — utility-first CSS with DaisyUI components for admin; custom theme for the public site.
 - **Docker Compose** — four services: `app-admin`, `app-public`, `pocketbase`, and `caddy` (reverse proxy).
 

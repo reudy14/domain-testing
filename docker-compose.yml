@@ -1,6 +1,9 @@
 services:
   pocketbase:
-    image: docker.io/spectado/pocketbase:latest
+    # Pinned: schema (pb_schema.json) and migrations target this version's
+    # format/JS API. Upgrade deliberately — read the PocketBase changelog,
+    # back up pb_data, then bump the tag and test migrations locally.
+    image: docker.io/spectado/pocketbase:0.23.12
     container_name: massage-pocketbase
     restart: unless-stopped
     # Internal only — accessed via the caddy reverse proxy
