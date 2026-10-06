@@ -33,9 +33,9 @@
 </script>
 
 <div class="space-y-4">
-	<label class="form-control w-full">
-		<div class="label"><span class="label-text">Title</span></div>
-		<input class="input input-bordered w-full" value={block.data.title || ''} oninput={(e) => updateData({ title: e.currentTarget.value })} />
+	<label class="fieldset">
+		<span class="fieldset-legend">Title</span>
+		<input class="input w-full" value={block.data.title || ''} oninput={(e) => updateData({ title: e.currentTarget.value })} />
 	</label>
 
 	<SegmentedControl

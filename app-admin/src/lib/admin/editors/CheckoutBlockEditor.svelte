@@ -15,17 +15,17 @@
 </script>
 
 <div class="space-y-4">
-	<label class="form-control w-full">
-		<div class="label"><span class="label-text">Title</span></div>
-		<input class="input input-bordered w-full" value={block.data.title || ''} oninput={(e) => updateData({ title: e.currentTarget.value })} />
+	<label class="fieldset">
+		<span class="fieldset-legend">Title</span>
+		<input class="input w-full" value={block.data.title || ''} oninput={(e) => updateData({ title: e.currentTarget.value })} />
 	</label>
-	<label class="form-control w-full">
-		<div class="label"><span class="label-text">Heading</span></div>
-		<input class="input input-bordered w-full" value={block.data.heading || ''} oninput={(e) => updateData({ heading: e.currentTarget.value })} />
+	<label class="fieldset">
+		<span class="fieldset-legend">Heading</span>
+		<input class="input w-full" value={block.data.heading || ''} oninput={(e) => updateData({ heading: e.currentTarget.value })} />
 	</label>
-	<label class="form-control w-full">
-		<div class="label"><span class="label-text">Notes label</span></div>
-		<input class="input input-bordered w-full" placeholder="Notes or special requests" value={block.data.notesLabel || ''} oninput={(e) => updateData({ notesLabel: e.currentTarget.value })} />
+	<label class="fieldset">
+		<span class="fieldset-legend">Notes label</span>
+		<input class="input w-full" placeholder="Notes or special requests" value={block.data.notesLabel || ''} oninput={(e) => updateData({ notesLabel: e.currentTarget.value })} />
 	</label>
 	<p class="text-sm text-base-content/60">Customer fields (name, email, phone, notes) and the payment flow are fixed and cannot be changed here.</p>
 </div>

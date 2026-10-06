@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { formatDateTime } from '$lib/calendar';
 
 	let { data, form } = $props();
 	let orders = $derived(data.orders || []);
 	let resending = $state('');
 
-	const eur = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR' });
+	let money = $derived(new Intl.NumberFormat('en-GB', { style: 'currency', currency: data.currency }));
 </script>
 
 {#snippet emailStatus(order: (typeof orders)[number], kind: 'customer' | 'client', label: string, sentAt: string)}
@@ -23,7 +24,7 @@
 	>
 		<input type="hidden" name="orderId" value={order.id} />
 		<input type="hidden" name="kind" value={kind} />
-		<span class="badge badge-sm" class:badge-success={sentAt} class:badge-ghost={!sentAt} title={sentAt ? new Date(sentAt).toLocaleString() : 'Not sent'}>
+		<span class="badge badge-sm" class:badge-success={sentAt} class:badge-ghost={!sentAt} title={sentAt ? `Sent ${formatDateTime(sentAt, data.timezone)}` : 'Not sent'}>
 			{label}: {sentAt ? 'sent' : 'not sent'}
 		</span>
 		<button class="btn btn-ghost btn-xs" type="submit" disabled={resending !== ''}>
@@ -37,14 +38,14 @@
 <div class="space-y-6">
 	<div>
 		<h1 class="text-3xl font-bold">Orders</h1>
-		<p class="text-base-content/60">Confirmed bookings and purchases.</p>
+		<p class="text-base-content/60">Bookings and purchases from the shop.</p>
 	</div>
 
 	{#if orders.length === 0}
 		<div class="rounded-box bg-base-100 p-8 text-center text-base-content/60 shadow">No orders yet.</div>
 	{/if}
 
-	{#each orders as order}
+	{#each orders as order (order.id)}
 		<div class="rounded-box bg-base-100 p-5 shadow">
 			<div class="flex flex-col justify-between gap-3 md:flex-row md:items-center">
 				<div>
@@ -52,7 +53,7 @@
 					<p class="text-sm text-base-content/60">
 						{order.email}
 						{#if order.customerDetails?.phone} · {order.customerDetails.phone}{/if}
-						{#if order.created} · {new Date(order.created).toLocaleString()}{/if}
+						{#if order.created} · {formatDateTime(order.created, data.timezone)}{/if}
 					</p>
 				</div>
 				<div class="flex items-center gap-3">
@@ -62,16 +63,16 @@
 						class:badge-warning={order.status === 'pending'}
 						class:badge-error={order.status === 'refunded'}
 					>{order.status}</span>
-					<span class="text-lg font-bold">{eur.format(order.total)}</span>
+					<span class="text-lg font-bold">{money.format(order.total)}</span>
 				</div>
 			</div>
 
 			<ul class="mt-4 space-y-1 border-t border-base-300 pt-4">
 				{#each order.lines as line}
 					<li>
-						{line.quantity}× {line.name} — {eur.format(line.price)}
+						{line.quantity}× {line.name} — {money.format(line.price)}
 						{#if line.lineType === 'slot' && line.start}
-							<span class="block text-sm text-base-content/60">{new Date(line.start).toLocaleString()}</span>
+							<span class="block text-sm text-base-content/60">{formatDateTime(line.start, data.timezone)}</span>
 						{/if}
 					</li>
 				{/each}

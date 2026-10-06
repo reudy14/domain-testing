@@ -1,15 +1,64 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import ImageUploader from '$lib/admin/editors/ImageUploader.svelte';
+	import type { SubmitFunction } from '@sveltejs/kit';
 
-	let { data } = $props();
+	let { data, form } = $props();
 	let header = $state(structuredClone(data.header.data));
 	let footer = $state(structuredClone(data.footer.data));
 	let colors = $state(structuredClone(data.colors.data));
+	let saving = $state('');
+	// Older records may predate the CTA button; the inputs below need an object.
+	header.ctaButton ??= { label: '', href: '' };
+
 	function addHeaderLink() { header.navLinks = [...(header.navLinks || []), { label: '', href: '' }]; }
 	function addSocial() { footer.socialLinks = [...(footer.socialLinks || []), { platform: '', url: '' }]; }
+
+	const footerFields = [
+		{ key: 'businessName', label: 'Business name' },
+		{ key: 'tagline', label: 'Tagline' },
+		{ key: 'address', label: 'Address' },
+		{ key: 'phone', label: 'Phone' },
+		{ key: 'email', label: 'Email', hint: 'Also used as the reply-to and alert address for booking emails.' },
+		{ key: 'copyrightText', label: 'Copyright text' }
+	];
+
+	const colorFields = [
+		{ key: 'background', label: 'Background' },
+		{ key: 'heading', label: 'Headings' },
+		{ key: 'subheading', label: 'Subheadings' },
+		{ key: 'text', label: 'Body text' },
+		{ key: 'primary', label: 'Primary', hint: 'Buttons and links' },
+		{ key: 'accent', label: 'Accent', hint: 'Highlights' }
+	];
+
+	const isHex = (value: unknown) => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
+
+	const submit: SubmitFunction = ({ formData }) => {
+		saving = String(formData.get('section'));
+		return async ({ update }) => {
+			await update({ reset: false, invalidateAll: false });
+			saving = '';
+		};
+	};
 </script>
 
 <svelte:head><title>Globals | CMS</title></svelte:head>
+
+{#snippet status(section: string)}
+	{#if form?.section === section && form.message}
+		<div class="alert mt-4 py-2 text-sm" class:alert-success={form.ok} class:alert-error={!form.ok} role="status">{form.message}</div>
+	{/if}
+{/snippet}
+
+{#snippet saveButton(section: string, label: string)}
+	<div class="flex-grow"></div>
+	{@render status(section)}
+	<button class="btn btn-primary mt-4 w-full" type="submit" disabled={saving !== ''}>
+		{#if saving === section}<span class="loading loading-spinner loading-sm"></span>{/if}
+		{label}
+	</button>
+{/snippet}
 
 <div class="mb-6">
 	<h1 class="text-3xl font-bold">Global sections</h1>
@@ -17,80 +66,83 @@
 </div>
 
 <div class="grid gap-6 xl:grid-cols-3">
-	<form class="rounded-box bg-base-100 p-5 shadow flex flex-col" method="POST" action="?/save">
+	<form class="flex flex-col rounded-box bg-base-100 p-5 shadow" method="POST" action="?/save" use:enhance={submit}>
 		<input type="hidden" name="id" value={data.header.id} />
+		<input type="hidden" name="section" value="header" />
 		<input type="hidden" name="data" value={JSON.stringify(header)} />
 		<h2 class="mb-4 text-2xl font-bold">Header</h2>
+		<h3 class="mb-2 font-bold">Logo</h3>
 		<ImageUploader url={header.logo?.url} alt={header.logo?.alt} onChange={(image) => (header.logo = image)} />
 		<h3 class="mt-6 font-bold">Navigation</h3>
 		{#each header.navLinks || [] as link, i}
 			<div class="my-2 grid grid-cols-[1fr_1fr_auto] gap-2">
-				<input class="input input-bordered" bind:value={link.label} placeholder="Label" />
-				<input class="input input-bordered" bind:value={link.href} placeholder="Href" />
-				<button class="btn btn-error btn-outline" type="button" onclick={() => (header.navLinks = header.navLinks.filter((_: unknown, index: number) => index !== i))}>×</button>
+				<input class="input" aria-label="Link label" bind:value={link.label} placeholder="Label" />
+				<input class="input" aria-label="Link address" bind:value={link.href} placeholder="/page" />
+				<button class="btn btn-error btn-outline btn-square" type="button" aria-label="Remove link" onclick={() => (header.navLinks = header.navLinks.filter((_: unknown, index: number) => index !== i))}>✕</button>
 			</div>
 		{/each}
-		<button class="btn btn-sm" type="button" onclick={addHeaderLink}>Add link</button>
-		<h3 class="mt-6 font-bold">CTA button</h3>
-		<input class="input input-bordered mb-2 w-full" bind:value={header.ctaButton.label} placeholder="Label" />
-		<input class="input input-bordered w-full" bind:value={header.ctaButton.href} placeholder="Href" />
-		<h3 class="mt-6 font-bold">Home page</h3>
-		<select class="select select-bordered w-full" bind:value={header.homePage}>
+		<button class="btn btn-sm mt-1" type="button" onclick={addHeaderLink}>Add link</button>
+		<h3 class="mt-6 mb-2 font-bold">CTA button</h3>
+		<div class="grid grid-cols-2 gap-2">
+			<input class="input w-full" aria-label="Button label" bind:value={header.ctaButton.label} placeholder="Label" />
+			<input class="input w-full" aria-label="Button address" bind:value={header.ctaButton.href} placeholder="/book" />
+		</div>
+		<h3 class="mt-6 mb-2 font-bold">Home page</h3>
+		<select class="select w-full" aria-label="Home page" bind:value={header.homePage}>
 			<option value="">— Select a page —</option>
-			{#each data.pages as page}
+			{#each data.pages as page (page.id)}
 				<option value={page.slug}>{page.title} [{page.slug}]</option>
 			{/each}
 		</select>
-		<p class="text-sm text-base-content/60 mt-1">The page that "/" will redirect to.</p>
-		<div class="flex-grow"></div>
-		<button class="btn btn-primary mt-6 block w-full" type="submit">Save header</button>
+		<p class="mt-1 text-sm text-base-content/60">The page that "/" will redirect to.</p>
+		{@render saveButton('header', 'Save header')}
 	</form>
 
-	<form class="rounded-box bg-base-100 p-5 shadow flex flex-col" method="POST" action="?/save">
+	<form class="flex flex-col rounded-box bg-base-100 p-5 shadow" method="POST" action="?/save" use:enhance={submit}>
 		<input type="hidden" name="id" value={data.footer.id} />
+		<input type="hidden" name="section" value="footer" />
 		<input type="hidden" name="data" value={JSON.stringify(footer)} />
 		<h2 class="mb-4 text-2xl font-bold">Footer</h2>
-		{#each ['businessName', 'tagline', 'address', 'phone', 'email', 'copyrightText'] as field}
-			<label class="form-control w-full">
-				<div class="label"><span class="label-text">{field}</span></div>
-				<input class="input input-bordered w-full" bind:value={footer[field]} />
+		{#each footerFields as field (field.key)}
+			<label class="fieldset py-1">
+				<span class="fieldset-legend pb-0">{field.label}</span>
+				{#if field.key === 'address'}
+					<textarea class="textarea w-full" rows="2" bind:value={footer[field.key]}></textarea>
+				{:else}
+					<input class="input w-full" type={field.key === 'email' ? 'email' : 'text'} bind:value={footer[field.key]} />
+				{/if}
+				{#if field.hint}<span class="label">{field.hint}</span>{/if}
 			</label>
 		{/each}
 		<h3 class="mt-6 font-bold">Social links</h3>
 		{#each footer.socialLinks || [] as link, i}
 			<div class="my-2 grid grid-cols-[1fr_1fr_auto] gap-2">
-				<input class="input input-bordered" bind:value={link.platform} placeholder="Platform" />
-				<input class="input input-bordered" bind:value={link.url} placeholder="URL" />
-				<button class="btn btn-error btn-outline" type="button" onclick={() => (footer.socialLinks = footer.socialLinks.filter((_: unknown, index: number) => index !== i))}>×</button>
+				<input class="input" aria-label="Platform" bind:value={link.platform} placeholder="Platform" />
+				<input class="input" aria-label="Profile URL" bind:value={link.url} placeholder="https://…" />
+				<button class="btn btn-error btn-outline btn-square" type="button" aria-label="Remove social link" onclick={() => (footer.socialLinks = footer.socialLinks.filter((_: unknown, index: number) => index !== i))}>✕</button>
 			</div>
 		{/each}
-		<button class="btn btn-sm" type="button" onclick={addSocial}>Add social link</button>
-		<div class="flex-grow"></div>
-		<button class="btn btn-primary mt-6 block w-full" type="submit">Save footer</button>
+		<button class="btn btn-sm mt-1" type="button" onclick={addSocial}>Add social link</button>
+		{@render saveButton('footer', 'Save footer')}
 	</form>
 
-	<form class="rounded-box bg-base-100 p-5 shadow flex flex-col" method="POST" action="?/save">
+	<form class="flex flex-col rounded-box bg-base-100 p-5 shadow" method="POST" action="?/save" use:enhance={submit}>
 		<input type="hidden" name="id" value={data.colors.id} />
+		<input type="hidden" name="section" value="colors" />
 		<input type="hidden" name="data" value={JSON.stringify(colors)} />
 		<h2 class="mb-4 text-2xl font-bold">Colors</h2>
-		<p class="text-sm text-base-content/60 mb-4">These colors are applied across the site as defaults.</p>
-		{#each [
-			{ key: 'background', label: 'Background color' },
-			{ key: 'heading', label: 'Heading color' },
-			{ key: 'subheading', label: 'Subheading color' },
-			{ key: 'text', label: 'Text color' },
-			{ key: 'primary', label: 'Primary color (buttons, links)' },
-			{ key: 'accent', label: 'Accent color (highlights)' }
-		] as { key, label }}
-			<label class="form-control w-full mb-3">
-				<div class="label"><span class="label-text">{label}</span></div>
+		<p class="mb-2 text-sm text-base-content/60">Default colors for the public site. Individual blocks can override them.</p>
+		{#each colorFields as field (field.key)}
+			<div class="fieldset py-1">
+				<label class="fieldset-legend pb-0" for="color-{field.key}">
+					{field.label}{#if field.hint}<span class="font-normal text-base-content/50">— {field.hint}</span>{/if}
+				</label>
 				<div class="flex gap-2">
-					<input type="color" class="cursor-pointer" bind:value={colors[key]} />
-					<input type="text" class="input input-bordered flex-1 font-mono text-sm" bind:value={colors[key]} />
+					<input type="color" class="input w-14 cursor-pointer p-1" aria-label="{field.label} picker" value={isHex(colors[field.key]) ? colors[field.key] : '#000000'} oninput={(e) => (colors[field.key] = e.currentTarget.value)} />
+					<input id="color-{field.key}" type="text" class="input flex-1 font-mono text-sm" bind:value={colors[field.key]} />
 				</div>
-			</label>
+			</div>
 		{/each}
-		<div class="flex-grow"></div>
-		<button class="btn btn-primary mt-6 block w-full" type="submit">Save colors</button>
+		{@render saveButton('colors', 'Save colors')}
 	</form>
 </div>
