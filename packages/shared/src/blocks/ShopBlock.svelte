@@ -130,6 +130,14 @@
 		<h2 class="mb-12 text-center font-serif text-3xl text-charcoal md:text-4xl">{data.title}</h2>
 	{/if}
 
+	{#if !visibleItems.length}
+		<!-- Never an empty section: no active items, a filter that matches none,
+		     or commerce data unavailable (see the public layout's server log). -->
+		<p class="rounded-2xl border border-dashed border-charcoal/15 px-6 py-10 text-center text-charcoal/60">
+			Nothing is available to book right now — please check back soon.
+		</p>
+	{/if}
+
 	<div class={isList ? 'flex flex-col gap-8' : 'grid gap-8 sm:grid-cols-2 lg:grid-cols-3'}>
 		{#each visibleItems as item (item.id)}
 			{@const ui = cardStates[item.id]}
@@ -204,7 +212,7 @@
 								class="inline-flex items-center justify-center gap-2 rounded-full px-6 py-2.5 text-sm font-medium transition {ui?.pickerOpen
 									? 'border border-charcoal/15 text-charcoal hover:bg-charcoal/5'
 									: itemSlotsByDay?.size
-										? 'bg-sage text-white hover:bg-sage-dark'
+										? 'bg-sage text-primary-content hover:bg-sage-dark'
 										: 'cursor-not-allowed bg-charcoal/10 text-charcoal/50'}"
 								disabled={!itemSlotsByDay?.size && !ui?.pickerOpen}
 								onclick={() => togglePicker(item.id)}
@@ -214,7 +222,7 @@
 						{:else}
 							<button
 								type="button"
-								class="inline-flex items-center justify-center gap-2 rounded-full bg-sage px-6 py-2.5 text-sm font-medium text-white transition hover:bg-sage-dark disabled:cursor-not-allowed disabled:bg-charcoal/10 disabled:text-charcoal/50"
+								class="inline-flex items-center justify-center gap-2 rounded-full bg-sage px-6 py-2.5 text-sm font-medium text-primary-content transition hover:bg-sage-dark disabled:cursor-not-allowed disabled:bg-charcoal/10 disabled:text-charcoal/50"
 								disabled={soldOut || ui?.adding}
 								onclick={() => addItem(item.id)}
 							>
@@ -252,7 +260,7 @@
 												aria-pressed={selected}
 												onclick={() => (ui.selectedDayKey = day.dateKey)}
 												class="aspect-square rounded-full text-sm transition {selected
-													? 'bg-sage font-semibold text-white'
+													? 'bg-sage font-semibold text-primary-content'
 													: selectable
 														? 'cursor-pointer bg-sage/15 font-medium text-charcoal hover:bg-sage/35'
 														: 'cursor-default text-charcoal/25'} {!day.inMonth ? 'opacity-40' : ''} {day.isToday &&

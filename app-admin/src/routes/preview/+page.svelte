@@ -27,7 +27,7 @@
 </svelte:head>
 
 {#if blocks.length}
-	<BlockRenderer {blocks} />
+	<BlockRenderer {blocks} items={data.items} slots={data.slots} calendarEvents={data.calendarEvents} />
 {:else}
 	<section class="mx-auto max-w-3xl px-6 py-20 text-center">
 		<h1 class="text-4xl">No preview content</h1>
