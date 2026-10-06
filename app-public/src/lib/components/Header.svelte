@@ -46,7 +46,7 @@
 			{#if header.logo?.url}
 				<img class="h-10 w-10 shrink-0 rounded-full object-cover md:h-12 md:w-12" src={header.logo.url} alt={header.logo.alt || ''} />
 			{:else}
-				<span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sage text-lg font-bold text-white md:h-12 md:w-12">DS</span>
+				<span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sage text-lg font-bold text-primary-content md:h-12 md:w-12">DS</span>
 			{/if}
 			<span class="truncate font-serif text-lg font-bold md:text-xl">Demo Studio</span>
 		</a>
