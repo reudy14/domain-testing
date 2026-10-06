@@ -4,6 +4,17 @@
 	themes: light --default;
 }
 
+/* Admin UI theme: DaisyUI light with a fixed sage primary. Deliberately NOT
+   tied to the site's Globals → Colors (those only apply inside /preview), so
+   a light brand colour can't make admin buttons unreadable. #647556 on white
+   text is ~5:1 contrast (WCAG AA). */
+@plugin 'daisyui/theme' {
+	name: 'light';
+	default: true;
+	--color-primary: #647556;
+	--color-primary-content: #ffffff;
+}
+
 @theme {
 	--font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
 	--font-serif: 'Playfair Display', Georgia, serif;
