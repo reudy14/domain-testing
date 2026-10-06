@@ -54,7 +54,7 @@ app-public/                   # SvelteKit public app (serves *.<domain>)
 │   │   ├── scrollReveal.ts   # Re-exports from $shared
 │   │   ├── stripe-client.ts  # Re-exports from $shared
 │   │   ├── basket.svelte.ts  # Re-exports from $shared
-│   │   └── server/           # Re-exports from $shared/server (pb-admin, basket); stripe.server.ts is public-only
+│   │   └── server/           # shop.ts (client for PocketBase's /api/shop routes, basket cookie) + $shared/server re-exports
 │   ├── routes/
 │   │   ├── +layout.svelte    # Root layout (always renders Header/Footer)
 │   │   ├── +page.svelte      # Home page (slug=home)
@@ -69,6 +69,7 @@ app-public/                   # SvelteKit public app (serves *.<domain>)
 ├── vite.config.ts            # Tailwind v4 + SvelteKit plugins
 └── package.json
 pocketbase/pb_migrations/     # JS migrations, mounted at /pb_migrations; applied on PocketBase start
+pocketbase/pb_hooks/          # JS hooks, mounted at /pb_hooks: the shop API (/api/shop/*) + hold-sweeping cron
 docker-compose.yml            # app-admin + app-public + pocketbase + caddy services
 Caddyfile                     # Subdomain-based routing
 ```
@@ -127,7 +128,8 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
 - Server load functions use `locals.pb.collection('pages').getFirstListItem()`
 - **Always build filters with `pb.filter('slug = {:slug}', { slug })`** — never interpolate values into filter strings (quotes break them).
 - **Schema changes**: add a migration to `pocketbase/pb_migrations/` (runs once, on the next PocketBase start) **and** mirror it in `pb_schema.json` (fresh installs import that after the migrations have already run). Migrations must skip missing collections and must not throw for data problems — a failing migration stops PocketBase from starting.
-- **API rules**: CMS collections require `@request.auth.id != ''`, so `users` must never allow public sign-up (its createRule is superuser-only). Commerce writes (orders, baskets, basket_lines) are superuser-only; the public app does them server-side via `getAdminPb()`.
+- **API rules**: CMS collections require `@request.auth.id != ''`, so `users` must never allow public sign-up (its createRule is superuser-only). Commerce writes (orders, order_lines, baskets, basket_lines) are superuser-only; they happen in the PocketBase shop hooks (`pocketbase/pb_hooks/shop/lib.js`), which bypass rules.
+- **Shop / payments**: all basket, slot-hold, Stripe and order logic lives in the PocketBase hooks (JSVM: synchronous, each handler `require()`s the lib; see the header comment). The public app must stay unprivileged — no superuser login, no Stripe secret key; its routes only proxy to `/api/shop/*` and manage the `basket_id` cookie (`app-public/src/lib/server/shop.ts`). Booking emails are rendered and sent by the public app from data the webhook hook returns (`OrderEmailData`, `sendOrderEmailsFromData`); keep `orderEmailData()` in the hook and `loadOrderEmailData()` in `packages/shared/src/server/email` returning the same shape. Local testing uses `stripe-mock` (`STRIPE_API_BASE`, local compose only).
 
 ### Styling
 - **Public site**: Custom theme via `@theme` in `app.css` — colors: `warm`, `charcoal`, `sage`, `sage-dark`, `terracotta`. Fonts: `DM Sans` (body), `Playfair Display` (headings).
@@ -159,7 +161,7 @@ DOMAIN=localhost docker compose up --build
 
 # Type checking (needs node_modules in packages/shared too, or every shared
 # file that imports a package fails with "Cannot find module")
-cd packages/shared && npm ci
+cd packages/shared && npm install   # no lockfile here, so not `npm ci`
 cd app-admin && npm run check
 cd app-public && npm run check
 
@@ -177,5 +179,6 @@ cd app-public && npm run build
 - `PUBLIC_SITE_URL` — public site URL used by the admin app for cross-subdomain preview links (`http://www.${DOMAIN}:8080`).
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`, `EMAIL_FROM_NAME` — Brevo SMTP relay for booking emails (both apps). Empty `SMTP_HOST` = log emails instead of sending.
 - `SITE_TIMEZONE` — IANA timezone for booking times in emails (default `Europe/Oslo`).
-- Stripe + PocketBase admin secrets are read from a root-level `.env` next to `docker-compose.yml`; see `.env.example`.
-- `POCKETBASE_ADMIN_EMAIL` / `POCKETBASE_ADMIN_PASSWORD` are required for **any** commerce data: without them the public app logs `Commerce data unavailable` and Shop blocks show "Nothing is available". Shop data is loaded by `loadShopData()` in `packages/shared/src/server/shop.ts` (public layout and admin `/preview`).
+- Secrets (Stripe, `INTERNAL_API_SECRET`, SMTP) are read from a root-level `.env` next to `docker-compose.yml`; see `.env.example`.
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` → PocketBase only. `INTERNAL_API_SECRET` → PocketBase and app-public (booking-email status). No app gets PocketBase superuser credentials.
+- Shop listings are public data, loaded anonymously by `loadShopData()` in `packages/shared/src/server/shop.ts` (public layout and admin `/preview`); if a Shop block has nothing to show it says "Nothing is available".
