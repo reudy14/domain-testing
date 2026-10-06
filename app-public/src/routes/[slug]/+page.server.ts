@@ -7,7 +7,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	try {
 		const page = await locals.pb
 			.collection('pages')
-			.getFirstListItem(`slug = "${params.slug}" && published = true`);
+			.getFirstListItem(locals.pb.filter('slug = {:slug} && published = true', { slug: params.slug }));
 		let calendarEvents: CalendarEventRecord[] = [];
 		if (hasUpcomingCalendarBlock(page.blocks || [])) {
 			const range = getUpcomingCalendarRange();
