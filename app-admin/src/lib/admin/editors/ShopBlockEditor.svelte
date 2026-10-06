@@ -74,6 +74,6 @@
 			</div>
 		</div>
 	{:else}
-		<p class="text-sm text-base-content/60">No items yet — create some under Items in the admin.</p>
+		<p class="text-sm text-base-content/60">Nothing to sell yet — add some under Services & products.</p>
 	{/if}
 </div>

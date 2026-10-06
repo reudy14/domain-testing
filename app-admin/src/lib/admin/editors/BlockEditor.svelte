@@ -156,7 +156,7 @@
 						{/each}
 					</div>
 				{:else}
-					<p class="text-sm text-base-content/60">No event categories exist yet. Add categories to events in Calendar first.</p>
+					<p class="text-sm text-base-content/60">No event categories exist yet. Add categories to events under Events first.</p>
 				{/if}
 			</div>
 		{:else if block.type === 'shop'}

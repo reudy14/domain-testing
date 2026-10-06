@@ -163,11 +163,12 @@ export function getUpcomingCalendarRange(reference = new Date()) {
 	return { start, end };
 }
 
-export function createCalendarMonth(monthDate: Date, reference = new Date()): CalendarMonth {
+/** `weekStartsOn`: 0 = Sunday (default), 1 = Monday. */
+export function createCalendarMonth(monthDate: Date, reference = new Date(), weekStartsOn: 0 | 1 = 0): CalendarMonth {
 	const first = startOfMonth(monthDate);
 	const monthEnd = endOfMonth(monthDate);
-	const gridStart = addDays(first, -first.getDay());
-	const gridEnd = addDays(monthEnd, 6 - monthEnd.getDay());
+	const gridStart = addDays(first, -((first.getDay() - weekStartsOn + 7) % 7));
+	const gridEnd = addDays(monthEnd, 6 - ((monthEnd.getDay() - weekStartsOn + 7) % 7));
 	const todayKey = dateKey(reference);
 	const days: CalendarDay[] = [];
 

@@ -21,7 +21,7 @@
 	const autoFilled: Record<string, string> = {
 		booking_details: 'Filled in automatically with the booked services, date and time, prices and the total paid.',
 		customer_details: "Filled in automatically with the customer's name, email, phone and checkout notes.",
-		contact_info: 'Filled in automatically from the business name, address, phone and email in Globals → Footer.'
+		contact_info: 'Filled in automatically from the business name, address, phone and email in Site design → Footer.'
 	};
 </script>
 

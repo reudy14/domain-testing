@@ -22,8 +22,8 @@
 	});
 	let categoryText = $state('');
 
-	const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-	let month = $derived(createCalendarMonth(viewDate));
+	const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+	let month = $derived(createCalendarMonth(viewDate, new Date(), 1));
 	let action = $derived(draft.id ? '?/update' : '?/create');
 	let dateInputType = $derived(draft.allDay ? 'date' : 'datetime-local');
 	let startValue = $derived(draft.allDay ? toDateInput(draft.start) : toZonedDatetimeInput(draft.start, data.timezone));
@@ -86,13 +86,13 @@
 	}
 </script>
 
-<svelte:head><title>Calendar | CMS</title></svelte:head>
+<svelte:head><title>Events | CMS</title></svelte:head>
 
 <div class="space-y-6">
 	<div class="flex flex-col justify-between gap-4 md:flex-row md:items-end">
 		<div>
-			<h1 class="text-3xl font-bold">Calendar</h1>
-			<p class="text-base-content/60">Create and manage events used by Upcoming Calendar blocks.</p>
+			<h1 class="text-3xl font-bold">Events</h1>
+			<p class="text-base-content/60">Workshops and events shown in Upcoming Calendar blocks.</p>
 		</div>
 		<button class="btn btn-primary" type="button" onclick={() => createEvent()}>Create event</button>
 	</div>

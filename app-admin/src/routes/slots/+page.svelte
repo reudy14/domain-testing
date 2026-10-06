@@ -87,7 +87,7 @@
 							</td>
 						</tr>
 					{:else}
-						<tr><td colspan="5" class="py-10 text-center text-base-content/60">{items.length ? 'No slots yet — create one so customers can book.' : 'Create a bookable service under Items first.'}</td></tr>
+						<tr><td colspan="5" class="py-10 text-center text-base-content/60">{items.length ? 'No slots yet — create one so customers can book.' : 'Add a bookable service under Services & products first.'}</td></tr>
 					{/each}
 				</tbody>
 			</table>

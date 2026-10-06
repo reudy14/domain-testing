@@ -74,15 +74,15 @@
 	}
 </script>
 
-<svelte:head><title>Items | CMS</title></svelte:head>
+<svelte:head><title>Services & products | CMS</title></svelte:head>
 
 <div class="space-y-6">
 	<div class="flex flex-col justify-between gap-4 md:flex-row md:items-end">
 		<div>
-			<h1 class="text-3xl font-bold">Items</h1>
-			<p class="text-base-content/60">Manage services and products shown in Shop blocks.</p>
+			<h1 class="text-3xl font-bold">Services & products</h1>
+			<p class="text-base-content/60">Bookable services and products, shown in Shop blocks.</p>
 		</div>
-		<button class="btn btn-primary" type="button" onclick={() => createItem()}>Create item</button>
+		<button class="btn btn-primary" type="button" onclick={() => createItem()}>Add service or product</button>
 	</div>
 
 	{#if form?.message}<div class="alert alert-error" role="alert">{form.message}</div>{/if}
@@ -120,7 +120,7 @@
 	</div>
 </div>
 
-<Modal bind:open={showEditor} title={draft.id ? 'Edit item' : 'Create item'} wide>
+<Modal bind:open={showEditor} title={draft.id ? `Edit “${draft.name}”` : 'New service or product'} wide>
 	<form method="POST" action={action} class="space-y-1">
 		<input type="hidden" name="id" value={draft.id} />
 		<input type="hidden" name="active" value={draft.active ? 'true' : 'false'} />
@@ -196,7 +196,7 @@
 			{/if}
 			<div class="flex gap-2">
 				<button class="btn" type="button" onclick={() => (showEditor = false)}>Cancel</button>
-				<button class="btn btn-primary" type="submit" disabled={uploading}>Save item</button>
+				<button class="btn btn-primary" type="submit" disabled={uploading}>Save</button>
 			</div>
 		</div>
 	</form>

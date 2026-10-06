@@ -43,7 +43,7 @@
 	};
 </script>
 
-<svelte:head><title>Globals | CMS</title></svelte:head>
+<svelte:head><title>Site design | CMS</title></svelte:head>
 
 {#snippet status(section: string)}
 	{#if form?.section === section && form.message}
@@ -61,8 +61,8 @@
 {/snippet}
 
 <div class="mb-6">
-	<h1 class="text-3xl font-bold">Global sections</h1>
-	<p class="text-base-content/60">Edit the site header, footer, and global color settings.</p>
+	<h1 class="text-3xl font-bold">Site design</h1>
+	<p class="text-base-content/60">The header, footer and colors shared by every page of the site.</p>
 </div>
 
 <div class="grid gap-6 xl:grid-cols-3">
