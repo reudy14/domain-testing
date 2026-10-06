@@ -157,7 +157,9 @@ DOMAIN=localhost docker compose up --build
 # Public app:   http://www.localhost:8080
 # PocketBase:   http://db.localhost:8080/_/
 
-# Type checking (can run on the host with node_modules present)
+# Type checking (needs node_modules in packages/shared too, or every shared
+# file that imports a package fails with "Cannot find module")
+cd packages/shared && npm ci
 cd app-admin && npm run check
 cd app-public && npm run check
 
@@ -176,3 +178,4 @@ cd app-public && npm run build
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`, `EMAIL_FROM_NAME` — Brevo SMTP relay for booking emails (both apps). Empty `SMTP_HOST` = log emails instead of sending.
 - `SITE_TIMEZONE` — IANA timezone for booking times in emails (default `Europe/Oslo`).
 - Stripe + PocketBase admin secrets are read from a root-level `.env` next to `docker-compose.yml`; see `.env.example`.
+- `POCKETBASE_ADMIN_EMAIL` / `POCKETBASE_ADMIN_PASSWORD` are required for **any** commerce data: without them the public app logs `Commerce data unavailable` and Shop blocks show "Nothing is available". Shop data is loaded by `loadShopData()` in `packages/shared/src/server/shop.ts` (public layout and admin `/preview`).
