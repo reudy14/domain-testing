@@ -3,37 +3,44 @@ import { sendOrderEmails, type EmailKind } from '$lib/server/email';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	// Sort by id, not 'created' — commerce collections were imported without
-	// autodate fields. PocketBase ids are time-sortable ULIDs.
+	// NOTE: there is no `created` field on orders (commerce collections were
+	// imported without autodate fields) and PocketBase ids are random, so
+	// '-id' is NOT chronological. See the polish report for the schema fix.
 	const records = await locals.pb.collection('orders').getFullList({ sort: '-id' }).catch(() => []);
 
-	const orders = [];
-	for (const record of records) {
-		const lineRecords = await locals.pb
-			.collection('order_lines')
-			.getFullList({ filter: locals.pb.filter('order = {:id}', { id: record.id }) })
-			.catch(() => []);
-
-		orders.push({
-			id: record.id,
-			email: String(record.email || ''),
-			customerDetails: record.customerDetails || {},
-			total: Number(record.total) || 0,
-			status: String(record.status || 'pending'),
-			created: String(record.created || ''),
-			customerEmailSentAt: String(record.customerEmailSentAt || ''),
-			clientEmailSentAt: String(record.clientEmailSentAt || ''),
-			emailError: String(record.emailError || ''),
-			lines: lineRecords.map((line) => ({
-				id: line.id,
-				name: String(line.name || ''),
-				price: Number(line.price) || 0,
-				quantity: Number(line.quantity) || 1,
-				lineType: String(line.lineType || 'item'),
-				start: line.start ? String(line.start) : ''
-			}))
-		});
+	// All lines in one request (previously one request per order).
+	const lineRecords = records.length
+		? await locals.pb
+				.collection('order_lines')
+				.getFullList({ sort: 'start' })
+				.catch(() => [])
+		: [];
+	const linesByOrder = new Map<string, typeof lineRecords>();
+	for (const line of lineRecords) {
+		const list = linesByOrder.get(line.order) ?? [];
+		list.push(line);
+		linesByOrder.set(line.order, list);
 	}
+
+	const orders = records.map((record) => ({
+		id: record.id,
+		email: String(record.email || ''),
+		customerDetails: record.customerDetails || {},
+		total: Number(record.total) || 0,
+		status: String(record.status || 'pending'),
+		created: String(record.created || ''),
+		customerEmailSentAt: String(record.customerEmailSentAt || ''),
+		clientEmailSentAt: String(record.clientEmailSentAt || ''),
+		emailError: String(record.emailError || ''),
+		lines: (linesByOrder.get(record.id) ?? []).map((line) => ({
+			id: line.id,
+			name: String(line.name || ''),
+			price: Number(line.price) || 0,
+			quantity: Number(line.quantity) || 1,
+			lineType: String(line.lineType || 'item'),
+			start: line.start ? String(line.start) : ''
+		}))
+	}));
 
 	return { orders };
 };

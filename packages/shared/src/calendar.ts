@@ -34,12 +34,94 @@ export function toDatetimeInput(value?: string | null) {
 	return local.toISOString().slice(0, 16);
 }
 
-export function dateInputToPocketBase(value: string, allDay = true) {
+/**
+ * Convert a form date value to PocketBase format. All-day dates are stored as
+ * UTC midnight of that calendar date. Timed values (`YYYY-MM-DDTHH:mm` from a
+ * datetime-local input) are wall-clock times in `timeZone` — NOT the server's
+ * zone, which is UTC in the container and silently shifted every save.
+ */
+export function dateInputToPocketBase(value: string, allDay = true, timeZone = 'UTC') {
 	if (!value) return '';
 	if (!allDay && value.includes('T')) {
-		return new Date(value).toISOString();
+		return zonedInputToIso(value, timeZone);
 	}
 	return `${value.slice(0, 10)} 00:00:00.000Z`;
+}
+
+// ── Site-timezone helpers ──────────────────────────────────────────────
+// Admin forms and listings work in the site's timezone (SITE_TIMEZONE), so
+// what the admin types is what customers book, and the server render (UTC
+// container) matches the browser render.
+
+const LOCAL_INPUT_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/;
+
+function zonedParts(date: Date, timeZone: string) {
+	const parts = new Intl.DateTimeFormat('en-US', {
+		timeZone,
+		hourCycle: 'h23',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+		hour: '2-digit',
+		minute: '2-digit',
+		second: '2-digit'
+	}).formatToParts(date);
+	const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '00';
+	return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour'), minute: get('minute'), second: get('second') };
+}
+
+/** Milliseconds `timeZone` is ahead of UTC at instant `date`. */
+function zoneOffsetMs(date: Date, timeZone: string) {
+	const p = zonedParts(date, timeZone);
+	const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+	return asUtc - Math.floor(date.getTime() / 1000) * 1000;
+}
+
+function parseInstant(value?: string | null) {
+	if (!value) return null;
+	const date = new Date(value.replace(' ', 'T'));
+	return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** `2026-10-08T10:00` as a wall-clock time in `timeZone` → ISO UTC string ('' if invalid). */
+export function zonedInputToIso(value: string, timeZone: string) {
+	const m = LOCAL_INPUT_RE.exec(value);
+	if (!m) return '';
+	const wallClockAsUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+	let instant = wallClockAsUtc - zoneOffsetMs(new Date(wallClockAsUtc), timeZone);
+	// Re-check at the candidate instant in case a DST change lies in between.
+	const corrected = wallClockAsUtc - zoneOffsetMs(new Date(instant), timeZone);
+	if (corrected !== instant) instant = corrected;
+	return new Date(instant).toISOString();
+}
+
+/**
+ * A stored instant → `YYYY-MM-DDTHH:mm` in `timeZone`, for datetime-local
+ * inputs. Values that are already wall-clock input strings pass through; a
+ * bare date becomes midnight.
+ */
+export function toZonedDatetimeInput(value: string | null | undefined, timeZone: string) {
+	if (!value) return '';
+	if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return value;
+	if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T00:00`;
+	const date = parseInstant(value);
+	if (!date) return '';
+	const p = zonedParts(date, timeZone);
+	return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}
+
+/** "8 Oct 2026, 10:00" in `timeZone`. Fixed locale so SSR and browser agree. */
+export function formatDateTime(value: string | null | undefined, timeZone: string) {
+	const date = parseInstant(value);
+	if (!date) return '';
+	return new Intl.DateTimeFormat('en-GB', { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+/** "10:00" in `timeZone`. */
+export function formatTime(value: string | null | undefined, timeZone: string) {
+	const date = parseInstant(value);
+	if (!date) return '';
+	return new Intl.DateTimeFormat('en-GB', { timeZone, timeStyle: 'short' }).format(date);
 }
 
 export function parseEventDate(value?: string | null) {
