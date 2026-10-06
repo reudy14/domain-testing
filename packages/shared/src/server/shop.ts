@@ -7,8 +7,8 @@ import type { ItemRecord, SlotRecord } from '../types';
  * blocks. Used by the public layout and the admin draft preview so both
  * render the same shop.
  *
- * `pb` must be able to read items, slots and media (admin client on the
- * public site, the logged-in superuser in the admin). Errors propagate.
+ * Works with an anonymous client: the API rules expose active items,
+ * available slots and media publicly. Errors propagate.
  */
 export async function loadShopData(pb: PocketBase): Promise<{ items: ItemRecord[]; slots: SlotRecord[] }> {
 	const [itemRecords, slotRecords] = await Promise.all([

@@ -1,7 +1,6 @@
 import { defaultColors, defaultFooter, defaultHeader } from '$lib/types';
 import type { ItemRecord, SlotRecord } from '$lib/types';
-import { getAdminPb } from '$lib/server/pb-admin';
-import { BASKET_COOKIE, loadBasket, sweepExpiredHolds } from '$lib/server/basket';
+import { BASKET_COOKIE, getBasket } from '$lib/server/shop';
 import { loadShopData } from '$shared/server/shop';
 import type { LayoutServerLoad } from './$types';
 
@@ -23,24 +22,18 @@ export const load: LayoutServerLoad = async ({ locals, cookies }) => {
 
 	if (!header.homePage) header.homePage = defaultHeader.homePage;
 
-	// Commerce data for the public site.
-	let basket = null;
-	let items: ItemRecord[] = [];
-	let slots: SlotRecord[] = [];
-
-	try {
-		const pb = await getAdminPb();
-		await sweepExpiredHolds(pb);
-
-		const basketId = cookies.get(BASKET_COOKIE);
-		if (basketId) basket = await loadBasket(pb, basketId);
-
-		({ items, slots } = await loadShopData(pb));
-	} catch (e) {
-		// Admin PB not configured (e.g. fresh dev env) — commerce features off;
-		// Shop blocks then show their "nothing available" message.
-		console.warn('Commerce data unavailable (shop blocks will be empty):', e instanceof Error ? e.message : e);
-	}
+	// Commerce data for the public site. The listing is public data (API
+	// rules allow active items / available slots); the basket comes from the
+	// shop API in PocketBase. Failures leave the shop empty, never break a page.
+	const [shop, basket] = await Promise.all([
+		loadShopData(locals.pb).catch((e) => {
+			console.warn('Shop data unavailable (shop blocks will be empty):', e instanceof Error ? e.message : e);
+			return null;
+		}),
+		getBasket(cookies.get(BASKET_COOKIE)).catch(() => null)
+	]);
+	const items: ItemRecord[] = shop?.items ?? [];
+	const slots: SlotRecord[] = shop?.slots ?? [];
 
 	return { header, footer, colors, user: locals.user, basket, items, slots };
 };
