@@ -4,16 +4,9 @@
 	themes: light --default;
 }
 
-/* Admin UI theme: DaisyUI light with a fixed sage primary. Deliberately NOT
-   tied to the site's colours (Site design → Colors) (those only apply inside /preview), so
-   a light brand colour can't make admin buttons unreadable. #647556 on white
-   text is ~5:1 contrast (WCAG AA). */
-@plugin 'daisyui/theme' {
-	name: 'light';
-	default: true;
-	--color-primary: #647556;
-	--color-primary-content: #ffffff;
-}
+/* Admin primary/secondary come from the site's colours (Site design →
+   Colors) via $shared/theme, rendered in the root layout's <head> with an
+   automatically readable text colour. */
 
 /* Hint text under form fields: DaisyUI's .label is nowrap, which stretched
    fields to fit long hints. */

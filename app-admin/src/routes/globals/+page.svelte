@@ -37,7 +37,8 @@
 	const submit: SubmitFunction = ({ formData }) => {
 		saving = String(formData.get('section'));
 		return async ({ update }) => {
-			await update({ reset: false, invalidateAll: false });
+			// Re-run loads so the admin theme picks up saved colours immediately.
+			await update({ reset: false });
 			saving = '';
 		};
 	};

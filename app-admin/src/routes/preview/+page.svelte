@@ -2,25 +2,13 @@
 	import { onMount } from 'svelte';
 	import BlockRenderer from '$shared/blocks/BlockRenderer.svelte';
 	import type { ContentBlock } from '$lib/types';
+	import { rootStyleTag, siteThemeVars } from '$shared/theme';
 
 	let { data } = $props();
 	let blocks = $state<ContentBlock[]>([]);
 	let error = $state('');
 
 	onMount(() => {
-		// Apply the site's colors so the preview matches the public site. Only
-		// here: these variable names overlap DaisyUI's theme (--color-primary,
-		// --color-accent), so setting them in the admin shell restyled the admin.
-		if (data.colors) {
-			const root = document.documentElement;
-			root.style.setProperty('--color-bg', data.colors.background);
-			root.style.setProperty('--color-heading', data.colors.heading);
-			root.style.setProperty('--color-subheading', data.colors.subheading);
-			root.style.setProperty('--color-text', data.colors.text);
-			root.style.setProperty('--color-primary', data.colors.primary);
-			root.style.setProperty('--color-accent', data.colors.accent);
-		}
-
 		const raw = sessionStorage.getItem('cms-preview-blocks');
 		if (!raw) return;
 		try {
@@ -34,6 +22,8 @@
 
 <svelte:head>
 	<title>Preview</title>
+	<!-- Full site colours so the draft looks like the public site. -->
+	{@html rootStyleTag(siteThemeVars(data.colors))}
 </svelte:head>
 
 {#if blocks.length}

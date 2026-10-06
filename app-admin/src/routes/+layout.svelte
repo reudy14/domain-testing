@@ -4,6 +4,7 @@
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createBasketStore, setBasketContext } from '$lib/basket.svelte';
+	import { brandThemeVars, rootStyleTag } from '$shared/theme';
 
 	let { children, data } = $props();
 
@@ -11,6 +12,9 @@
 	// preview iframe (which must look like the public site, not the admin).
 	const BARE_ROUTES = ['/login', '/preview'];
 	let bare = $derived(BARE_ROUTES.includes(page.url.pathname));
+
+	// The active item is marked with a tint + bar in the brand colour, never
+	// brand-coloured text: the site's primary may be too light to read as text.
 
 	// Sidebar navigation, grouped by what the studio is doing. Labels are
 	// user-facing names; hrefs keep the original route names.
@@ -55,6 +59,8 @@
 <svelte:head>
 	<link rel="icon" href={favicon} />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<!-- Admin buttons/highlights use the site's Primary and Accent colours (sanitised; readable text picked automatically). -->
+	{@html rootStyleTag(brandThemeVars(data.colors))}
 </svelte:head>
 
 {#if bare}
@@ -86,7 +92,7 @@
 							<li class="menu-title mt-3 first:mt-0">{group.title}</li>
 							{#each group.links as link (link.href)}
 								<li>
-									<a href={link.href} class={isActive(link.href) ? 'bg-primary/10 font-semibold text-primary' : ''} aria-current={isActive(link.href) ? 'page' : undefined}>{link.label}</a>
+									<a href={link.href} class={isActive(link.href) ? 'bg-primary/20 font-semibold shadow-[inset_3px_0_0_var(--color-primary)]' : ''} aria-current={isActive(link.href) ? 'page' : undefined}>{link.label}</a>
 								</li>
 							{/each}
 						{/each}

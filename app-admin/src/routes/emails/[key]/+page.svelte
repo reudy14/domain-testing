@@ -128,7 +128,7 @@
 					<div class="grid gap-2 sm:grid-cols-2">
 						{#each emailPlaceholders as placeholder}
 							<button type="button" class="btn btn-ghost btn-sm justify-start font-normal" onclick={() => copyPlaceholder(placeholder.key)}>
-								<code class="text-primary">{`{{${placeholder.key}}}`}</code>
+								<code class="font-semibold">{`{{${placeholder.key}}}`}</code>
 								<span class="text-base-content/60">{copied === placeholder.key ? 'Copied!' : placeholder.description}</span>
 							</button>
 						{/each}
@@ -142,7 +142,7 @@
 				<div class="rounded-box bg-base-100 p-4 shadow">
 					<div class="dropdown w-full">
 						<button class="btn btn-primary w-full" type="button" tabindex="0">Add block</button>
-						<ul class="menu dropdown-content z-10 mt-2 w-full rounded-box bg-base-100 p-2 shadow">
+						<ul class="menu dropdown-content z-20 mt-2 w-full rounded-box bg-base-100 p-2 shadow-lg">
 							{#each emailBlockTypes as type}
 								<li><button type="button" onclick={() => addBlock(type)}>{emailBlockLabels[type]}</button></li>
 							{/each}
