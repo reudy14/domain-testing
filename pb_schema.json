@@ -458,9 +458,9 @@
     "system": false,
     "listRule": "@request.auth.id != ''",
     "viewRule": "@request.auth.id != ''",
-    "createRule": "",
-    "updateRule": "",
-    "deleteRule": "",
+    "createRule": null,
+    "updateRule": null,
+    "deleteRule": null,
     "fields": [
       { "id": "text3208210256", "name": "id", "type": "text", "system": true, "required": true, "presentable": false, "hidden": false, "primaryKey": true, "autogeneratePattern": "[a-z0-9]{15}", "min": 15, "max": 15, "pattern": "^[a-z0-9]+$" },
       { "id": "rel_olorder00001", "name": "order", "type": "relation", "system": false, "required": true, "presentable": false, "unique": false, "collectionId": "pbc_orders00001", "cascadeDelete": true, "minSelect": 0, "maxSelect": 1, "displayFields": null },
