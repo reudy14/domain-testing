@@ -38,6 +38,17 @@ The project runs exclusively through Docker Compose. There is no bare host dev m
 
 Caddy's `.localhost` handling works without DNS or hosts-file changes. Source changes require rebuilding (`docker compose up --build`); the containers run the production build (`node build`), not a dev server.
 
+**Deploying behind HTTPS** (e.g. another reverse proxy terminating TLS and forwarding to `:8080`): the apps must know the URL the browser really uses, or the admin login fails with *"Cross-site POST form submissions are forbidden"*. In `.env`:
+
+```sh
+DOMAIN=example.com     # → admin.example.com, www.example.com, db.example.com
+URL_SCHEME=https
+URL_PORT=              # empty: no port in the URL
+CADDY_SCHEME=http      # this stack's Caddy stays plain HTTP behind the TLS proxy
+```
+
+Then `docker compose up -d` (no rebuild needed: these are runtime env vars).
+
 ## Docker Compose
 
 Run the full stack:

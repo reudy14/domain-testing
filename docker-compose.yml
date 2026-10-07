@@ -34,9 +34,12 @@ services:
     environment:
       PORT: 3001
       POCKETBASE_INTERNAL_URL: http://pocketbase:80
-      PUBLIC_POCKETBASE_URL: http://db.${DOMAIN:-localhost}:8080
-      ORIGIN: http://admin.${DOMAIN:-localhost}:8080
-      PUBLIC_SITE_URL: http://www.${DOMAIN:-localhost}:8080
+      # Browser-facing URLs. They must match the address bar exactly, or
+      # SvelteKit rejects logins/forms ("Cross-site POST form submissions are
+      # forbidden"). Behind a TLS proxy: URL_SCHEME=https and URL_PORT= (empty).
+      PUBLIC_POCKETBASE_URL: ${URL_SCHEME:-http}://db.${DOMAIN:-localhost}${URL_PORT-:8080}
+      ORIGIN: ${URL_SCHEME:-http}://admin.${DOMAIN:-localhost}${URL_PORT-:8080}
+      PUBLIC_SITE_URL: ${URL_SCHEME:-http}://www.${DOMAIN:-localhost}${URL_PORT-:8080}
       BODY_SIZE_LIMIT: 52428800 # 50MB — import payload embeds all images as base64
       STRIPE_CURRENCY: ${STRIPE_CURRENCY:-eur}
       # Booking emails (Brevo SMTP relay) — admin needs these for resend/test sends
@@ -62,8 +65,8 @@ services:
     environment:
       PORT: 3000
       POCKETBASE_INTERNAL_URL: http://pocketbase:80
-      PUBLIC_POCKETBASE_URL: http://db.${DOMAIN:-localhost}:8080
-      ORIGIN: http://www.${DOMAIN:-localhost}:8080
+      PUBLIC_POCKETBASE_URL: ${URL_SCHEME:-http}://db.${DOMAIN:-localhost}${URL_PORT-:8080}
+      ORIGIN: ${URL_SCHEME:-http}://www.${DOMAIN:-localhost}${URL_PORT-:8080}
       # No PocketBase or Stripe secrets here: shop writes happen in PocketBase
       # (pb_hooks/shop). The publishable key is public by design.
       PUBLIC_STRIPE_PUBLISHABLE_KEY: ${PUBLIC_STRIPE_PUBLISHABLE_KEY:-}

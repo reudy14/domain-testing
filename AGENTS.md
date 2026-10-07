@@ -173,10 +173,11 @@ cd app-public && npm run build
 ## Environment
 
 - `DOMAIN` — base domain for subdomain routing. Defaults to `localhost` for local dev. Set in `docker-compose.yml` or `.env`.
-- `PUBLIC_POCKETBASE_URL` — public-facing PocketBase URL (`http://db.${DOMAIN}:8080`). Set in `docker-compose.yml`.
+- `URL_SCHEME` (default `http`), `URL_PORT` (default `:8080`; set it empty for no port) — build every browser-facing URL below as `<scheme>://<sub>.<DOMAIN><port>`. They must match the address bar exactly: a mismatched `ORIGIN` makes SvelteKit reject form POSTs (admin login) with "Cross-site POST form submissions are forbidden". Behind a TLS reverse proxy: `URL_SCHEME=https`, `URL_PORT=`. (podman-compose 1.5 can't do nested `${A:-${B}}` defaults, hence two flat variables.)
+- `PUBLIC_POCKETBASE_URL` — public-facing PocketBase URL (`<scheme>://db.${DOMAIN}<port>`). Set in `docker-compose.yml`.
 - `POCKETBASE_INTERNAL_URL` — internal Docker network URL (`http://pocketbase:80`). Set in `docker-compose.yml`.
-- `ORIGIN` — SvelteKit origin for SSR. Differs per app: `http://admin.${DOMAIN}:8080` (admin), `http://www.${DOMAIN}:8080` (public).
-- `PUBLIC_SITE_URL` — public site URL used by the admin app for cross-subdomain preview links (`http://www.${DOMAIN}:8080`).
+- `ORIGIN` — SvelteKit origin for SSR. Differs per app: `<scheme>://admin.${DOMAIN}<port>` (admin), `<scheme>://www.${DOMAIN}<port>` (public).
+- `PUBLIC_SITE_URL` — public site URL used by the admin app for cross-subdomain preview links (`<scheme>://www.${DOMAIN}<port>`).
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`, `EMAIL_FROM_NAME` — Brevo SMTP relay for booking emails (both apps). Empty `SMTP_HOST` = log emails instead of sending.
 - `SITE_TIMEZONE` — IANA timezone for booking times in emails (default `Europe/Oslo`).
 - Secrets (Stripe, `INTERNAL_API_SECRET`, SMTP) are read from a root-level `.env` next to `docker-compose.yml`; see `.env.example`.
