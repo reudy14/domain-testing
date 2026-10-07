@@ -26,7 +26,6 @@
 		"daisyui": "^5.5.19",
 		"nodemailer": "^10.0.12",
 		"pocketbase": "^0.26.9",
-		"stripe": "^22.3.2",
 		"tailwindcss": "^4.3.0"
 	}
 }

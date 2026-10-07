@@ -62,13 +62,14 @@ export function emailSiteUrl(): string {
 }
 
 export async function loadEmailSettings(pb: PocketBase): Promise<EmailSettings> {
-	const [business, colors] = await Promise.all([
-		getGlobalData(pb, 'footer', defaultFooter),
-		getGlobalData(pb, 'colors', defaultColors)
-	]);
+	const [footer, colors] = await Promise.all([getGlobalData(pb, 'footer', {}), getGlobalData(pb, 'colors', {})]);
+	return emailSettingsFrom(footer, colors);
+}
+
+function emailSettingsFrom(footer: Partial<FooterGlobal> | null, colors: Partial<ColorsGlobal> | null): EmailSettings {
 	return {
-		business,
-		colors,
+		business: { ...defaultFooter, ...(footer || {}) },
+		colors: { ...defaultColors, ...(colors || {}) },
 		siteUrl: emailSiteUrl(),
 		timezone: env.SITE_TIMEZONE || 'Europe/Oslo',
 		currency: env.STRIPE_CURRENCY || 'eur'
@@ -104,11 +105,47 @@ function bookingIcs(ctx: EmailContext, lineIds: string[], settings: EmailSetting
 	return events.length ? buildIcs(events, settings.business.businessName || 'Booking') : null;
 }
 
-async function loadOrderContext(pb: PocketBase, orderId: string, settings: EmailSettings) {
-	const order = await pb.collection('orders').getOne(orderId);
-	const lineRecords = await pb
-		.collection('order_lines')
-		.getFullList({ filter: pb.filter('order = {:orderId}', { orderId }), expand: 'slot,item', sort: 'start' });
+/**
+ * Everything the booking emails for one order need, as raw PocketBase
+ * records (REST JSON shape). Built by `loadOrderEmailData` (admin resend) or
+ * by the PocketBase shop hooks (`orderEmailData` in pb_hooks/shop/lib.js,
+ * after a payment) — keep the two in sync.
+ */
+export type OrderEmailData = {
+	order: Record<string, any>;
+	/** order_lines with `expand.slot` and `expand.item` */
+	lines: Record<string, any>[];
+	templates: Partial<Record<EmailTemplateKey, Record<string, any> | null>>;
+	footer: Partial<FooterGlobal> | null;
+	colors: Partial<ColorsGlobal> | null;
+};
+
+export async function loadOrderEmailData(pb: PocketBase, orderId: string): Promise<OrderEmailData> {
+	const globalData = (key: string) =>
+		pb
+			.collection('globals')
+			.getFirstListItem(pb.filter('key = {:key}', { key }))
+			.then((record) => record.data || null)
+			.catch(() => null);
+	const template = (key: string) =>
+		pb
+			.collection('email_templates')
+			.getFirstListItem(pb.filter('key = {:key}', { key }))
+			.catch(() => null);
+	const [order, lines, customer_confirmation, client_alert, footer, colors] = await Promise.all([
+		pb.collection('orders').getOne(orderId),
+		pb.collection('order_lines').getFullList({ filter: pb.filter('order = {:orderId}', { orderId }), expand: 'slot,item', sort: 'start' }),
+		template('customer_confirmation'),
+		template('client_alert'),
+		globalData('footer'),
+		globalData('colors')
+	]);
+	return { order, lines, templates: { customer_confirmation, client_alert }, footer, colors };
+}
+
+function orderEmailContext(data: OrderEmailData, settings: EmailSettings) {
+	const order = data.order;
+	const lineRecords = [...data.lines].sort((a, b) => String(a.start || '').localeCompare(String(b.start || '')));
 
 	const lines: EmailLine[] = lineRecords.map((line) => {
 		const start = line.start ? new Date(line.start).toISOString() : null;
@@ -143,32 +180,34 @@ async function loadOrderContext(pb: PocketBase, orderId: string, settings: Email
 		lines,
 		...settings
 	};
-	return { order, ctx, lineIds: lineRecords.map((line) => line.id) };
+	return { ctx, lineIds: lineRecords.map((line) => line.id) };
 }
 
-/**
- * Render and send the booking emails for a paid order, then record the
- * outcome on the order (customerEmailSentAt / clientEmailSentAt / emailError).
- * Never throws — a failed email must not fail the Stripe webhook; the admin
- * can resend from /orders.
- */
-export async function sendOrderEmails(
-	pb: PocketBase,
-	orderId: string,
-	kinds: EmailKind[] = ['customer', 'client']
-): Promise<Partial<Record<EmailKind, EmailOutcome>>> {
-	const outcomes: Partial<Record<EmailKind, EmailOutcome>> = {};
-	try {
-		const settings = await loadEmailSettings(pb);
-		const { order, ctx, lineIds } = await loadOrderContext(pb, orderId, settings);
+/** Email status fields to write on the order (customerEmailSentAt / clientEmailSentAt / emailError). */
+export type OrderEmailPatch = Record<string, string>;
 
-		const patch: Record<string, string> = {};
-		const errorLines = String(order.emailError || '')
+/**
+ * Render and send the booking emails for a paid order. Never throws — a
+ * failed email must not fail the payment flow; the admin can resend from
+ * /orders. Returns the outcomes and the status patch for the caller to save.
+ */
+export async function sendOrderEmailsFromData(
+	data: OrderEmailData,
+	kinds: EmailKind[] = ['customer', 'client']
+): Promise<{ outcomes: Partial<Record<EmailKind, EmailOutcome>>; patch: OrderEmailPatch }> {
+	const outcomes: Partial<Record<EmailKind, EmailOutcome>> = {};
+	const patch: OrderEmailPatch = {};
+	const orderId = String(data.order?.id || '');
+	try {
+		const settings = emailSettingsFrom(data.footer, data.colors);
+		const { ctx, lineIds } = orderEmailContext(data, settings);
+
+		const errorLines = String(data.order.emailError || '')
 			.split('\n')
 			.filter((line) => line && !kinds.some((kind) => line.startsWith(ERROR_PREFIX[kind])));
 
 		for (const kind of kinds) {
-			const template = await loadEmailTemplate(pb, TEMPLATE_KEY[kind]);
+			const template = normalizeEmailTemplate(TEMPLATE_KEY[kind], data.templates[TEMPLATE_KEY[kind]] ?? null);
 			if (!template.enabled) {
 				outcomes[kind] = 'disabled';
 				continue;
@@ -205,14 +244,31 @@ export async function sendOrderEmails(
 		}
 
 		patch.emailError = errorLines.join('\n').slice(0, 2000);
-		await pb
-			.collection('orders')
-			.update(orderId, patch)
-			.catch((e) => console.error(`[email] could not record email status on order ${orderId}:`, e));
 	} catch (e) {
 		console.error(`[email] could not prepare emails for order ${orderId}:`, e);
 		for (const kind of kinds) outcomes[kind] ??= 'failed';
 	}
+	return { outcomes, patch };
+}
+
+/** Load, send and record the booking emails for an order (admin resend, with the signed-in admin's client). */
+export async function sendOrderEmails(
+	pb: PocketBase,
+	orderId: string,
+	kinds: EmailKind[] = ['customer', 'client']
+): Promise<Partial<Record<EmailKind, EmailOutcome>>> {
+	let data: OrderEmailData;
+	try {
+		data = await loadOrderEmailData(pb, orderId);
+	} catch (e) {
+		console.error(`[email] could not load order ${orderId}:`, e);
+		return Object.fromEntries(kinds.map((kind) => [kind, 'failed' as const]));
+	}
+	const { outcomes, patch } = await sendOrderEmailsFromData(data, kinds);
+	await pb
+		.collection('orders')
+		.update(orderId, patch)
+		.catch((e) => console.error(`[email] could not record email status on order ${orderId}:`, e));
 	return outcomes;
 }
 

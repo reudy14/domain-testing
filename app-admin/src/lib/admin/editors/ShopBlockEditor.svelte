@@ -33,9 +33,9 @@
 </script>
 
 <div class="space-y-4">
-	<label class="form-control w-full">
-		<div class="label"><span class="label-text">Title</span></div>
-		<input class="input input-bordered w-full" value={block.data.title || ''} oninput={(e) => updateData({ title: e.currentTarget.value })} />
+	<label class="fieldset">
+		<span class="fieldset-legend">Title</span>
+		<input class="input w-full" value={block.data.title || ''} oninput={(e) => updateData({ title: e.currentTarget.value })} />
 	</label>
 
 	<SegmentedControl
@@ -74,6 +74,6 @@
 			</div>
 		</div>
 	{:else}
-		<p class="text-sm text-base-content/60">No items yet — create some under Items in the admin.</p>
+		<p class="text-sm text-base-content/60">Nothing to sell yet — add some under Services & products.</p>
 	{/if}
 </div>

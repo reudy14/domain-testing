@@ -4,7 +4,7 @@
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import { createBasketStore, setBasketContext } from '$lib/basket.svelte';
-	import { onMount } from 'svelte';
+	import { rootStyleTag, siteThemeVars } from '$shared/theme';
 
 	let { children, data } = $props();
 
@@ -16,23 +16,14 @@
 	// Keep the store in sync when layout data refreshes (e.g. after checkout
 	// clears the cookie and data.basket becomes null).
 	$effect(() => basketStore.syncFrom(data.basket ?? null));
-
-	onMount(() => {
-		if (data.colors) {
-			const root = document.documentElement;
-			root.style.setProperty('--color-bg', data.colors.background);
-			root.style.setProperty('--color-heading', data.colors.heading);
-			root.style.setProperty('--color-subheading', data.colors.subheading);
-			root.style.setProperty('--color-text', data.colors.text);
-			root.style.setProperty('--color-primary', data.colors.primary);
-			root.style.setProperty('--color-accent', data.colors.accent);
-		}
-	});
 </script>
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<!-- Site colours, rendered server-side (previously applied in onMount, which
+	     flashed the defaults on every page load). Values are sanitised. -->
+	{@html rootStyleTag(siteThemeVars(data.colors))}
 </svelte:head>
 
 <Header header={data.header} />

@@ -77,6 +77,12 @@ The app containers use two PocketBase URLs:
 
 If the `globals` records do not exist, the app falls back to safe defaults and the admin globals page will create them.
 
+### Migrations
+
+`pocketbase/pb_migrations/` is mounted into the PocketBase container, which applies any new migration once when it starts (`docker compose up` / restart). The first one (`1791244800_lock_rules_dates_unique.js`) closes public sign-up on the `users` collection, makes order/basket writes superuser-only, adds `created`/`updated` dates and unique slug/key indexes. On an existing install, check the PocketBase log after restarting — if duplicate page slugs or global keys exist, the unique index is skipped with a log line. `1791331200_lock_order_lines.js` makes `order_lines` writes superuser-only (they were public).
+
+> **Security:** every CMS collection allows writes to *any* signed-in user, so the `users` collection must not allow public sign-up. The migration enforces this; if you manage PocketBase by hand, keep `users` → API rules → Create set to superuser-only.
+
 ### Manual collection fields fallback
 
 If schema import fails because of a PocketBase version mismatch, create these collections manually:
@@ -130,10 +136,12 @@ All routes in `app-admin` except `/login` are guarded in `src/hooks.server.ts`.
 
 The shop/checkout blocks implement a basket-based booking flow: visitors add services (with time slots) or products to a server-side basket, then pay with an embedded Stripe Payment Element. Order creation is confirmed by the Stripe **webhook** (never the client).
 
+**Where the logic lives:** all commerce writes (baskets, slot holds, Stripe PaymentIntents, the webhook that creates orders) run *inside PocketBase* as JS hooks — `pocketbase/pb_hooks/shop/lib.js`, routes under `/api/shop/*`, plus a once-a-minute cron that releases expired holds. The public app holds **no PocketBase or Stripe secret**: its `/api/basket`, `/api/checkout/create-intent`, `/api/webhooks/stripe` and `/checkout/return` only forward to those routes and keep the basket cookie. A compromised public app therefore can't read or change the database beyond what any visitor can. Its one privileged call records booking-email status on an order, authorised by `INTERNAL_API_SECRET`.
+
 Setup:
 
-1. Add the Stripe + PocketBase-admin vars from `.env.example` to `.env` at the project root.
-2. `POCKETBASE_ADMIN_EMAIL` / `POCKETBASE_ADMIN_PASSWORD` are the credentials of the PocketBase superuser you created — the basket/checkout/webhook APIs use a server-side admin client so collection rules can stay admin-only.
+1. Add the Stripe vars and `INTERNAL_API_SECRET` (e.g. `openssl rand -hex 32`) from `.env.example` to `.env` at the project root. docker-compose gives the Stripe secret key and webhook secret to **PocketBase only**.
+2. Hook changes apply on PocketBase restart (the directory is mounted read-only at `/pb_hooks`).
 3. For local webhook testing, forward Stripe events with the CLI:
    ```sh
    stripe listen --forward-to www.localhost:8080/api/webhooks/stripe
@@ -144,7 +152,7 @@ Setup:
 
 ## Booking emails (Brevo)
 
-After the Stripe webhook creates an order it sends two emails through an SMTP relay (Brevo) with `nodemailer`:
+After the Stripe webhook creates an order (in PocketBase, which hands the order data back to the public app's webhook route) the public app sends two emails through an SMTP relay (Brevo) with `nodemailer`:
 
 - **Booking confirmation** to the customer, with a `booking.ics` calendar attachment for booked time slots. Reply-To is the footer email.
 - **New booking alert** to the studio (the template's recipients, or the footer email). Reply-To is the customer.

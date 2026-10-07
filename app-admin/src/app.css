@@ -4,6 +4,16 @@
 	themes: light --default;
 }
 
+/* Admin primary/secondary come from the site's colours (Site design →
+   Colors) via $shared/theme, rendered in the root layout's <head> with an
+   automatically readable text colour. */
+
+/* Hint text under form fields: DaisyUI's .label is nowrap, which stretched
+   fields to fit long hints. */
+.fieldset .label {
+	white-space: normal;
+}
+
 @theme {
 	--font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
 	--font-serif: 'Playfair Display', Georgia, serif;

@@ -3,7 +3,7 @@
 ## Stack
 
 - **SvelteKit 2** (SSR, Svelte 5 runes mode) — all `.svelte` files use `$state`, `$derived`, `$props()` etc.
-- **PocketBase** — REST API via the `pocketbase` SDK (v0.26). Auth, DB, and image storage.
+- **PocketBase** — server pinned to **0.23.12** (`docker-compose.yml`), REST API via the `pocketbase` SDK (v0.26). Auth, DB, and image storage. Bump the server version deliberately (changelog, backup, test migrations).
 - **Tailwind CSS v4** + **DaisyUI 5** — utility-first CSS with DaisyUI components for admin; custom theme for the public site.
 - **Docker Compose** — four services: `app-admin`, `app-public`, `pocketbase`, and `caddy` (reverse proxy).
 
@@ -14,7 +14,7 @@ packages/shared/src/          # Shared code (types, calendar utils, blocks, pb, 
 app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 ├── src/
 │   ├── lib/
-│   │   ├── admin/            # Admin UI components (BlockList, editors)
+│   │   ├── admin/            # Admin UI components (BlockList, Modal, editors, confirm/unsaved helpers)
 │   │   ├── blocks/           # Re-exports from $shared/blocks (block renderers live in shared)
 │   │   ├── pb.ts             # Re-exports from $shared/pb + app-specific uploadMedia
 │   │   ├── types.ts          # Re-exports from $shared
@@ -22,17 +22,18 @@ app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 │   │   ├── scrollReveal.ts   # Re-exports from $shared
 │   │   ├── stripe-client.ts # Re-exports from $shared
 │   │   ├── basket.svelte.ts # Re-exports from $shared
-│   │   └── server/           # Re-exports from $shared/server (pb-admin, basket)
+│   │   └── server/           # Re-exports from $shared/server + admin helpers (actions.ts, pages.ts)
 │   ├── routes/
-│   │   ├── +layout.svelte    # Root layout (admin shell: navbar, export/import, logout)
+│   │   ├── +layout.svelte    # Root layout (admin shell: grouped sidebar; bare on /login and /preview)
 │   │   ├── login/            # Admin login
 │   │   ├── pages/            # Page CRUD + block editor
-│   │   ├── calendar/         # Event CRUD
-│   │   ├── items/            # Service/product CRUD
+│   │   ├── calendar/         # Event CRUD (menu label: Events)
+│   │   ├── items/            # Service/product CRUD (menu label: Services & products)
 │   │   ├── slots/            # Bookable time slot CRUD
 │   │   ├── orders/           # Order list + booking-email status/resend
 │   │   ├── emails/           # Block-based booking email editor (live preview, test send)
-│   │   ├── globals/          # Header/footer/colors editor
+│   │   ├── globals/          # Header/footer/colors editor (menu label: Site design)
+│   │   ├── backup/           # Export/import UI (calls api/export, api/import)
 │   │   ├── preview/          # Draft preview via sessionStorage (same-origin)
 │   │   └── api/              # upload, export, import endpoints
 │   ├── hooks.server.ts       # Auth guard — all routes except /login
@@ -53,7 +54,7 @@ app-public/                   # SvelteKit public app (serves *.<domain>)
 │   │   ├── scrollReveal.ts   # Re-exports from $shared
 │   │   ├── stripe-client.ts  # Re-exports from $shared
 │   │   ├── basket.svelte.ts  # Re-exports from $shared
-│   │   └── server/           # Re-exports from $shared/server (pb-admin, basket); stripe.server.ts is public-only
+│   │   └── server/           # shop.ts (client for PocketBase's /api/shop routes, basket cookie) + $shared/server re-exports
 │   ├── routes/
 │   │   ├── +layout.svelte    # Root layout (always renders Header/Footer)
 │   │   ├── +page.svelte      # Home page (slug=home)
@@ -67,7 +68,8 @@ app-public/                   # SvelteKit public app (serves *.<domain>)
 ├── svelte.config.js          # Adapter-node, runes mode forced, $shared alias
 ├── vite.config.ts            # Tailwind v4 + SvelteKit plugins
 └── package.json
-pocketbase/pb_data/           # PocketBase data (volume-mounted)
+pocketbase/pb_migrations/     # JS migrations, mounted at /pb_migrations; applied on PocketBase start
+pocketbase/pb_hooks/          # JS hooks, mounted at /pb_hooks: the shop API (/api/shop/*) + hold-sweeping cron
 docker-compose.yml            # app-admin + app-public + pocketbase + caddy services
 Caddyfile                     # Subdomain-based routing
 ```
@@ -124,14 +126,25 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
 - `$lib/pb.ts` exports `createPocketBase()`, `getFileUrl()`, `uploadMedia()`
 - Collections: `pages` (slug, title, blocks[], published), `globals` (key, data), `media` (file, alt), `email_templates` (key, subject, blocks[], recipients, enabled)
 - Server load functions use `locals.pb.collection('pages').getFirstListItem()`
+- **Always build filters with `pb.filter('slug = {:slug}', { slug })`** — never interpolate values into filter strings (quotes break them).
+- **Schema changes**: add a migration to `pocketbase/pb_migrations/` (runs once, on the next PocketBase start) **and** mirror it in `pb_schema.json` (fresh installs import that after the migrations have already run). Migrations must skip missing collections and must not throw for data problems — a failing migration stops PocketBase from starting.
+- **API rules**: CMS collections require `@request.auth.id != ''`, so `users` must never allow public sign-up (its createRule is superuser-only). Commerce writes (orders, order_lines, baskets, basket_lines) are superuser-only; they happen in the PocketBase shop hooks (`pocketbase/pb_hooks/shop/lib.js`), which bypass rules.
+- **Shop / payments**: all basket, slot-hold, Stripe and order logic lives in the PocketBase hooks (JSVM: synchronous, each handler `require()`s the lib; see the header comment). The public app must stay unprivileged — no superuser login, no Stripe secret key; its routes only proxy to `/api/shop/*` and manage the `basket_id` cookie (`app-public/src/lib/server/shop.ts`). Booking emails are rendered and sent by the public app from data the webhook hook returns (`OrderEmailData`, `sendOrderEmailsFromData`); keep `orderEmailData()` in the hook and `loadOrderEmailData()` in `packages/shared/src/server/email` returning the same shape. Local testing uses `stripe-mock` (`STRIPE_API_BASE`, local compose only).
 
 ### Styling
 - **Public site**: Custom theme via `@theme` in `app.css` — colors: `warm`, `charcoal`, `sage`, `sage-dark`, `terracotta`. Fonts: `DM Sans` (body), `Playfair Display` (headings).
-- **Admin area**: DaisyUI utility classes (`btn`, `card`, `input`, `select`, `rounded-box`, etc.)
+- **Admin area**: DaisyUI **5** (no `form-control` / `label-text` / `*-bordered` — those are v4). Colours come from Site design via `$shared/theme`, rendered as a `<style>` in `<head>` (SSR, no flash): the admin gets only DaisyUI primary (= site Primary) and secondary (= site Accent) with auto-contrast text; `/preview` and the public site get all site colour variables. Never use `text-primary`/`text-secondary` for text — a light brand colour is unreadable as text; mark state with a tint/bar instead. Conventions:
+  - Section card: `rounded-box bg-base-100 p-5 shadow` with an `h2.text-2xl.font-bold` title (see Site design / globals).
+  - Form field: `<label class="fieldset"><span class="fieldset-legend">Label</span><input class="input w-full" /></label>`; hints in `<span class="label">`.
+  - Setting rows in editors: `SegmentedControl` (choices) and `ColorField` (colours) — label column on the left, like the block Background picker.
+  - Create/edit forms open in `$lib/admin/Modal.svelte`; destructive submits use `confirmSubmit()` from `$lib/admin/confirm` (returning `false` from a handler does not cancel).
+  - Server actions wrap PocketBase writes in `attempt()` from `$lib/server/actions` so failures show as an error banner, not a 500.
+  - Editors with unsaved state use `use:enhance` + `warnOnUnsavedChanges()`.
+- **Dates/times in admin**: entered and displayed in `SITE_TIMEZONE` (layout data `timezone`), via `toZonedDatetimeInput`, `zonedInputToIso`, `formatDateTime` in `$shared/calendar`. Never `new Date(localInput)` on the server — the container runs in UTC.
 - **Prose**: `.prose-wellness` class for rich text content styling
 
 ### Routing
-- **Admin app** (`app-admin`): All routes except `/login` are auth-guarded in `hooks.server.ts`. The root layout renders the admin shell (navbar, export/import, logout). The `/preview` route reads `sessionStorage` set by the page editor (same-origin, so it works).
+- **Admin app** (`app-admin`): All routes except `/login` are auth-guarded in `hooks.server.ts` (which also refreshes the token per request and sets the cookie's `Secure` flag from the real scheme). The root layout renders the admin shell (grouped sidebar) except on `/login` and `/preview`. The `/preview` route reads `sessionStorage` set by the page editor (same-origin, so it works).
 - **Public app** (`app-public`): No auth guard. The root layout always renders Header/Footer. `+layout.server.ts` fetches header/footer/colors globals + basket/items/slots for every page.
 - `+page.server.ts` for home fetches `slug = "home" && published = true`
 - `[slug]/+page.server.ts` fetches by dynamic slug
@@ -146,7 +159,9 @@ DOMAIN=localhost docker compose up --build
 # Public app:   http://www.localhost:8080
 # PocketBase:   http://db.localhost:8080/_/
 
-# Type checking (can run on the host with node_modules present)
+# Type checking (needs node_modules in packages/shared too, or every shared
+# file that imports a package fails with "Cannot find module")
+cd packages/shared && npm install   # no lockfile here, so not `npm ci`
 cd app-admin && npm run check
 cd app-public && npm run check
 
@@ -164,4 +179,6 @@ cd app-public && npm run build
 - `PUBLIC_SITE_URL` — public site URL used by the admin app for cross-subdomain preview links (`http://www.${DOMAIN}:8080`).
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`, `EMAIL_FROM_NAME` — Brevo SMTP relay for booking emails (both apps). Empty `SMTP_HOST` = log emails instead of sending.
 - `SITE_TIMEZONE` — IANA timezone for booking times in emails (default `Europe/Oslo`).
-- Stripe + PocketBase admin secrets are read from a root-level `.env` next to `docker-compose.yml`; see `.env.example`.
+- Secrets (Stripe, `INTERNAL_API_SECRET`, SMTP) are read from a root-level `.env` next to `docker-compose.yml`; see `.env.example`.
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` → PocketBase only. `INTERNAL_API_SECRET` → PocketBase and app-public (booking-email status). No app gets PocketBase superuser credentials.
+- Shop listings are public data, loaded anonymously by `loadShopData()` in `packages/shared/src/server/shop.ts` (public layout and admin `/preview`); if a Shop block has nothing to show it says "Nothing is available".

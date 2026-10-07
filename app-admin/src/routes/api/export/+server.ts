@@ -46,10 +46,13 @@ export const GET: RequestHandler = async ({ locals }) => {
 		}
 	}
 
-	// Build URL → key mapping
+	// Build URL → key mapping — only for images that were actually exported.
+	// A URL whose image couldn't be fetched is left as-is rather than turned
+	// into a placeholder the import could never resolve.
 	const urlToKeyMap = new Map<string, string>();
 	for (const url of allUrls) {
-		urlToKeyMap.set(url, urlToKey(url));
+		const key = urlToKey(url);
+		if (key in images) urlToKeyMap.set(url, key);
 	}
 
 	// Replace URLs with placeholders in pages

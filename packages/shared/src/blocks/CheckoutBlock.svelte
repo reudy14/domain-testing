@@ -347,7 +347,7 @@
 				{#if payState === 'idle' || payState === 'creating'}
 					<button
 						type="submit"
-						class="btn w-full rounded-full border-0 text-white"
+						class="btn w-full rounded-full border-0 text-primary-content"
 						style="background-color: var(--color-primary, #8a9a7b);"
 						disabled={payState === 'creating'}
 					>
@@ -382,7 +382,7 @@
 				{#if payState === 'ready' || payState === 'confirming'}
 					<button
 						type="button"
-						class="btn mt-4 w-full rounded-full border-0 text-white"
+						class="btn mt-4 w-full rounded-full border-0 text-primary-content"
 						style="background-color: var(--color-primary, #8a9a7b);"
 						disabled={payState === 'confirming'}
 						onclick={confirmPayment}

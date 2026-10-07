@@ -1,5 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import { getFileUrl } from '$lib/pb';
+import { attempt } from '$lib/server/actions';
 import type { ItemRecord, ItemType } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -51,8 +52,9 @@ export const actions: Actions = {
 	create: async ({ request, locals }) => {
 		const data = await request.formData();
 		const payload = itemPayload(data);
-		if (!payload.name || Number.isNaN(payload.price)) return fail(400, { message: 'Name and price are required.' });
-		await locals.pb.collection('items').create(payload);
+		if (!payload.name || Number.isNaN(payload.price) || payload.price < 0) return fail(400, { message: 'Name and a valid price are required.' });
+		const result = await attempt('Could not create the item.', () => locals.pb.collection('items').create(payload));
+		if (!result.ok) return result.failure;
 		return { ok: true };
 	},
 	update: async ({ request, locals }) => {
@@ -60,15 +62,17 @@ export const actions: Actions = {
 		const id = String(data.get('id') || '');
 		const payload = itemPayload(data);
 		if (!id) return fail(400, { message: 'Item id is required.' });
-		if (!payload.name || Number.isNaN(payload.price)) return fail(400, { message: 'Name and price are required.' });
-		await locals.pb.collection('items').update(id, payload);
+		if (!payload.name || Number.isNaN(payload.price) || payload.price < 0) return fail(400, { message: 'Name and a valid price are required.' });
+		const result = await attempt('Could not save the item.', () => locals.pb.collection('items').update(id, payload));
+		if (!result.ok) return result.failure;
 		return { ok: true };
 	},
 	delete: async ({ request, locals }) => {
 		const data = await request.formData();
 		const id = String(data.get('id') || '');
 		if (!id) return fail(400, { message: 'Item id is required.' });
-		await locals.pb.collection('items').delete(id);
+		const result = await attempt('Could not delete the item — if it has slots or past orders, switch it to inactive instead.', () => locals.pb.collection('items').delete(id));
+		if (!result.ok) return result.failure;
 		return { ok: true };
 	}
 };

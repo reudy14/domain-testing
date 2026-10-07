@@ -1,6 +1,9 @@
 services:
   pocketbase:
-    image: spectado/pocketbase:latest
+    # Pinned: schema (pb_schema.json) and migrations target this version's
+    # format/JS API. Upgrade deliberately — read the PocketBase changelog,
+    # back up pb_data, then bump the tag and test migrations locally.
+    image: docker.io/spectado/pocketbase:0.23.12
     container_name: massage-pocketbase
     restart: unless-stopped
     # Internal only — accessed via the caddy reverse proxy
@@ -8,6 +11,17 @@ services:
       - "80"
     volumes:
       - pocketbase:/pb_data
+      # Versioned schema changes; PocketBase applies pending ones on start.
+      - ./pocketbase/pb_migrations:/pb_migrations:ro,Z
+      # Shop API (baskets, slot holds, Stripe payments, orders) — the only
+      # place commerce data is written. See pocketbase/pb_hooks/shop/lib.js.
+      - ./pocketbase/pb_hooks:/pb_hooks:ro,Z
+    environment:
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_CURRENCY: ${STRIPE_CURRENCY:-eur}
+      # Shared with app-public: lets it record booking-email status on orders.
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-}
 
   app-admin:
     build:
@@ -24,9 +38,6 @@ services:
       ORIGIN: http://admin.${DOMAIN:-localhost}:8080
       PUBLIC_SITE_URL: http://www.${DOMAIN:-localhost}:8080
       BODY_SIZE_LIMIT: 52428800 # 50MB — import payload embeds all images as base64
-      # Commerce (reservation & payment system) — set these in a root-level .env
-      POCKETBASE_ADMIN_EMAIL: ${POCKETBASE_ADMIN_EMAIL:-}
-      POCKETBASE_ADMIN_PASSWORD: ${POCKETBASE_ADMIN_PASSWORD:-}
       STRIPE_CURRENCY: ${STRIPE_CURRENCY:-eur}
       # Booking emails (Brevo SMTP relay) — admin needs these for resend/test sends
       SMTP_HOST: ${SMTP_HOST:-}
@@ -53,13 +64,11 @@ services:
       POCKETBASE_INTERNAL_URL: http://pocketbase:80
       PUBLIC_POCKETBASE_URL: http://db.${DOMAIN:-localhost}:8080
       ORIGIN: http://www.${DOMAIN:-localhost}:8080
-      # Commerce (reservation & payment system) — set these in a root-level .env
-      POCKETBASE_ADMIN_EMAIL: ${POCKETBASE_ADMIN_EMAIL:-}
-      POCKETBASE_ADMIN_PASSWORD: ${POCKETBASE_ADMIN_PASSWORD:-}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # No PocketBase or Stripe secrets here: shop writes happen in PocketBase
+      # (pb_hooks/shop). The publishable key is public by design.
       PUBLIC_STRIPE_PUBLISHABLE_KEY: ${PUBLIC_STRIPE_PUBLISHABLE_KEY:-}
       STRIPE_CURRENCY: ${STRIPE_CURRENCY:-eur}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-}
       # Booking emails (Brevo SMTP relay) — sent from the Stripe webhook
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -73,7 +82,7 @@ services:
       - "3000"
 
   caddy:
-    image: caddy:2-alpine
+    image: docker.io/library/caddy:2-alpine
     container_name: massage-caddy
     restart: unless-stopped
     ports:

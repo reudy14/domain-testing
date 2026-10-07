@@ -30,6 +30,8 @@
 		try {
 			const result = await uploadMedia(file);
 			localUrl = result.url;
+			// Keep a hand-written alt text; otherwise use the one derived from the filename.
+			if (!localAlt) localAlt = result.record?.alt || '';
 			emitChange();
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Upload failed';
@@ -92,14 +94,14 @@
 	/>
 
 	<!-- URL & Alt fields -->
-	<div class="space-y-3">
-		<label class="form-control w-full">
-			<div class="label"><span class="label-text">Image URL</span></div>
-			<input class="input input-bordered w-full" bind:value={localUrl} oninput={() => emitChange()} />
+	<div>
+		<label class="fieldset pt-0">
+			<span class="fieldset-legend">Image URL</span>
+			<input class="input w-full" bind:value={localUrl} oninput={() => emitChange()} />
 		</label>
-		<label class="form-control w-full">
-			<div class="label"><span class="label-text">Alt text</span></div>
-			<input class="input input-bordered w-full" bind:value={localAlt} oninput={() => emitChange()} />
+		<label class="fieldset">
+			<span class="fieldset-legend">Alt text</span>
+			<input class="input w-full" bind:value={localAlt} oninput={() => emitChange()} />
 		</label>
 	</div>
 </div>

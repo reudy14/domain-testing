@@ -25,7 +25,7 @@
 
 <section class="mx-auto max-w-2xl px-6 py-16 text-center">
 	{#if data.state === 'paid' && data.order}
-		<div class="mb-6 inline-grid h-16 w-16 place-items-center rounded-full bg-sage text-3xl text-white">✓</div>
+		<div class="mb-6 inline-grid h-16 w-16 place-items-center rounded-full bg-sage text-3xl text-primary-content">✓</div>
 		<h1 class="font-serif text-4xl">Thank you, {data.order.customerDetails?.name || 'friend'}!</h1>
 		<p class="mt-3 text-charcoal/70">
 			Your booking is confirmed. A receipt was sent to <strong>{data.order.email}</strong>.
@@ -51,7 +51,7 @@
 			</div>
 		</div>
 
-		<a class="btn mt-8 rounded-full border-0 px-8 text-white" style="background-color: var(--color-primary, #8a9a7b);" href="/">Book another</a>
+		<a class="btn mt-8 rounded-full border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href="/">Book another</a>
 	{:else if data.state === 'processing'}
 		<h1 class="font-serif text-4xl">Processing your payment…</h1>
 		<p class="mt-3 text-charcoal/70">
@@ -63,10 +63,10 @@
 	{:else if data.state === 'canceled' || data.state === 'failed'}
 		<h1 class="font-serif text-4xl">Payment not completed</h1>
 		<p class="mt-3 text-charcoal/70">Your payment didn't go through — no money was captured. Please try again.</p>
-		<a class="btn mt-8 rounded-full border-0 px-8 text-white" style="background-color: var(--color-primary, #8a9a7b);" href="/">Back to the shop</a>
+		<a class="btn mt-8 rounded-full border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href="/">Back to the shop</a>
 	{:else}
 		<h1 class="font-serif text-4xl">Nothing to see here</h1>
 		<p class="mt-3 text-charcoal/70">This link is missing a payment reference.</p>
-		<a class="btn mt-8 rounded-full border-0 px-8 text-white" style="background-color: var(--color-primary, #8a9a7b);" href="/">Back to the shop</a>
+		<a class="btn mt-8 rounded-full border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href="/">Back to the shop</a>
 	{/if}
 </section>
