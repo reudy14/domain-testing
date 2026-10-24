@@ -110,6 +110,7 @@ export type ItemRecord = {
 	type: ItemType;
 	stock: number | null;
 	duration: number | null; // minutes, for item_with_time
+	bufferMinutes: number | null; // get-ready time after each appointment; default gap when generating slots
 	active: boolean;
 };
 

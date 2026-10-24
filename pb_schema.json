@@ -331,6 +331,7 @@
       { "id": "sel_itemtype001", "name": "type", "type": "select", "system": false, "required": true, "presentable": false, "unique": false, "maxSelect": 1, "values": ["item", "item_with_time"] },
       { "id": "num_itemstock01", "name": "stock", "type": "number", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": 0, "max": null } },
       { "id": "num_itemdur0001", "name": "duration", "type": "number", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": 1, "max": null } },
+      { "id": "num_itembuffer1", "name": "bufferMinutes", "type": "number", "system": false, "required": false, "presentable": false, "min": 0, "max": null, "onlyInt": true },
       { "id": "bool_itemactive", "name": "active", "type": "bool", "system": false, "required": false, "presentable": false, "unique": false, "options": {} },
       {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
       {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}

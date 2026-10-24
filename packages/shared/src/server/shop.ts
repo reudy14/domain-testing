@@ -31,6 +31,7 @@ export async function loadShopData(pb: PocketBase): Promise<{ items: ItemRecord[
 			type: record.type,
 			stock: record.stock ?? null,
 			duration: record.duration ?? null,
+			bufferMinutes: record.bufferMinutes ?? null,
 			active: record.active
 		};
 	});
