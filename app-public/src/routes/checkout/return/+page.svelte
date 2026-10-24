@@ -1,21 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { formatInstant, formatPrice } from '$shared/calendar';
 
 	let { data } = $props();
 
+	// "Friday 15 January, 10:00" in the studio's timezone.
 	function formatSlotDate(iso?: string | null) {
-		if (!iso) return '';
-		return new Date(iso).toLocaleString(undefined, {
-			weekday: 'long',
-			month: 'long',
-			day: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit'
-		});
-	}
-
-	function formatPrice(amount: number) {
-		return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR' }).format(amount);
+		return formatInstant(iso, data.timezone, { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 	}
 </script>
 

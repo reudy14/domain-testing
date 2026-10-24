@@ -48,6 +48,31 @@ export function dateInputToPocketBase(value: string, allDay = true, timeZone = '
 	return `${value.slice(0, 10)} 00:00:00.000Z`;
 }
 
+/**
+ * Locale for every date, time and price shown to people: day-month-year and
+ * a 24-hour clock. Fixed (not the visitor's or server's default, which is
+ * en-US in the container) so the server render and the browser agree.
+ */
+export const DISPLAY_LOCALE = 'en-GB';
+
+/** Fallback when no SITE_TIMEZONE reaches the page. */
+export const DEFAULT_TIMEZONE = 'Europe/Oslo';
+
+export function formatPrice(amount: number) {
+	return new Intl.NumberFormat(DISPLAY_LOCALE, { style: 'currency', currency: 'EUR' }).format(amount);
+}
+
+/** Format an instant in `timeZone` with the display locale. */
+export function formatInstant(value: string | null | undefined, timeZone: string, options: Intl.DateTimeFormatOptions) {
+	const date = parseInstant(value);
+	return date ? new Intl.DateTimeFormat(DISPLAY_LOCALE, { ...options, timeZone }).format(date) : '';
+}
+
+/** The calendar date (`YYYY-MM-DD`) of an instant in `timeZone`. */
+export function zonedDateKey(value: string | null | undefined, timeZone: string) {
+	return toZonedDatetimeInput(value, timeZone).slice(0, 10);
+}
+
 // ── Site-timezone helpers ──────────────────────────────────────────────
 // Admin forms and listings work in the site's timezone (SITE_TIMEZONE), so
 // what the admin types is what customers book, and the server render (UTC
@@ -114,14 +139,14 @@ export function toZonedDatetimeInput(value: string | null | undefined, timeZone:
 export function formatDateTime(value: string | null | undefined, timeZone: string) {
 	const date = parseInstant(value);
 	if (!date) return '';
-	return new Intl.DateTimeFormat('en-GB', { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(date);
+	return new Intl.DateTimeFormat(DISPLAY_LOCALE, { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
 /** "10:00" in `timeZone`. */
 export function formatTime(value: string | null | undefined, timeZone: string) {
 	const date = parseInstant(value);
 	if (!date) return '';
-	return new Intl.DateTimeFormat('en-GB', { timeZone, timeStyle: 'short' }).format(date);
+	return new Intl.DateTimeFormat(DISPLAY_LOCALE, { timeZone, timeStyle: 'short' }).format(date);
 }
 
 export function parseEventDate(value?: string | null) {
@@ -184,7 +209,7 @@ export function createCalendarMonth(monthDate: Date, reference = new Date(), wee
 
 	return {
 		date: first,
-		label: first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+		label: first.toLocaleDateString(DISPLAY_LOCALE, { month: 'long', year: 'numeric' }),
 		days
 	};
 }
@@ -264,7 +289,7 @@ export function formatEventDateRange(event: CalendarEventRecord) {
 	const start = parseEventDate(event.start);
 	const end = parseEventDate(event.end);
 	if (!start) return '';
-	const formatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+	const formatter = new Intl.DateTimeFormat(DISPLAY_LOCALE, { month: 'short', day: 'numeric' });
 	if (!end || dateKey(start) === dateKey(end)) return formatter.format(start);
 	return `${formatter.format(start)} – ${formatter.format(end)}`;
 }

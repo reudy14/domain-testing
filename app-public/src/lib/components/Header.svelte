@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import type { HeaderGlobal } from '$lib/types';
 	import { getBasketContext } from '$lib/basket.svelte';
+	import { formatPrice } from '$shared/calendar';
 
 	let { header } = $props<{ header: HeaderGlobal }>();
 
@@ -29,9 +30,7 @@
 		return href === '/' ? path === '/' : path === href || path.startsWith(href + '/');
 	}
 
-	function formatTotal(amount: number) {
-		return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR' }).format(amount);
-	}
+	const formatTotal = formatPrice;
 </script>
 
 {#snippet basketIcon()}
