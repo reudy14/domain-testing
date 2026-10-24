@@ -72,7 +72,8 @@ export function mapBasket(payload: BasketPayload): Basket | null {
 			itemPrice: item?.price,
 			itemImageUrl: media ? getFileUrl('media', media.id, media.file) : undefined,
 			slotStart: slot?.start,
-			slotEnd: slot?.end
+			slotEnd: slot?.end,
+			slotCapacity: slot?.capacity
 		};
 	});
 	return {
