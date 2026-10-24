@@ -14,7 +14,7 @@ packages/shared/src/          # Shared code (types, calendar utils, blocks, pb, 
 app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 ├── src/
 │   ├── lib/
-│   │   ├── admin/            # Admin UI components (BlockList, Modal, editors, confirm/unsaved helpers)
+│   │   ├── admin/            # Admin UI components (BlockList, Modal, editors, confirm/unsaved helpers, slots/ bulk modals)
 │   │   ├── blocks/           # Re-exports from $shared/blocks (block renderers live in shared)
 │   │   ├── pb.ts             # Re-exports from $shared/pb + app-specific uploadMedia
 │   │   ├── types.ts          # Re-exports from $shared
@@ -22,14 +22,14 @@ app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 │   │   ├── scrollReveal.ts   # Re-exports from $shared
 │   │   ├── stripe-client.ts # Re-exports from $shared
 │   │   ├── basket.svelte.ts # Re-exports from $shared
-│   │   └── server/           # Re-exports from $shared/server + admin helpers (actions.ts, pages.ts)
+│   │   └── server/           # Re-exports from $shared/server + admin helpers (actions.ts, pages.ts, slots.ts)
 │   ├── routes/
 │   │   ├── +layout.svelte    # Root layout (admin shell: grouped sidebar; bare on /login and /preview)
 │   │   ├── login/            # Admin login
 │   │   ├── pages/            # Page CRUD + block editor
 │   │   ├── calendar/         # Event CRUD (menu label: Events)
 │   │   ├── items/            # Service/product CRUD (menu label: Services & products)
-│   │   ├── slots/            # Bookable time slot CRUD
+│   │   ├── slots/            # Bookable slots: month calendar (?month=YYYY-MM), CRUD, bulk generate/copy/clear
 │   │   ├── orders/           # Order list + booking-email status/resend
 │   │   ├── emails/           # Block-based booking email editor (live preview, test send)
 │   │   ├── globals/          # Header/footer/colors editor (menu label: Site design)
@@ -118,6 +118,7 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
 ### Shared Code
 - `packages/shared/src/types.ts` — all type definitions
 - `packages/shared/src/calendar.ts` — calendar utilities (used by admin calendar editor and public upcoming calendar block)
+- `packages/shared/src/slots.ts` — pure slot planning (generate/copy-week maths on date keys + wall-clock times in `SITE_TIMEZONE`, DST-safe); the `/slots` actions use it via `$lib/slots`, PocketBase I/O is in `app-admin/src/lib/server/slots.ts`
 - Each app's `svelte.config.js` declares `kit.alias.$shared → '../packages/shared/src'`
 - Each app's `src/lib/types.ts` and `src/lib/calendar.ts` re-export from `$shared` so existing `$lib/types` and `$lib/calendar` imports work
 

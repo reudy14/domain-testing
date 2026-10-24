@@ -112,7 +112,7 @@ If schema import fails because of a PocketBase version mismatch, create these co
 
 Commerce collections (see the Stripe section above for context):
 
-- `items` — `name` text, `description` text, `price` number, `image` relation→media, `type` select `item|item_with_time`, `stock` number (nullable), `duration` number (nullable, minutes), `active` bool
+- `items` — `name` text, `description` text, `price` number, `image` relation→media, `type` select `item|item_with_time`, `stock` number (nullable), `duration` number (nullable, minutes), `bufferMinutes` number (nullable, get-ready minutes after each appointment), `active` bool
 - `slots` — `item` relation→items, `start` date, `end` date, `status` select `available|held|booked`, `heldUntil` date (nullable), `order` relation→orders (nullable), `notes` text
 - `baskets` — `status` select `active|completed|abandoned`, `expiresAt` date, `email` text, `customerDetails` json, `stripePaymentIntentId` text
 - `basket_lines` — `basket` relation→baskets, `item` relation→items, `slot` relation→slots (nullable), `quantity` number, `lineType` select `item|slot`
@@ -120,7 +120,7 @@ Commerce collections (see the Stripe section above for context):
 - `order_lines` — `order` relation→orders, `item` relation→items, `slot` relation→slots (nullable), `quantity` number, `lineType` select `item|slot`, `name` text (snapshot), `price` number (snapshot), `start` date (nullable, snapshot)
 - `email_templates` — `key` text (unique: `customer_confirmation` | `client_alert`), `subject` text, `blocks` json, `recipients` text, `enabled` bool
 
-> **Schema format note:** `pb_schema.json` targets PocketBase 0.23+ using the `fields` array (not the legacy `schema` array). Relation and select fields carry their config (`collectionId`, `cascadeDelete`, `maxSelect`, `values`) at the field top level, not nested under `options`. Importing the whole file via the PocketBase admin UI or `PUT /api/collections/import` creates or updates all collections in one pass.
+> **Schema format note:** `pb_schema.json` targets PocketBase 0.23+ using the `fields` array (not the legacy `schema` array). Field config (`collectionId`, `cascadeDelete`, `maxSelect`, `values`, number `min`/`max`/`onlyInt`) belongs at the field top level — 0.23 silently ignores anything nested under `options`, so the older number/text fields that still use `options` get no min/max on a fresh install. Importing the whole file via the PocketBase admin UI or `PUT /api/collections/import` creates or updates all collections in one pass.
 
 ## Authentication
 
@@ -138,7 +138,7 @@ All routes in `app-admin` except `/login` are guarded in `src/hooks.server.ts`.
 - `/pages/[slug]` — block editor with draft preview
 - `/calendar` — events shown by Upcoming Calendar blocks
 - `/items` — services and products shown in Shop blocks
-- `/slots` — manually created bookable time slots for services
+- `/slots` — bookable time slots: month calendar, single slots, and bulk tools — *Generate slots* (date range × weekdays × opening hours, spaced by the service's duration + get-ready time), *Copy a week* (repeat into the next 1–12 weeks) and *Clear slots* (free slots only). Bulk tools preview first, skip slots in the past or overlapping a slot of the same service, and never touch booked or in-basket slots. Different services may overlap — there is no cross-service collision check.
 - `/orders` — confirmed bookings and purchases, with booking-email status and resend buttons
 - `/emails` — block-based editor for the booking confirmation and new-booking alert emails (live preview, test send)
 - `/globals` — header/footer/colors editor
