@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import ImageUploader from '$lib/admin/editors/ImageUploader.svelte';
+	import { PRIVACY_PAGE_SLUG } from '$lib/admin/privacyTemplate';
 	import type { SubmitFunction } from '@sveltejs/kit';
 
 	let { data, form } = $props();
@@ -10,6 +11,7 @@
 	let saving = $state('');
 	// Older records may predate the CTA button; the inputs below need an object.
 	header.ctaButton ??= { label: '', href: '' };
+	footer.privacyPage ??= '';
 
 	function addHeaderLink() { header.navLinks = [...(header.navLinks || []), { label: '', href: '' }]; }
 	function addSocial() { footer.socialLinks = [...(footer.socialLinks || []), { platform: '', url: '' }]; }
@@ -124,6 +126,18 @@
 			</div>
 		{/each}
 		<button class="btn btn-sm mt-1" type="button" onclick={addSocial}>Add social link</button>
+		<h3 class="mt-6 mb-2 font-bold">Privacy policy page</h3>
+		<select class="select w-full" aria-label="Privacy policy page" bind:value={footer.privacyPage}>
+			<option value="">— None —</option>
+			{#each data.pages as page (page.id)}
+				<option value={page.slug}>{page.title} [{page.slug}]</option>
+			{/each}
+		</select>
+		<p class="mt-1 text-sm text-base-content/60">Linked from the footer and the checkout. Only published pages work as links.</p>
+		{#if !data.pages.some((page) => page.slug === PRIVACY_PAGE_SLUG)}
+			<button class="btn btn-sm mt-2 self-start" type="submit" formaction="?/createPrivacyDraft" formnovalidate>Create a privacy policy draft</button>
+			<p class="mt-1 text-sm text-base-content/60">An unpublished page describing what this site does with customer data, with [gaps] for you to fill in. You're responsible for it being accurate.</p>
+		{/if}
 		{@render saveButton('footer', 'Save footer')}
 	</form>
 
