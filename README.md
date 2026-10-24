@@ -116,7 +116,7 @@ Commerce collections (see the Stripe section above for context):
 - `slots` — `item` relation→items, `start` date, `end` date, `capacity` number (places; >1 = group session), `notes` text. Nothing about bookings is stored here — see *Slot availability* below
 - `baskets` — `status` select `active|completed|abandoned`, `expiresAt` date, `email` text, `customerDetails` json, `stripePaymentIntentId` text
 - `basket_lines` — `basket` relation→baskets, `item` relation→items, `slot` relation→slots (nullable), `quantity` number (places, for a slot line), `lineType` select `item|slot`, `heldUntil` date (a slot line's hold)
-- `orders` — `basket` relation→baskets, `email` text, `customerDetails` json, `total` number, `status` select `pending|paid|refunded`, `stripePaymentIntentId` text, `customerEmailSentAt` date, `clientEmailSentAt` date, `emailError` text
+- `orders` — `basket` relation→baskets, `email` text, `customerDetails` json, `total` number, `status` select `pending|paid|refunded`, `stripePaymentIntentId` text, `customerEmailSentAt` date, `clientEmailSentAt` date, `emailError` text, `anonymisedAt` date (set by GDPR erasure/retention; `email` is then empty)
 - `order_lines` — `order` relation→orders, `item` relation→items, `slot` relation→slots (nullable), `quantity` number, `lineType` select `item|slot`, `name` text (snapshot), `price` number (snapshot), `start` date (nullable, snapshot)
 - `email_templates` — `key` text (unique: `customer_confirmation` | `client_alert`), `subject` text, `blocks` json, `recipients` text, `enabled` bool
 
@@ -140,6 +140,7 @@ All routes in `app-admin` except `/login` are guarded in `src/hooks.server.ts`.
 - `/items` — services and products shown in Shop blocks
 - `/slots` — bookable time slots: month calendar, single slots, and bulk tools — *Generate slots* (date range × weekdays × opening hours, spaced by the service's duration + get-ready time), *Copy a week* (repeat into the next 1–12 weeks) and *Clear slots* (slots with no places taken). Bulk tools preview first and skip slots in the past or overlapping a slot of the same service. Different services may share a time; whichever is booked first blocks the others (see *Slot availability*). The calendar marks slots available / in a basket / booked / full / blocked, with places taken for group sessions.
 - `/orders` — confirmed bookings and purchases, with booking-email status and resend buttons
+- `/customers` — customer personal data (GDPR): search, export as JSON, correct details on every order, erase, and the data-retention settings (see *Personal data (GDPR)*)
 - `/emails` — block-based editor for the booking confirmation and new-booking alert emails (live preview, test send)
 - `/globals` — header/footer/colors editor
 
@@ -188,6 +189,18 @@ Setup:
 5. Rebuild, open **Emails** in the admin, and use **Send test email**.
 
 With `SMTP_HOST` empty (local dev) emails are written to the app container logs instead of being sent.
+
+## Personal data (GDPR)
+
+What the software does; the studio (the controller) is responsible for the privacy policy text and for how it uses the data.
+
+- **What is stored:** name, email, phone and booking notes, on `orders.customerDetails` (one copy per order) and on `baskets` while checkout is in progress. A paid basket's copy is cleared as soon as its order exists.
+- **Privacy policy:** *Site design → Footer → Privacy policy page* links a page from the footer and above the Pay button. *Create a privacy policy draft* makes an unpublished `privacy` page describing what this software does, with [gaps] to fill in.
+- **Checkout:** a short privacy notice with the link, and a hint under the notes field asking customers not to write health details (special-category data). There is deliberately no "I consent" box: booking data is processed to perform the contract, not on consent. Both texts are editable in the Checkout block.
+- **Customers (admin):** look a customer up by name, email, phone or notes (orders and unpaid checkouts, matched by email case-insensitively); *Export data (JSON)* for access/portability requests; correct name/email/phone or remove notes on every record; *Erase* anonymises their orders (amounts, services and dates stay for the accounts) and deletes unpaid checkouts. Stripe and the email provider keep their own copies — handle those in their dashboards.
+- **Retention:** daily at 03:15 UTC and on PocketBase start (`pocketbase/pb_hooks/privacy.pb.js`): unpaid checkouts are deleted after *N* days (default 30); orders are anonymised after *M* months (default 0 = never — set it once the accountant has said how long records must be kept). Orders with a booking still ahead are skipped. Settings live in the `privacy` global.
+- **No third parties on page load:** fonts are bundled (`@fontsource/*`), not loaded from Google, and Stripe.js loads only when the customer presses Pay (`@stripe/stripe-js/pure`). The only cookies are the basket cookie and the admin login, so no cookie banner is needed — keep it that way, or add one before adding analytics.
+- All customer-data reads and writes go through `/api/privacy/*` (signed-in admin only; `orders`/`baskets` are superuser-only collections).
 
 ## Public routes (public app)
 
