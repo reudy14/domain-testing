@@ -1,4 +1,5 @@
 import { getContext, setContext } from 'svelte';
+import { invalidateAll } from '$app/navigation';
 import type { Basket, BasketLine } from './types';
 
 const BASKET_KEY = 'basket';
@@ -8,11 +9,19 @@ export type BasketStore = ReturnType<typeof createBasketStore>;
 export function createBasketStore(initial: Basket | null) {
 	let lines = $state<BasketLine[]>(initial?.lines ?? []);
 	let status = $state<Basket['status']>(initial?.status ?? 'active');
+	// Browser clock minus server clock, so hold countdowns survive a wrong clock.
+	let clockOffset = $state(clockOffsetOf(initial));
 
 	const total = $derived(
 		lines.reduce((sum, line) => sum + (line.itemPrice ?? 0) * line.quantity, 0)
 	);
 	const count = $derived(lines.reduce((sum, line) => sum + line.quantity, 0));
+
+	/** When the first slot reservation in the basket lapses, in browser-clock ms (null: none). */
+	const holdDeadline = $derived.by(() => {
+		const ends = lines.filter((l) => l.lineType === 'slot' && l.heldUntil).map((l) => Date.parse(l.heldUntil!));
+		return ends.length ? Math.min(...ends) + clockOffset : null;
+	});
 
 	async function callApi(body: Record<string, unknown>): Promise<Basket | null> {
 		const res = await fetch('/api/basket', {
@@ -31,13 +40,27 @@ export function createBasketStore(initial: Basket | null) {
 	function applyBasket(basket: Basket | null) {
 		lines = basket?.lines ?? [];
 		status = basket?.status ?? 'active';
+		clockOffset = clockOffsetOf(basket);
+	}
+
+	/**
+	 * Apply a basket change that can free or take slot places, then reload
+	 * page data so shop listings (places left, blocked times) match it.
+	 */
+	async function applySlotChange(basket: Basket | null) {
+		applyBasket(basket);
+		await invalidateAll();
 	}
 
 	async function refresh() {
 		const res = await fetch('/api/basket');
 		if (!res.ok) return;
 		const data = await res.json();
+		const slotLines = () => lines.filter((l) => l.lineType === 'slot').length;
+		const before = slotLines();
 		applyBasket(data.basket);
+		// Lapsed reservations were dropped: their places are free again.
+		if (slotLines() < before) await invalidateAll();
 	}
 
 	/** Overwrite local state from server-provided layout data. */
@@ -50,15 +73,20 @@ export function createBasketStore(initial: Basket | null) {
 	}
 
 	async function addSlotLine(slotId: string) {
-		applyBasket(await callApi({ action: 'add_slot', slotId }));
+		await applySlotChange(await callApi({ action: 'add_slot', slotId }));
 	}
 
 	async function updateQuantity(lineId: string, quantity: number) {
-		applyBasket(await callApi({ action: 'update_quantity', lineId, quantity }));
+		await applySlotChange(await callApi({ action: 'update_quantity', lineId, quantity }));
 	}
 
 	async function removeLine(lineId: string) {
-		applyBasket(await callApi({ action: 'remove_line', lineId }));
+		await applySlotChange(await callApi({ action: 'remove_line', lineId }));
+	}
+
+	/** Hold the basket's time slots for another 10 minutes. */
+	async function renewHolds() {
+		await applySlotChange(await callApi({ action: 'renew_holds' }));
 	}
 
 	return {
@@ -74,13 +102,21 @@ export function createBasketStore(initial: Basket | null) {
 		get status() {
 			return status;
 		},
+		get holdDeadline() {
+			return holdDeadline;
+		},
 		refresh,
 		syncFrom,
 		addItemLine,
 		addSlotLine,
 		updateQuantity,
-		removeLine
+		removeLine,
+		renewHolds
 	};
+}
+
+function clockOffsetOf(basket: Basket | null) {
+	return basket?.serverNow ? Date.now() - basket.serverNow : 0;
 }
 
 export function setBasketContext(store: BasketStore) {

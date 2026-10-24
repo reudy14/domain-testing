@@ -73,7 +73,8 @@ export function mapBasket(payload: BasketPayload): Basket | null {
 			itemImageUrl: media ? getFileUrl('media', media.id, media.file) : undefined,
 			slotStart: slot?.start,
 			slotEnd: slot?.end,
-			slotCapacity: slot?.capacity
+			slotCapacity: slot?.capacity,
+			heldUntil: line.heldUntil ? new Date(String(line.heldUntil).replace(' ', 'T')).toISOString() : undefined
 		};
 	});
 	return {
@@ -83,7 +84,8 @@ export function mapBasket(payload: BasketPayload): Basket | null {
 		email: record.email || null,
 		customerDetails: record.customerDetails || null,
 		stripePaymentIntentId: record.stripePaymentIntentId || null,
-		lines: mappedLines
+		lines: mappedLines,
+		serverNow: Date.now()
 	};
 }
 

@@ -275,8 +275,9 @@ function createBasket(app) {
 
 /**
  * Renew the hold on every slot line in a basket. Used at checkout start
- * (30 min) and after a failed payment (10 min, so the customer can retry).
- * A live hold is simply extended (its seats are already counted). A lapsed
+ * (30 min), after a failed payment (10 min, so the customer can retry) and
+ * when the customer asks for more time (`renew_holds`, 10 min). A live hold
+ * is extended, never shortened (its seats are already counted). A lapsed
  * one that hasn't been swept yet is rescued only if its seats are still
  * free and nothing has blocked the time since — otherwise it's left for
  * the sweep, and checkout tells the customer the slot expired.
@@ -285,9 +286,12 @@ function extendBasketHolds(app, basketId, durationMs) {
 	const now = Date.now();
 	const until = isoIn(durationMs);
 	for (const line of findAll(app, 'basket_lines', "basket = {:basket} && lineType = 'slot'", { basket: basketId })) {
-		if (toMs(line.getString('heldUntil')) > now) {
-			line.set('heldUntil', until);
-			app.save(line);
+		const heldUntil = toMs(line.getString('heldUntil'));
+		if (heldUntil > now) {
+			if (heldUntil < now + durationMs) {
+				line.set('heldUntil', until);
+				app.save(line);
+			}
 			continue;
 		}
 		try {
@@ -376,6 +380,13 @@ function basketAction(app, body) {
 			if (stock != null && stock !== '' && quantity > item.getInt('stock')) throw conflict(`Only ${item.getInt('stock')} in stock`);
 			line.set('quantity', quantity);
 			app.save(line);
+			break;
+		}
+
+		case 'renew_holds': {
+			// "Keep my reservation" at checkout. Holds that already lapsed were
+			// swept above; the customer is told and picks the time again.
+			extendBasketHolds(app, basket.id, SLOT_HOLD_MS);
 			break;
 		}
 

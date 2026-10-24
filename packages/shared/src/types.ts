@@ -144,6 +144,8 @@ export type BasketLine = {
 	slotStart?: string;
 	slotEnd?: string;
 	slotCapacity?: number;
+	/** Slot lines: when the reservation lapses and the line is dropped (ISO). */
+	heldUntil?: string;
 };
 
 export type Basket = {
@@ -154,6 +156,8 @@ export type Basket = {
 	customerDetails: CustomerDetails | null;
 	stripePaymentIntentId: string | null;
 	lines: BasketLine[];
+	/** Server clock (epoch ms) when this was read, so browsers with a wrong clock count holds down correctly. */
+	serverNow?: number;
 };
 
 export type CustomerDetails = {

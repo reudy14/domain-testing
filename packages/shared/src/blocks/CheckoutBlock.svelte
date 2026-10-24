@@ -1,8 +1,11 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import type { CheckoutBlockData } from '$shared/types';
+	import { page } from '$app/state';
+	import type { BasketLine, CheckoutBlockData } from '$shared/types';
 	import { getBasketContext } from '$shared/basket.svelte';
+	import { DEFAULT_TIMEZONE, formatInstant, formatPrice } from '$shared/calendar';
 	import { loadStripe } from '$shared/stripe-client';
 	import type { Stripe, StripeElements, StripePaymentElement } from '@stripe/stripe-js';
 
@@ -38,23 +41,79 @@
 		lastSig = sig;
 	});
 
-	const currency = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR' });
 	const payLabel = $derived(
 		payState === 'confirming'
 			? 'Confirming…'
 			: payState === 'creating'
 				? 'Preparing payment…'
-				: `Pay ${currency.format(basket.total)}`
+				: `Pay ${formatPrice(basket.total)}`
 	);
 
+	const timezone = $derived<string>(page.data.timezone ?? DEFAULT_TIMEZONE);
+
+	/** "Fri 15 Jan, 10:00" in the studio's timezone. */
 	function formatSlotTime(iso: string) {
-		return new Date(iso).toLocaleString(undefined, {
-			weekday: 'short',
-			month: 'short',
-			day: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit'
-		});
+		return formatInstant(iso, timezone, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+	}
+
+	// ── Reservation countdown ───────────────────────────────────────────
+	// Time slots are held for a while after being added (longer once payment
+	// starts). Show how long is left, offer more time near the end, and say
+	// so when a reservation runs out instead of the line silently vanishing.
+
+	/** Offer "keep my reservation" once less than this is left. */
+	const RENEW_OFFER_MS = 3 * 60 * 1000;
+
+	// null until mounted, so the server render shows no (soon wrong) countdown.
+	let now = $state<number | null>(null);
+	onMount(() => {
+		now = Date.now();
+		const timer = setInterval(() => (now = Date.now()), 1000);
+		return () => clearInterval(timer);
+	});
+
+	const holdLeftMs = $derived(now === null || basket.holdDeadline === null ? null : Math.max(0, basket.holdDeadline - now));
+	const slotLineCount = $derived(basket.lines.filter((l) => l.lineType === 'slot').length);
+	let renewing = $state(false);
+	/** Reservations that ran out while this page was open, e.g. "Group class, Fri 15 Jan, 10:00". */
+	let lapsed = $state<string[]>([]);
+	let nextLapseCheck = 0;
+
+	function formatCountdown(ms: number) {
+		const seconds = Math.ceil(ms / 1000);
+		return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+	}
+
+	function describeLine(line: BasketLine) {
+		return [line.itemName ?? 'A time slot', line.slotStart ? formatSlotTime(line.slotStart) : ''].filter(Boolean).join(', ');
+	}
+
+	// At zero, reload the basket: the server drops the lapsed line. Retry every
+	// few seconds in case its clock is slightly behind.
+	$effect(() => {
+		if (holdLeftMs !== 0 || now === null || now < nextLapseCheck) return;
+		nextLapseCheck = now + 5000;
+		void checkLapsed();
+	});
+
+	async function checkLapsed() {
+		const before = basket.lines.filter((l) => l.lineType === 'slot');
+		await basket.refresh();
+		const gone = before.filter((l) => !basket.lines.some((line) => line.id === l.id));
+		if (gone.length) lapsed = [...lapsed, ...gone.map(describeLine)];
+	}
+
+	async function renewHolds() {
+		if (renewing) return;
+		renewing = true;
+		errorMsg = '';
+		try {
+			await basket.renewHolds();
+		} catch (e) {
+			errorMsg = e instanceof Error ? e.message : 'Could not extend your reservation.';
+		} finally {
+			renewing = false;
+		}
 	}
 
 	function resetPayment() {
@@ -115,6 +174,8 @@
 				);
 			}
 			const { clientSecret } = await res.json();
+			// Starting payment holds the slots longer; show the new countdown.
+			await basket.refresh();
 
 			stripe = await loadStripe();
 			if (!stripe) throw new Error('Payment system failed to load. Please refresh and try again.');
@@ -209,14 +270,59 @@
 		<p class="mt-2 text-fg-body/70">{data.heading}</p>
 	{/if}
 
+	{#if lapsed.length}
+		<div class="mt-8 flex items-start justify-between gap-3 rounded-2xl border border-terracotta/40 bg-terracotta/10 px-5 py-4 text-sm text-charcoal" role="alert">
+			<div>
+				<p class="font-medium">
+					{lapsed.length === 1 ? 'Your reservation ran out' : 'Some reservations ran out'}, so {lapsed.length === 1 ? 'it was' : 'they were'} taken out of your basket:
+				</p>
+				<ul class="mt-1 list-disc pl-5">
+					{#each lapsed as description, i (i)}
+						<li>{description}</li>
+					{/each}
+				</ul>
+				<p class="mt-1 text-charcoal/70">You can pick the time again in the shop if it’s still free.</p>
+			</div>
+			<button type="button" class="shrink-0 font-bold" aria-label="Dismiss" onclick={() => (lapsed = [])}>✕</button>
+		</div>
+	{/if}
+
 	{#if basket.lines.length === 0}
 		<div class="mt-12 rounded-2xl border border-charcoal/10 bg-white/60 px-6 py-16 text-center">
 			<p class="font-serif text-xl">Your basket is empty</p>
 			<p class="mt-2 text-sm text-fg-body/70">Pick a service or product above.</p>
 		</div>
 	{:else}
+		{#if holdLeftMs !== null && slotLineCount}
+			{@const ending = holdLeftMs < RENEW_OFFER_MS}
+			<div
+				class="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-5 py-3 text-sm {ending
+					? 'border-terracotta/40 bg-terracotta/10'
+					: 'border-sage/30 bg-sage/10'}"
+				role="timer"
+				aria-live={ending ? 'polite' : 'off'}
+			>
+				<p>
+					{slotLineCount === 1 ? 'Your time is' : 'Your times are'} reserved for
+					<strong class="tabular-nums">{formatCountdown(holdLeftMs)}</strong>{ending
+						? ' — after that it goes back to the shop.'
+						: '.'}
+				</p>
+				{#if ending && payState !== 'confirming'}
+					<button
+						type="button"
+						class="rounded-full border border-charcoal/20 bg-white px-4 py-1.5 font-medium transition hover:bg-charcoal/5 disabled:opacity-60"
+						disabled={renewing}
+						onclick={renewHolds}
+					>
+						{renewing ? 'Extending…' : 'Keep it 10 more minutes'}
+					</button>
+				{/if}
+			</div>
+		{/if}
+
 		<!-- Basket lines -->
-		<ul class="mt-8 space-y-4">
+		<ul class="{holdLeftMs !== null && slotLineCount ? 'mt-4' : 'mt-8'} space-y-4">
 			{#each basket.lines as line (line.id)}
 				{@const pending = pendingLines.has(line.id)}
 				<li class="flex items-center gap-4 rounded-2xl border border-charcoal/10 bg-white p-4 shadow-sm">
@@ -237,7 +343,7 @@
 						{#if line.lineType === 'slot' && line.slotStart}
 							<p class="text-sm text-fg-body/70">{formatSlotTime(line.slotStart)}</p>
 						{/if}
-						<p class="text-sm text-fg-body/70">{currency.format(line.itemPrice ?? 0)}</p>
+						<p class="text-sm text-fg-body/70">{formatPrice(line.itemPrice ?? 0)}</p>
 					</div>
 
 					<!-- Products, and places in a group session (capacity > 1); the server checks what's left. -->
@@ -266,7 +372,7 @@
 					{/if}
 
 					<p class="w-20 shrink-0 text-right font-medium">
-						{currency.format((line.itemPrice ?? 0) * line.quantity)}
+						{formatPrice((line.itemPrice ?? 0) * line.quantity)}
 					</p>
 
 					<button
@@ -286,7 +392,7 @@
 		<div class="mt-6 rounded-2xl border border-charcoal/10 bg-white p-5">
 			<div class="flex items-center justify-between">
 				<span class="text-fg-body/70">Subtotal</span>
-				<span class="font-serif text-xl font-bold">{currency.format(basket.total)}</span>
+				<span class="font-serif text-xl font-bold">{formatPrice(basket.total)}</span>
 			</div>
 		</div>
 
@@ -368,7 +474,7 @@
 					</div>
 				{/if}
 
-				{#if basketChanged}
+				{#if basketChanged && !lapsed.length}
 					<p class="mt-4 rounded-xl border border-sage/30 bg-sage/10 px-4 py-3 text-sm">
 						Basket changed — please press Pay again.
 					</p>
@@ -388,7 +494,7 @@
 						disabled={payState === 'confirming'}
 						onclick={confirmPayment}
 					>
-						{payState === 'confirming' ? 'Confirming…' : `Confirm payment — ${currency.format(basket.total)}`}
+						{payState === 'confirming' ? 'Confirming…' : `Confirm payment — ${formatPrice(basket.total)}`}
 					</button>
 				{/if}
 
