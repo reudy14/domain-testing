@@ -110,20 +110,22 @@ export type ItemRecord = {
 	type: ItemType;
 	stock: number | null;
 	duration: number | null; // minutes, for item_with_time
+	bufferMinutes: number | null; // get-ready time after each appointment; default gap when generating slots
+	capacity: number | null; // places per slot (default for new slots; >1 = group session)
 	active: boolean;
 };
 
-export type SlotStatus = 'available' | 'held' | 'booked';
-
+/**
+ * A bookable slot as the shop lists it (GET /api/shop/slots): only slots
+ * with places left that no overlapping booking blocks.
+ */
 export type SlotRecord = {
 	id: string;
 	item: string; // item id
 	start: string;
 	end: string;
-	status: SlotStatus;
-	heldUntil: string | null;
-	order: string | null;
-	notes: string;
+	capacity: number; // places in total
+	free: number; // places still bookable
 };
 
 export type BasketStatus = 'active' | 'completed' | 'abandoned';
@@ -141,6 +143,9 @@ export type BasketLine = {
 	itemImageUrl?: string;
 	slotStart?: string;
 	slotEnd?: string;
+	slotCapacity?: number;
+	/** Slot lines: when the reservation lapses and the line is dropped (ISO). */
+	heldUntil?: string;
 };
 
 export type Basket = {
@@ -151,6 +156,8 @@ export type Basket = {
 	customerDetails: CustomerDetails | null;
 	stripePaymentIntentId: string | null;
 	lines: BasketLine[];
+	/** Server clock (epoch ms) when this was read, so browsers with a wrong clock count holds down correctly. */
+	serverNow?: number;
 };
 
 export type CustomerDetails = {

@@ -55,30 +55,188 @@ function conflict(message) {
 	return new ApiError(409, message);
 }
 
+/** Epoch ms → PocketBase's stored datetime format, for comparing dates in filters. */
+function pbDate(ms) {
+	return new Date(ms).toISOString().replace('T', ' ');
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// ── Slot availability ───────────────────────────────────────────────────
+//
+// Nothing about bookings is stored on a slot. Its seats are taken by paid
+// order lines and by basket lines whose hold (`heldUntil`) hasn't lapsed;
+// it has `capacity` seats (1 for a one-to-one massage, more for a group).
+//
+// One practitioner works all services, so a slot with any seat taken
+// BLOCKS every other slot it overlaps — whatever the service — including
+// each service's get-ready time after it. The client can offer three
+// massages at 10:00; once one is booked (or in a basket), the others go.
+
+/**
+ * Occupancy and blocking for the slots starting in [rangeStart, rangeEnd) (epoch ms).
+ * `options.excludeLineId` leaves one basket line's seats out (used when
+ * changing that line's quantity). Must run inside a transaction when the
+ * result decides a write: PocketBase runs transactions one at a time, so
+ * the check and the write can't interleave with another customer's.
+ */
+function slotStates(app, rangeStart, rangeEnd, options) {
+	const opts = options || {};
+	// Slots just outside the range can still block ones inside it.
+	const range = { from: pbDate(rangeStart - DAY_MS), to: pbDate(rangeEnd + DAY_MS) };
+	const records = findAll(app, 'slots', 'start >= {:from} && start < {:to}', range, 'start');
+	if (!records.length) return [];
+
+	const items = {};
+	const byId = {};
+	const states = records.map((record) => {
+		const itemId = record.getString('item');
+		if (!(itemId in items)) items[itemId] = findOrNull(app, 'items', itemId);
+		const item = items[itemId];
+		const start = toMs(record.getString('start'));
+		const storedEnd = toMs(record.getString('end'));
+		const end = Number.isNaN(storedEnd) ? start + (item ? item.getInt('duration') : 0) * 60000 : storedEnd;
+		const state = {
+			id: record.id,
+			item: itemId,
+			itemName: item ? item.getString('name') : '',
+			bookable: !!item && item.getBool('active') && item.getString('type') === 'item_with_time',
+			start,
+			end,
+			readyAt: end + Math.max(0, item ? item.getInt('bufferMinutes') : 0) * 60000,
+			capacity: Math.max(1, record.getInt('capacity')),
+			notes: record.getString('notes'),
+			booked: 0,
+			held: 0,
+			blockedBy: ''
+		};
+		byId[record.id] = state;
+		return state;
+	});
+
+	const lineRange = 'slot.start >= {:from} && slot.start < {:to}';
+	for (const line of findAll(app, 'order_lines', "lineType = 'slot' && order.status != 'refunded' && " + lineRange, range)) {
+		const state = byId[line.getString('slot')];
+		if (state) state.booked += line.getInt('quantity');
+	}
+	const heldParams = Object.assign({ now: pbDate(Date.now()) }, range);
+	for (const line of findAll(app, 'basket_lines', "lineType = 'slot' && heldUntil > {:now} && " + lineRange, heldParams)) {
+		const state = byId[line.getString('slot')];
+		if (state && line.id !== opts.excludeLineId) state.held += line.getInt('quantity');
+	}
+
+	const occupied = states.filter((s) => s.booked + s.held > 0);
+	for (const state of states) {
+		const blocker = occupied.find((o) => o.id !== state.id && state.start < o.readyAt && o.start < state.readyAt);
+		if (blocker) state.blockedBy = blocker.id;
+	}
+	return states.filter((s) => s.start >= rangeStart && s.start < rangeEnd);
+}
+
+/** One slot's state (see slotStates), or null if it doesn't exist. */
+function slotState(app, slotId, options) {
+	const record = findOrNull(app, 'slots', slotId);
+	if (!record) return null;
+	const start = toMs(record.getString('start'));
+	return slotStates(app, start, start + 1, options).find((s) => s.id === slotId) || null;
+}
+
+function freeSeats(state) {
+	return state.capacity - state.booked - state.held;
+}
+
+/** Future slots a customer can book right now — the public shop listing. */
+function bookableSlots(app) {
+	const now = Date.now();
+	return slotStates(app, now, now + 366 * DAY_MS)
+		.filter((s) => s.bookable && !s.blockedBy && freeSeats(s) > 0)
+		.map((s) => ({
+			id: s.id,
+			item: s.item,
+			start: new Date(s.start).toISOString(),
+			end: new Date(s.end).toISOString(),
+			capacity: s.capacity,
+			free: freeSeats(s)
+		}));
+}
+
+/**
+ * Every slot in a range (or one slot by id) with its seats and blocking —
+ * for the signed-in admin. `query`: from/to (ISO), optional item, or id.
+ */
+function slotDetails(app, query) {
+	let states;
+	if (query.id) {
+		const state = slotState(app, String(query.id));
+		states = state ? [state] : [];
+	} else {
+		const from = toMs(query.from);
+		const to = toMs(query.to);
+		if (Number.isNaN(from) || Number.isNaN(to) || to <= from) throw new BadRequestError('from and to are required');
+		if (to - from > 400 * DAY_MS) throw new BadRequestError('Range too long');
+		states = slotStates(app, from, to);
+		if (query.item) states = states.filter((s) => s.item === query.item);
+	}
+	return states.map((s) => ({
+		id: s.id,
+		item: s.item,
+		itemName: s.itemName,
+		start: new Date(s.start).toISOString(),
+		end: new Date(s.end).toISOString(),
+		capacity: s.capacity,
+		notes: s.notes,
+		booked: s.booked,
+		held: s.held,
+		blockedBy: s.blockedBy
+	}));
+}
+
+/**
+ * Check a slot can take `seats` more seats; returns an ApiError to throw,
+ * or null. Call inside the transaction that then writes the hold.
+ */
+function seatProblem(state, seats) {
+	if (!state || !state.bookable) return new NotFoundError('Slot not found');
+	if (state.start <= Date.now()) return conflict('This time has already passed — please pick another');
+	if (state.blockedBy) return conflict('This time is no longer available — please pick another');
+	const free = freeSeats(state);
+	if (seats > free) {
+		return conflict(free <= 0 ? 'This time is fully booked — please pick another' : `Only ${free} place${free === 1 ? '' : 's'} left at this time`);
+	}
+	return null;
+}
+
+/**
+ * Run `fn(tx)` in a transaction; `fn` returns an ApiError to refuse (nothing
+ * is written) or nothing to commit. Unexpected failures become `fallback`.
+ */
+function guardedTransaction(app, fallback, fn) {
+	let refusal = null;
+	try {
+		app.runInTransaction((tx) => {
+			refusal = fn(tx) || null;
+		});
+	} catch (e) {
+		console.error('[shop]', fallback, e);
+		throw conflict(fallback);
+	}
+	if (refusal) throw refusal;
+}
+
 // ── Holds and baskets ───────────────────────────────────────────────────
 
 /**
- * Release slots whose hold has lapsed (dropping the basket lines holding
- * them) and abandon expired baskets. Runs every minute (cron) and before
- * basket/checkout operations, so expiry is exact where it matters.
+ * Drop basket lines whose slot hold has lapsed (their seats are already
+ * free — availability only counts live holds — this is just tidying) and
+ * abandon expired baskets. Runs every minute (cron) and before
+ * basket/checkout operations.
  */
 function sweepExpiredHolds(app) {
-	const now = Date.now();
-	for (const slot of findAll(app, 'slots', "status = 'held'")) {
-		const until = toMs(slot.getString('heldUntil'));
-		// Still valid, or no parseable hold to judge by — leave it alone.
-		if (Number.isNaN(until) || until > now) continue;
+	for (const line of findAll(app, 'basket_lines', "lineType = 'slot' && heldUntil < {:now}", { now: pbDate(Date.now()) })) {
 		try {
-			app.runInTransaction((tx) => {
-				for (const line of findAll(tx, 'basket_lines', 'slot = {:slot}', { slot: slot.id })) tx.delete(line);
-				const fresh = tx.findRecordById('slots', slot.id);
-				if (fresh.getString('status') !== 'held') return;
-				fresh.set('status', 'available');
-				fresh.set('heldUntil', '');
-				tx.save(fresh);
-			});
+			app.delete(line);
 		} catch (e) {
-			console.error('[shop] could not release slot', slot.id, e);
+			console.error('[shop] could not drop expired basket line', line.id, e);
 		}
 	}
 
@@ -115,26 +273,36 @@ function createBasket(app) {
 	return basket;
 }
 
-function releaseSlotHold(app, slotId) {
-	const slot = findOrNull(app, 'slots', slotId);
-	if (!slot || slot.getString('status') !== 'held') return;
-	slot.set('status', 'available');
-	slot.set('heldUntil', '');
-	app.save(slot);
-}
-
 /**
- * Renew the hold on every slot line in a basket whose slot is still `held`
- * (nobody else can take a held slot, so renewing is safe). Used at checkout
- * start (30 min) and after a failed payment (10 min, so the customer can retry).
+ * Renew the hold on every slot line in a basket. Used at checkout start
+ * (30 min), after a failed payment (10 min, so the customer can retry) and
+ * when the customer asks for more time (`renew_holds`, 10 min). A live hold
+ * is extended, never shortened (its seats are already counted). A lapsed
+ * one that hasn't been swept yet is rescued only if its seats are still
+ * free and nothing has blocked the time since — otherwise it's left for
+ * the sweep, and checkout tells the customer the slot expired.
  */
 function extendBasketHolds(app, basketId, durationMs) {
+	const now = Date.now();
 	const until = isoIn(durationMs);
 	for (const line of findAll(app, 'basket_lines', "basket = {:basket} && lineType = 'slot'", { basket: basketId })) {
-		const slot = findOrNull(app, 'slots', line.getString('slot'));
-		if (slot && slot.getString('status') === 'held') {
-			slot.set('heldUntil', until);
-			app.save(slot);
+		const heldUntil = toMs(line.getString('heldUntil'));
+		if (heldUntil > now) {
+			if (heldUntil < now + durationMs) {
+				line.set('heldUntil', until);
+				app.save(line);
+			}
+			continue;
+		}
+		try {
+			app.runInTransaction((tx) => {
+				const fresh = tx.findRecordById('basket_lines', line.id);
+				if (seatProblem(slotState(tx, fresh.getString('slot')), fresh.getInt('quantity'))) return;
+				fresh.set('heldUntil', until);
+				tx.save(fresh);
+			});
+		} catch (e) {
+			console.error('[shop] could not renew hold', line.id, e);
 		}
 	}
 }
@@ -175,35 +343,38 @@ function basketAction(app, body) {
 		}
 
 		case 'add_slot': {
+			// Adding a slot that's already in the basket adds seats to that line.
 			const slotId = String(body.slotId || '');
-			if (lines.some((l) => l.getString('slot') === slotId)) throw conflict('Slot already in your basket');
-			const slot = findOrNull(app, 'slots', slotId);
-			if (!slot) throw new NotFoundError('Slot not found');
-			if (slot.getString('status') !== 'available') throw conflict('Slot is no longer available');
-
-			// Line + hold in one transaction. basket_lines.slot is UNIQUE, so of
-			// two concurrent requests for the same slot only one can succeed.
-			try {
-				app.runInTransaction((tx) => {
-					const fresh = tx.findRecordById('slots', slotId);
-					if (fresh.getString('status') !== 'available') throw new Error('taken');
-					tx.save(newRecord(tx, 'basket_lines', { basket: basket.id, item: fresh.getString('item'), slot: slotId, quantity: 1, lineType: 'slot' }));
-					fresh.set('status', 'held');
-					fresh.set('heldUntil', isoIn(SLOT_HOLD_MS));
-					tx.save(fresh);
-				});
-			} catch (_) {
-				throw conflict('Slot was just reserved by someone else');
-			}
+			const seats = Math.max(1, Math.floor(Number(body.seats)) || 1);
+			guardedTransaction(app, 'Could not reserve this time — please try again', (tx) => {
+				const problem = seatProblem(slotState(tx, slotId), seats);
+				if (problem) return problem;
+				const existing = findAll(tx, 'basket_lines', 'basket = {:basket} && slot = {:slot}', { basket: basket.id, slot: slotId })[0];
+				const line = existing || newRecord(tx, 'basket_lines', { basket: basket.id, item: tx.findRecordById('slots', slotId).getString('item'), slot: slotId, quantity: 0, lineType: 'slot' });
+				line.set('quantity', line.getInt('quantity') + seats);
+				line.set('heldUntil', isoIn(SLOT_HOLD_MS));
+				tx.save(line);
+			});
 			break;
 		}
 
 		case 'update_quantity': {
 			const line = lines.find((l) => l.id === String(body.lineId || ''));
 			if (!line) throw new NotFoundError('Line not found in your basket');
-			if (line.getString('lineType') === 'slot') throw new BadRequestError('Slot lines have fixed quantity 1');
 			const quantity = Number(body.quantity);
 			if (!Number.isInteger(quantity) || quantity < 1) throw new BadRequestError('Quantity must be a positive integer');
+			if (line.getString('lineType') === 'slot') {
+				// Seats for a group session: re-check capacity without this line's current seats.
+				guardedTransaction(app, 'Could not change the number of places — please try again', (tx) => {
+					const fresh = tx.findRecordById('basket_lines', line.id);
+					const problem = seatProblem(slotState(tx, fresh.getString('slot'), { excludeLineId: fresh.id }), quantity);
+					if (problem) return problem;
+					fresh.set('quantity', quantity);
+					fresh.set('heldUntil', isoIn(SLOT_HOLD_MS));
+					tx.save(fresh);
+				});
+				break;
+			}
 			const item = findOrNull(app, 'items', line.getString('item'));
 			const stock = item ? item.get('stock') : null;
 			if (stock != null && stock !== '' && quantity > item.getInt('stock')) throw conflict(`Only ${item.getInt('stock')} in stock`);
@@ -212,12 +383,17 @@ function basketAction(app, body) {
 			break;
 		}
 
+		case 'renew_holds': {
+			// "Keep my reservation" at checkout. Holds that already lapsed were
+			// swept above; the customer is told and picks the time again.
+			extendBasketHolds(app, basket.id, SLOT_HOLD_MS);
+			break;
+		}
+
 		case 'remove_line': {
 			const line = lines.find((l) => l.id === String(body.lineId || ''));
 			if (!line) throw new NotFoundError('Line not found in your basket');
-			const slotId = line.getString('slot');
-			app.delete(line);
-			if (slotId) releaseSlotHold(app, slotId);
+			app.delete(line); // a slot line's seats free up with it
 			break;
 		}
 
@@ -303,8 +479,8 @@ function startCheckout(app, body) {
 		if (!item || !item.getBool('active')) throw conflict('An item in your basket is no longer available');
 		const quantity = line.getInt('quantity');
 		if (line.getString('lineType') === 'slot') {
-			const slot = findOrNull(app, 'slots', line.getString('slot'));
-			if (!slot || slot.getString('status') !== 'held') {
+			// The sweep above dropped lapsed holds that couldn't be renewed.
+			if (!findOrNull(app, 'slots', line.getString('slot')) || !(toMs(line.getString('heldUntil')) > Date.now())) {
 				throw conflict(`Your time slot for "${item.getString('name')}" has expired — please pick it again`);
 			}
 		} else {
@@ -426,7 +602,9 @@ function createOrderFromIntent(app, intent) {
 		});
 		tx.save(order);
 
-		// Snapshot lines, book slots, decrement stock.
+		// Snapshot lines and decrement stock. A slot's seats move from the
+		// basket line (a hold) to the order line (a booking) in this same
+		// transaction, so availability never sees them free in between.
 		for (const line of lines) {
 			const item = findOrNull(tx, 'items', line.getString('item'));
 			const slot = findOrNull(tx, 'slots', line.getString('slot'));
@@ -442,12 +620,7 @@ function createOrderFromIntent(app, intent) {
 					start: slot ? slot.getString('start') : ''
 				})
 			);
-			if (line.getString('lineType') === 'slot' && slot) {
-				slot.set('status', 'booked');
-				slot.set('heldUntil', '');
-				slot.set('order', order.id);
-				tx.save(slot);
-			} else if (item && item.get('stock') != null && item.get('stock') !== '') {
+			if (line.getString('lineType') === 'item' && item && item.get('stock') != null && item.get('stock') !== '') {
 				item.set('stock', Math.max(0, item.getInt('stock') - line.getInt('quantity')));
 				tx.save(item);
 			}
@@ -539,6 +712,8 @@ function recordEmailStatus(app, secretHeader, body) {
 }
 
 module.exports = {
+	bookableSlots,
+	slotDetails,
 	sweepExpiredHolds,
 	loadActiveBasket,
 	basketPayload,

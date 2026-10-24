@@ -331,6 +331,8 @@
       { "id": "sel_itemtype001", "name": "type", "type": "select", "system": false, "required": true, "presentable": false, "unique": false, "maxSelect": 1, "values": ["item", "item_with_time"] },
       { "id": "num_itemstock01", "name": "stock", "type": "number", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": 0, "max": null } },
       { "id": "num_itemdur0001", "name": "duration", "type": "number", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": 1, "max": null } },
+      { "id": "num_itembuffer1", "name": "bufferMinutes", "type": "number", "system": false, "required": false, "presentable": false, "min": 0, "max": null, "onlyInt": true },
+      { "id": "num_itemcapacity", "name": "capacity", "type": "number", "system": false, "required": false, "presentable": false, "min": 1, "max": null, "onlyInt": true },
       { "id": "bool_itemactive", "name": "active", "type": "bool", "system": false, "required": false, "presentable": false, "unique": false, "options": {} },
       {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
       {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
@@ -344,8 +346,8 @@
     "name": "slots",
     "type": "base",
     "system": false,
-    "listRule": "status = 'available' || @request.auth.id != ''",
-    "viewRule": "status = 'available' || @request.auth.id != ''",
+    "listRule": "@request.auth.id != ''",
+    "viewRule": "@request.auth.id != ''",
     "createRule": "@request.auth.id != ''",
     "updateRule": "@request.auth.id != ''",
     "deleteRule": "@request.auth.id != ''",
@@ -354,16 +356,13 @@
       { "id": "rel_slotitem001", "name": "item", "type": "relation", "system": false, "required": true, "presentable": false, "unique": false, "collectionId": "pbc_items00001", "cascadeDelete": true, "minSelect": 0, "maxSelect": 1, "displayFields": null },
       { "id": "date_slotstart0", "name": "start", "type": "date", "system": false, "required": true, "presentable": false, "unique": false, "options": { "min": "", "max": "" } },
       { "id": "date_slotend000", "name": "end", "type": "date", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": "", "max": "" } },
-      { "id": "sel_slotstatus0", "name": "status", "type": "select", "system": false, "required": true, "presentable": false, "unique": false, "maxSelect": 1, "values": ["available", "held", "booked"] },
-      { "id": "date_slotheldun0", "name": "heldUntil", "type": "date", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": "", "max": "" } },
-      { "id": "rel_slotorder01", "name": "order", "type": "relation", "system": false, "required": false, "presentable": false, "unique": false, "collectionId": "pbc_orders00001", "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
+      { "id": "num_slotcapacity", "name": "capacity", "type": "number", "system": false, "required": false, "presentable": false, "min": 1, "max": null, "onlyInt": true },
       { "id": "text_slotnotes0", "name": "notes", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 500, "pattern": "" } },
       {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
       {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
     "indexes": [
-      "CREATE INDEX `idx_slots_item_start` ON `slots` (`item`, `start`)",
-      "CREATE INDEX `idx_slots_status` ON `slots` (`status`)"
+      "CREATE INDEX `idx_slots_item_start` ON `slots` (`item`, `start`)"
     ],
     "autodate": true,
     "options": {}
@@ -411,12 +410,13 @@
       { "id": "rel_blslot000001", "name": "slot", "type": "relation", "system": false, "required": false, "presentable": false, "unique": false, "collectionId": "pbc_slots00001", "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
       { "id": "num_blquantity01", "name": "quantity", "type": "number", "system": false, "required": true, "presentable": false, "unique": false, "options": { "min": 1, "max": null } },
       { "id": "sel_bllinetype01", "name": "lineType", "type": "select", "system": false, "required": true, "presentable": false, "unique": false, "maxSelect": 1, "values": ["item", "slot"] },
+      { "id": "date_blheldunt1", "name": "heldUntil", "type": "date", "system": false, "required": false, "presentable": false, "hidden": false, "min": "", "max": "" },
       {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
       {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
     "indexes": [
       "CREATE INDEX `idx_basket_lines_basket` ON `basket_lines` (`basket`)",
-      "CREATE UNIQUE INDEX `idx_basket_lines_slot_unique` ON `basket_lines` (`slot`) WHERE `slot` != ''"
+      "CREATE INDEX `idx_basket_lines_slot` ON `basket_lines` (`slot`)"
     ],
     "autodate": true,
     "options": {}
@@ -475,7 +475,8 @@
       {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
     "indexes": [
-      "CREATE INDEX `idx_order_lines_order` ON `order_lines` (`order`)"
+      "CREATE INDEX `idx_order_lines_order` ON `order_lines` (`order`)",
+      "CREATE INDEX `idx_order_lines_slot` ON `order_lines` (`slot`)"
     ],
     "autodate": true,
     "options": {}

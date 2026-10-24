@@ -112,15 +112,15 @@ If schema import fails because of a PocketBase version mismatch, create these co
 
 Commerce collections (see the Stripe section above for context):
 
-- `items` — `name` text, `description` text, `price` number, `image` relation→media, `type` select `item|item_with_time`, `stock` number (nullable), `duration` number (nullable, minutes), `active` bool
-- `slots` — `item` relation→items, `start` date, `end` date, `status` select `available|held|booked`, `heldUntil` date (nullable), `order` relation→orders (nullable), `notes` text
+- `items` — `name` text, `description` text, `price` number, `image` relation→media, `type` select `item|item_with_time`, `stock` number (nullable), `duration` number (nullable, minutes), `bufferMinutes` number (nullable, get-ready minutes after each appointment), `capacity` number (nullable = 1, default places for new slots), `active` bool
+- `slots` — `item` relation→items, `start` date, `end` date, `capacity` number (places; >1 = group session), `notes` text. Nothing about bookings is stored here — see *Slot availability* below
 - `baskets` — `status` select `active|completed|abandoned`, `expiresAt` date, `email` text, `customerDetails` json, `stripePaymentIntentId` text
-- `basket_lines` — `basket` relation→baskets, `item` relation→items, `slot` relation→slots (nullable), `quantity` number, `lineType` select `item|slot`
+- `basket_lines` — `basket` relation→baskets, `item` relation→items, `slot` relation→slots (nullable), `quantity` number (places, for a slot line), `lineType` select `item|slot`, `heldUntil` date (a slot line's hold)
 - `orders` — `basket` relation→baskets, `email` text, `customerDetails` json, `total` number, `status` select `pending|paid|refunded`, `stripePaymentIntentId` text, `customerEmailSentAt` date, `clientEmailSentAt` date, `emailError` text
 - `order_lines` — `order` relation→orders, `item` relation→items, `slot` relation→slots (nullable), `quantity` number, `lineType` select `item|slot`, `name` text (snapshot), `price` number (snapshot), `start` date (nullable, snapshot)
 - `email_templates` — `key` text (unique: `customer_confirmation` | `client_alert`), `subject` text, `blocks` json, `recipients` text, `enabled` bool
 
-> **Schema format note:** `pb_schema.json` targets PocketBase 0.23+ using the `fields` array (not the legacy `schema` array). Relation and select fields carry their config (`collectionId`, `cascadeDelete`, `maxSelect`, `values`) at the field top level, not nested under `options`. Importing the whole file via the PocketBase admin UI or `PUT /api/collections/import` creates or updates all collections in one pass.
+> **Schema format note:** `pb_schema.json` targets PocketBase 0.23+ using the `fields` array (not the legacy `schema` array). Field config (`collectionId`, `cascadeDelete`, `maxSelect`, `values`, number `min`/`max`/`onlyInt`) belongs at the field top level — 0.23 silently ignores anything nested under `options`, so the older number/text fields that still use `options` get no min/max on a fresh install. Importing the whole file via the PocketBase admin UI or `PUT /api/collections/import` creates or updates all collections in one pass.
 
 ## Authentication
 
@@ -138,7 +138,7 @@ All routes in `app-admin` except `/login` are guarded in `src/hooks.server.ts`.
 - `/pages/[slug]` — block editor with draft preview
 - `/calendar` — events shown by Upcoming Calendar blocks
 - `/items` — services and products shown in Shop blocks
-- `/slots` — manually created bookable time slots for services
+- `/slots` — bookable time slots: month calendar, single slots, and bulk tools — *Generate slots* (date range × weekdays × opening hours, spaced by the service's duration + get-ready time), *Copy a week* (repeat into the next 1–12 weeks) and *Clear slots* (slots with no places taken). Bulk tools preview first and skip slots in the past or overlapping a slot of the same service. Different services may share a time; whichever is booked first blocks the others (see *Slot availability*). The calendar marks slots available / in a basket / booked / full / blocked, with places taken for group sessions.
 - `/orders` — confirmed bookings and purchases, with booking-email status and resend buttons
 - `/emails` — block-based editor for the booking confirmation and new-booking alert emails (live preview, test send)
 - `/globals` — header/footer/colors editor
@@ -147,7 +147,14 @@ All routes in `app-admin` except `/login` are guarded in `src/hooks.server.ts`.
 
 The shop/checkout blocks implement a basket-based booking flow: visitors add services (with time slots) or products to a server-side basket, then pay with an embedded Stripe Payment Element. Order creation is confirmed by the Stripe **webhook** (never the client).
 
-**Where the logic lives:** all commerce writes (baskets, slot holds, Stripe PaymentIntents, the webhook that creates orders) run *inside PocketBase* as JS hooks — `pocketbase/pb_hooks/shop/lib.js`, routes under `/api/shop/*`, plus a once-a-minute cron that releases expired holds. The public app holds **no PocketBase or Stripe secret**: its `/api/basket`, `/api/checkout/create-intent`, `/api/webhooks/stripe` and `/checkout/return` only forward to those routes and keep the basket cookie. A compromised public app therefore can't read or change the database beyond what any visitor can. Its one privileged call records booking-email status on an order, authorised by `INTERNAL_API_SECRET`.
+**Where the logic lives:** all commerce writes (baskets, slot holds, Stripe PaymentIntents, the webhook that creates orders) run *inside PocketBase* as JS hooks — `pocketbase/pb_hooks/shop/lib.js`, routes under `/api/shop/*`, plus a once-a-minute cron that tidies expired holds. The public app holds **no PocketBase or Stripe secret**: its `/api/basket`, `/api/checkout/create-intent`, `/api/webhooks/stripe` and `/checkout/return` only forward to those routes and keep the basket cookie. A compromised public app therefore can't read or change the database beyond what any visitor can. Its one privileged call records booking-email status on an order, authorised by `INTERNAL_API_SECRET`.
+
+**Slot availability** (`slotStates()` in `pocketbase/pb_hooks/shop/lib.js` — the one place these rules live):
+
+- A slot has `capacity` places. Places are taken by paid order lines and by basket lines whose `heldUntil` hasn't passed (10 min after adding, 30 min once payment starts). A lapsed hold stops counting immediately; the cron only deletes the line. The checkout shows a countdown to the first hold running out, offers "Keep it 10 more minutes" (basket action `renew_holds`; holds are extended, never shortened) in the last 3 minutes, and says which times ran out when one does.
+- One practitioner works every service, so a slot with **any** place taken blocks every other slot that overlaps it — whatever the service — counting each service's get-ready time (`items.bufferMinutes`) after it. The client can offer three massages at 10:00; once one is in a basket or booked, the other two disappear. A group session with one place booked blocks massages at that time too, while staying bookable itself until full.
+- `GET /api/shop/slots` lists the bookable future slots (public; feeds the Shop block). With `?detail=1` a signed-in admin gets every slot in a range with booked/held places and what blocks it (the `/slots` page).
+- Adding to a basket (`add_slot`, with `seats`) and changing a group line's places re-check capacity and blocking inside one transaction; PocketBase runs transactions one at a time, so concurrent customers can't both get the last place or two overlapping times.
 
 Setup:
 
@@ -158,7 +165,7 @@ Setup:
    stripe listen --forward-to www.localhost:8080/api/webhooks/stripe
    ```
    Copy the printed `whsec_…` signing secret into `STRIPE_WEBHOOK_SECRET`.
-4. Import the updated `pb_schema.json` (adds `items`, `slots`, `baskets`, `basket_lines`, `orders`, `order_lines`). The `basket_lines.slot` partial unique index guarantees two visitors can't hold the same slot.
+4. Import the updated `pb_schema.json` (adds `items`, `slots`, `baskets`, `basket_lines`, `orders`, `order_lines`). Two visitors can't take the same place: holds are checked and written in one PocketBase transaction (see *Slot availability*).
 5. Create a published page (e.g. slug `book`) with a `shop` block and a `checkout` block, and point the header CTA at it.
 
 ## Booking emails (Brevo)

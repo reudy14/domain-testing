@@ -8,8 +8,12 @@ function itemPayload(data: FormData) {
 	const type: ItemType = String(data.get('type')) === 'item_with_time' ? 'item_with_time' : 'item';
 	const rawStock = String(data.get('stock') ?? '').trim();
 	const rawDuration = String(data.get('duration') ?? '').trim();
+	const rawBuffer = String(data.get('bufferMinutes') ?? '').trim();
+	const rawCapacity = String(data.get('capacity') ?? '').trim();
 	const stock = type === 'item' && rawStock !== '' ? parseInt(rawStock, 10) : null;
 	const duration = type === 'item_with_time' && rawDuration !== '' ? parseInt(rawDuration, 10) : null;
+	const bufferMinutes = type === 'item_with_time' && rawBuffer !== '' ? parseInt(rawBuffer, 10) : null;
+	const capacity = type === 'item_with_time' && rawCapacity !== '' ? parseInt(rawCapacity, 10) : null;
 
 	return {
 		name: String(data.get('name') || '').trim(),
@@ -19,6 +23,8 @@ function itemPayload(data: FormData) {
 		type,
 		stock: Number.isNaN(stock) ? null : stock,
 		duration: Number.isNaN(duration) ? null : duration,
+		bufferMinutes: Number.isNaN(bufferMinutes) ? null : bufferMinutes,
+		capacity: Number.isNaN(capacity) ? null : capacity,
 		active: String(data.get('active')) === 'true'
 	};
 }
@@ -35,6 +41,8 @@ function normalizeItem(record: Record<string, any>): ItemRecord {
 		type: record.type === 'item_with_time' ? 'item_with_time' : 'item',
 		stock: record.stock ?? null,
 		duration: record.duration ?? null,
+		bufferMinutes: record.bufferMinutes ?? null,
+		capacity: record.capacity ?? null,
 		active: record.active !== false
 	};
 }

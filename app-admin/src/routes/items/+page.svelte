@@ -21,6 +21,8 @@
 		type: ItemType;
 		stock: string;
 		duration: string;
+		bufferMinutes: string;
+		capacity: string;
 		active: boolean;
 	};
 
@@ -30,7 +32,7 @@
 	let money = $derived(new Intl.NumberFormat('en-GB', { style: 'currency', currency: data.currency }));
 
 	function emptyDraft(): ItemDraft {
-		return { id: '', name: '', description: '', price: 0, image: '', imageUrl: '', type: 'item', stock: '', duration: '', active: true };
+		return { id: '', name: '', description: '', price: 0, image: '', imageUrl: '', type: 'item', stock: '', duration: '', bufferMinutes: '', capacity: '', active: true };
 	}
 
 	function createItem() {
@@ -50,6 +52,8 @@
 			type: item.type,
 			stock: item.stock == null ? '' : String(item.stock),
 			duration: item.duration == null ? '' : String(item.duration),
+			bufferMinutes: item.bufferMinutes == null ? '' : String(item.bufferMinutes),
+			capacity: item.capacity == null ? '' : String(item.capacity),
 			active: item.active
 		};
 		uploadError = '';
@@ -107,7 +111,7 @@
 							<td><span class="badge">{item.type === 'item_with_time' ? 'Service' : 'Product'}</span></td>
 							<td>{money.format(item.price)}</td>
 							<td>{item.type === 'item' ? (item.stock ?? '∞') : '—'}</td>
-							<td>{item.type === 'item_with_time' ? `${item.duration ?? 0} min` : '—'}</td>
+							<td>{item.type === 'item_with_time' ? `${item.duration ?? 0} min${item.bufferMinutes ? ` + ${item.bufferMinutes} get-ready` : ''}${(item.capacity ?? 1) > 1 ? ` · ${item.capacity} places` : ''}` : '—'}</td>
 							<td><span class="badge" class:badge-success={item.active}>{item.active ? 'Active' : 'Inactive'}</span></td>
 							<td class="text-right"><button class="btn btn-sm" type="button" onclick={() => editItem(item)}>Edit</button></td>
 						</tr>
@@ -156,10 +160,22 @@
 				<input class="input w-full" type="number" min="0" step="1" name="stock" placeholder="Unlimited when empty" bind:value={draft.stock} />
 			</label>
 		{:else}
-			<label class="fieldset">
-				<span class="fieldset-legend">Duration (minutes)</span>
-				<input class="input w-full" type="number" min="1" step="1" name="duration" placeholder="60" required bind:value={draft.duration} />
-			</label>
+			<div class="grid gap-x-4 md:grid-cols-2">
+				<label class="fieldset">
+					<span class="fieldset-legend">Duration (minutes)</span>
+					<input class="input w-full" type="number" min="1" step="1" name="duration" placeholder="60" required bind:value={draft.duration} />
+				</label>
+				<label class="fieldset">
+					<span class="fieldset-legend">Get-ready time (minutes)</span>
+					<input class="input w-full" type="number" min="0" step="1" name="bufferMinutes" placeholder="0" bind:value={draft.bufferMinutes} />
+					<span class="label">Gap after each appointment — between generated slots, and before another service can start</span>
+				</label>
+				<label class="fieldset">
+					<span class="fieldset-legend">Places per slot</span>
+					<input class="input w-full" type="number" min="1" max="500" step="1" name="capacity" placeholder="1" bind:value={draft.capacity} />
+					<span class="label">1 for one-to-one; more for a group session. New slots start with this.</span>
+				</label>
+			</div>
 		{/if}
 
 		<div class="fieldset">

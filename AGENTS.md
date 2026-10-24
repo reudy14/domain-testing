@@ -14,7 +14,7 @@ packages/shared/src/          # Shared code (types, calendar utils, blocks, pb, 
 app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 ├── src/
 │   ├── lib/
-│   │   ├── admin/            # Admin UI components (BlockList, Modal, editors, confirm/unsaved helpers)
+│   │   ├── admin/            # Admin UI components (BlockList, Modal, editors, confirm/unsaved helpers, slots/ bulk modals)
 │   │   ├── blocks/           # Re-exports from $shared/blocks (block renderers live in shared)
 │   │   ├── pb.ts             # Re-exports from $shared/pb + app-specific uploadMedia
 │   │   ├── types.ts          # Re-exports from $shared
@@ -22,14 +22,14 @@ app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 │   │   ├── scrollReveal.ts   # Re-exports from $shared
 │   │   ├── stripe-client.ts # Re-exports from $shared
 │   │   ├── basket.svelte.ts # Re-exports from $shared
-│   │   └── server/           # Re-exports from $shared/server + admin helpers (actions.ts, pages.ts)
+│   │   └── server/           # Re-exports from $shared/server + admin helpers (actions.ts, pages.ts, slots.ts)
 │   ├── routes/
 │   │   ├── +layout.svelte    # Root layout (admin shell: grouped sidebar; bare on /login and /preview)
 │   │   ├── login/            # Admin login
 │   │   ├── pages/            # Page CRUD + block editor
 │   │   ├── calendar/         # Event CRUD (menu label: Events)
 │   │   ├── items/            # Service/product CRUD (menu label: Services & products)
-│   │   ├── slots/            # Bookable time slot CRUD
+│   │   ├── slots/            # Bookable slots: month calendar (?month=YYYY-MM), CRUD, bulk generate/copy/clear
 │   │   ├── orders/           # Order list + booking-email status/resend
 │   │   ├── emails/           # Block-based booking email editor (live preview, test send)
 │   │   ├── globals/          # Header/footer/colors editor (menu label: Site design)
@@ -118,6 +118,7 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
 ### Shared Code
 - `packages/shared/src/types.ts` — all type definitions
 - `packages/shared/src/calendar.ts` — calendar utilities (used by admin calendar editor and public upcoming calendar block)
+- `packages/shared/src/slots.ts` — pure slot planning (generate/copy-week maths on date keys + wall-clock times in `SITE_TIMEZONE`, DST-safe); the `/slots` actions use it via `$lib/slots`, PocketBase I/O is in `app-admin/src/lib/server/slots.ts`
 - Each app's `svelte.config.js` declares `kit.alias.$shared → '../packages/shared/src'`
 - Each app's `src/lib/types.ts` and `src/lib/calendar.ts` re-export from `$shared` so existing `$lib/types` and `$lib/calendar` imports work
 
@@ -129,6 +130,7 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
 - **Always build filters with `pb.filter('slug = {:slug}', { slug })`** — never interpolate values into filter strings (quotes break them).
 - **Schema changes**: add a migration to `pocketbase/pb_migrations/` (runs once, on the next PocketBase start) **and** mirror it in `pb_schema.json` (fresh installs import that after the migrations have already run). Migrations must skip missing collections and must not throw for data problems — a failing migration stops PocketBase from starting.
 - **API rules**: CMS collections require `@request.auth.id != ''`, so `users` must never allow public sign-up (its createRule is superuser-only). Commerce writes (orders, order_lines, baskets, basket_lines) are superuser-only; they happen in the PocketBase shop hooks (`pocketbase/pb_hooks/shop/lib.js`), which bypass rules.
+- **Slot availability** (places + blocking by overlapping bookings, incl. get-ready time) is computed only by `slotStates()` in the shop hooks — the public listing, basket holds and the admin `/slots` page all go through it (`GET /api/shop/slots`, `?detail=1` for the admin). Never store booking state on a slot or re-implement the rule elsewhere; see the README's *Slot availability*.
 - **Shop / payments**: all basket, slot-hold, Stripe and order logic lives in the PocketBase hooks (JSVM: synchronous, each handler `require()`s the lib; see the header comment). The public app must stay unprivileged — no superuser login, no Stripe secret key; its routes only proxy to `/api/shop/*` and manage the `basket_id` cookie (`app-public/src/lib/server/shop.ts`). Booking emails are rendered and sent by the public app from data the webhook hook returns (`OrderEmailData`, `sendOrderEmailsFromData`); keep `orderEmailData()` in the hook and `loadOrderEmailData()` in `packages/shared/src/server/email` returning the same shape. Local testing uses `stripe-mock` (`STRIPE_API_BASE`, local compose only).
 
 ### Styling
@@ -140,6 +142,7 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
   - Create/edit forms open in `$lib/admin/Modal.svelte`; destructive submits use `confirmSubmit()` from `$lib/admin/confirm` (returning `false` from a handler does not cancel).
   - Server actions wrap PocketBase writes in `attempt()` from `$lib/server/actions` so failures show as an error banner, not a 500.
   - Editors with unsaved state use `use:enhance` + `warnOnUnsavedChanges()`.
+- **Dates, times and prices shown to people** use `DISPLAY_LOCALE` (`en-GB`: day-month-year, 24-hour clock) and the helpers in `$shared/calendar` (`formatInstant`, `formatPrice`, `formatDateTime`) — never `toLocale*(undefined)`, which renders US formats on the server. Booking times on the public site are shown in `SITE_TIMEZONE` too (layout data `timezone`, read by blocks via `page.data.timezone`). Native `<input type="date">` fields follow the visitor's browser language and can't be changed from the page.
 - **Dates/times in admin**: entered and displayed in `SITE_TIMEZONE` (layout data `timezone`), via `toZonedDatetimeInput`, `zonedInputToIso`, `formatDateTime` in `$shared/calendar`. Never `new Date(localInput)` on the server — the container runs in UTC.
 - **Prose**: `.prose-wellness` class for rich text content styling
 
@@ -182,4 +185,4 @@ cd app-public && npm run build
 - `SITE_TIMEZONE` — IANA timezone for booking times in emails (default `Europe/Oslo`).
 - Secrets (Stripe, `INTERNAL_API_SECRET`, SMTP) are read from a root-level `.env` next to `docker-compose.yml`; see `.env.example`.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` → PocketBase only. `INTERNAL_API_SECRET` → PocketBase and app-public (booking-email status). No app gets PocketBase superuser credentials.
-- Shop listings are public data, loaded anonymously by `loadShopData()` in `packages/shared/src/server/shop.ts` (public layout and admin `/preview`); if a Shop block has nothing to show it says "Nothing is available".
+- Shop listings are public data, loaded anonymously by `loadShopData()` in `packages/shared/src/server/shop.ts` (public layout and admin `/preview`; slots via `GET /api/shop/slots`); if a Shop block has nothing to show it says "Nothing is available".
