@@ -22,5 +22,11 @@
 			{/each}
 		</div>
 	</div>
-	<div class="border-t border-charcoal/5 px-6 py-5 text-center text-sm text-charcoal/55">{footer.copyrightText}</div>
+	<div class="border-t border-charcoal/5 px-6 py-5 text-center text-sm text-charcoal/55">
+		{footer.copyrightText}
+		{#if footer.privacyPage}
+			<span aria-hidden="true">·</span>
+			<a class="underline-offset-2 hover:text-sage-dark hover:underline" href={`/${footer.privacyPage}`}>Privacy policy</a>
+		{/if}
+	</div>
 </footer>

@@ -73,6 +73,8 @@ export type FooterGlobal = {
 	email: string;
 	socialLinks: { platform: string; url: string }[];
 	copyrightText: string;
+	/** Slug of the privacy policy page, linked from the footer and the checkout ('' = none). */
+	privacyPage?: string;
 };
 
 export const defaultHeader: HeaderGlobal = {
@@ -93,7 +95,24 @@ export const defaultFooter: FooterGlobal = {
 	phone: '',
 	email: '',
 	socialLinks: [{ platform: 'instagram', url: '' }],
-	copyrightText: `© ${new Date().getFullYear()} Demo Studio. All rights reserved.`
+	copyrightText: `© ${new Date().getFullYear()} Demo Studio. All rights reserved.`,
+	privacyPage: ''
+};
+
+/**
+ * How long customer details are kept (the `privacy` global). Applied daily by
+ * pocketbase/pb_hooks/privacy, which has the same defaults.
+ */
+export type PrivacyGlobal = {
+	/** Unpaid baskets, with whatever was typed at checkout, are deleted after this many days. */
+	abandonedBasketDays: number;
+	/** Orders are anonymised this many months after they were placed; 0 = never automatically. */
+	anonymiseOrdersAfterMonths: number;
+};
+
+export const defaultPrivacy: PrivacyGlobal = {
+	abandonedBasketDays: 30,
+	anonymiseOrdersAfterMonths: 0
 };
 
 // ── Commerce types ─────────────────────────────────────────────────────
@@ -207,7 +226,14 @@ export type CheckoutBlockData = {
 	title?: string;
 	heading?: string;
 	notesLabel?: string;
+	/** Under the notes field; steers customers away from sharing health details. */
+	notesHint?: string;
+	/** Above the Pay button, next to the privacy policy link. */
+	privacyNotice?: string;
 };
+
+export const DEFAULT_NOTES_HINT = "Please don't include health details here — we'll talk about anything we should know at your appointment.";
+export const DEFAULT_PRIVACY_NOTICE = 'We use your details only to arrange your booking and send your confirmation.';
 
 // ── Email types ───────────────────────────────────────────────────────
 

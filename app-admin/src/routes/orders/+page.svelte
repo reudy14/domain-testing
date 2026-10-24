@@ -49,9 +49,9 @@
 		<div class="rounded-box bg-base-100 p-5 shadow">
 			<div class="flex flex-col justify-between gap-3 md:flex-row md:items-center">
 				<div>
-					<h2 class="text-xl font-bold">{order.customerDetails?.name || order.email || 'Order'}</h2>
+					<h2 class="text-xl font-bold">{order.anonymisedAt ? 'Anonymised customer' : order.customerDetails?.name || order.email || 'Order'}</h2>
 					<p class="text-sm text-base-content/60">
-						{order.email}
+						{#if order.email}<a class="link link-hover" href={`/customers?email=${encodeURIComponent(order.email)}`}>{order.email}</a>{/if}
 						{#if order.customerDetails?.phone} · {order.customerDetails.phone}{/if}
 						{#if order.created} · {formatDateTime(order.created, data.timezone)}{/if}
 					</p>
@@ -82,10 +82,12 @@
 				<p class="mt-3 text-sm italic text-base-content/60">"{order.customerDetails.notes}"</p>
 			{/if}
 
-			<div class="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-base-300 pt-3">
-				{@render emailStatus(order, 'customer', 'Confirmation', order.customerEmailSentAt)}
-				{@render emailStatus(order, 'client', 'Alert', order.clientEmailSentAt)}
-			</div>
+			{#if !order.anonymisedAt}
+				<div class="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-base-300 pt-3">
+					{@render emailStatus(order, 'customer', 'Confirmation', order.customerEmailSentAt)}
+					{@render emailStatus(order, 'client', 'Alert', order.clientEmailSentAt)}
+				</div>
+			{/if}
 			{#if order.emailError}
 				<p class="mt-2 whitespace-pre-line text-sm text-error">{order.emailError}</p>
 			{/if}

@@ -1,4 +1,7 @@
-import { loadStripe as _loadStripe } from '@stripe/stripe-js';
+// The `pure` entry point loads Stripe.js only when loadStripe() is called
+// (when the customer presses Pay). The default entry injects it on import,
+// i.e. on every page, sending every visitor's IP address to Stripe.
+import { loadStripe as _loadStripe } from '@stripe/stripe-js/pure';
 import { env } from '$env/dynamic/public';
 import { browser } from '$app/environment';
 

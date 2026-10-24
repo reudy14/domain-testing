@@ -1,5 +1,6 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { ClientResponseError } from 'pocketbase';
+import { PRIVACY_PAGE_SLUG, privacyTemplateHtml } from '$lib/admin/privacyTemplate';
 import { attempt } from '$lib/server/actions';
 import { defaultColors, defaultFooter, defaultHeader } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
@@ -51,5 +52,19 @@ export const actions: Actions = {
 		const result = await attempt('Could not save.', () => locals.pb.collection('globals').update(id, { data: value }));
 		if (!result.ok) return fail(400, { section, ok: false, message: result.failure.data.message });
 		return { section, ok: true, message: 'Saved.' };
+	},
+
+	// An unpublished privacy policy page to fill in, opened in the page editor.
+	createPrivacyDraft: async ({ locals }) => {
+		const result = await attempt('Could not create the privacy policy draft.', () =>
+			locals.pb.collection('pages').create({
+				slug: PRIVACY_PAGE_SLUG,
+				title: 'Privacy policy',
+				published: false,
+				blocks: [{ id: crypto.randomUUID(), type: 'text', data: { content: privacyTemplateHtml } }]
+			})
+		);
+		if (!result.ok) return fail(400, { section: 'footer', ok: false, message: result.failure.data.message });
+		redirect(303, `/pages/${PRIVACY_PAGE_SLUG}`);
 	}
 };

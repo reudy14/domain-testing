@@ -434,7 +434,7 @@
     "fields": [
       { "id": "text3208210256", "name": "id", "type": "text", "system": true, "required": true, "presentable": false, "hidden": false, "primaryKey": true, "autogeneratePattern": "[a-z0-9]{15}", "min": 15, "max": 15, "pattern": "^[a-z0-9]+$" },
       { "id": "rel_orderbasket0", "name": "basket", "type": "relation", "system": false, "required": true, "presentable": false, "unique": false, "collectionId": "pbc_baskets0001", "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
-      { "id": "text_orderemail0", "name": "email", "type": "text", "system": false, "required": true, "presentable": false, "unique": false, "options": { "min": null, "max": 254, "pattern": "" } },
+      { "id": "text_orderemail0", "name": "email", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 254, "pattern": "" } },
       { "id": "json_ordercustde", "name": "customerDetails", "type": "json", "system": false, "required": false, "presentable": false, "unique": false, "options": { "maxSize": 100000 } },
       { "id": "num_ordertotal01", "name": "total", "type": "number", "system": false, "required": true, "presentable": false, "unique": false, "options": { "min": 0, "max": null } },
       { "id": "sel_orderstatus0", "name": "status", "type": "select", "system": false, "required": true, "presentable": false, "unique": false, "maxSelect": 1, "values": ["pending", "paid", "refunded"] },
@@ -442,11 +442,13 @@
       { "id": "date_ordcustmail", "name": "customerEmailSentAt", "type": "date", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": "", "max": "" } },
       { "id": "date_ordclntmail", "name": "clientEmailSentAt", "type": "date", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": "", "max": "" } },
       { "id": "text_ordmailerr0", "name": "emailError", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 2000, "pattern": "" } },
+      { "id": "date_ordanonym01", "name": "anonymisedAt", "type": "date", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": "", "max": "" } },
       {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
       {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
     ],
     "indexes": [
-      "CREATE INDEX `idx_orders_basket` ON `orders` (`basket`)"
+      "CREATE INDEX `idx_orders_basket` ON `orders` (`basket`)",
+      "CREATE INDEX `idx_orders_email` ON `orders` (`email`)"
     ],
     "autodate": true,
     "options": {}

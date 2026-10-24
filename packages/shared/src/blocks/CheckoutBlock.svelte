@@ -3,7 +3,7 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import type { BasketLine, CheckoutBlockData } from '$shared/types';
+	import { DEFAULT_NOTES_HINT, DEFAULT_PRIVACY_NOTICE, type BasketLine, type CheckoutBlockData } from '$shared/types';
 	import { getBasketContext } from '$shared/basket.svelte';
 	import { DEFAULT_TIMEZONE, formatInstant, formatPrice } from '$shared/calendar';
 	import { loadStripe } from '$shared/stripe-client';
@@ -12,6 +12,8 @@
 	let { data = {} } = $props<{ data: CheckoutBlockData }>();
 
 	const basket = getBasketContext();
+	// Not set in the admin preview, which has no footer data.
+	const privacyPage = $derived(page.data.footer?.privacyPage || '');
 
 	const customer = $state({ name: '', email: '', phone: '', notes: '' });
 	let payState = $state<'idle' | 'creating' | 'ready' | 'confirming' | 'error'>('idle');
@@ -446,10 +448,19 @@
 					<textarea
 						id="checkout-notes"
 						rows="3"
+						aria-describedby="checkout-notes-hint"
 						class="w-full rounded-xl border border-charcoal/15 bg-white px-4 py-3 focus:ring-2 focus:ring-sage/50 focus:outline-none"
 						bind:value={customer.notes}
 					></textarea>
+					<p id="checkout-notes-hint" class="mt-1 text-sm text-fg-body/70">{data.notesHint || DEFAULT_NOTES_HINT}</p>
 				</div>
+
+				<p class="text-sm text-fg-body/70">
+					{data.privacyNotice || DEFAULT_PRIVACY_NOTICE}
+					{#if privacyPage}
+						<a class="underline underline-offset-2 hover:text-sage-dark" href={`/${privacyPage}`} target="_blank" rel="noopener">Privacy policy</a>
+					{/if}
+				</p>
 
 				{#if payState === 'idle' || payState === 'creating'}
 					<button

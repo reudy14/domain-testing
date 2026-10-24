@@ -1,5 +1,13 @@
 <script lang="ts">
 	import '../app.css';
+	// Fonts are bundled and served by this app, not loaded from Google: a
+	// Google Fonts request sends every visitor's IP address to Google (GDPR).
+	import '@fontsource/dm-sans/400.css';
+	import '@fontsource/dm-sans/500.css';
+	import '@fontsource/dm-sans/600.css';
+	import '@fontsource/dm-sans/700.css';
+	import '@fontsource/playfair-display/600.css';
+	import '@fontsource/playfair-display/700.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
