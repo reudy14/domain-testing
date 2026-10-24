@@ -5,7 +5,7 @@
 // the site's timezone; they become UTC instants only at the very end, via
 // zonedInputToIso, so a run across a DST change still starts at 09:00.
 
-import { toZonedDatetimeInput, zonedInputToIso } from './calendar';
+import { DISPLAY_LOCALE, toZonedDatetimeInput, zonedInputToIso } from './calendar';
 
 /** A stretch of the day in which appointments may start and end, e.g. 09:00–12:00. */
 export type TimeWindow = { from: string; to: string };
@@ -69,8 +69,13 @@ export const SLOT_STATE_LABELS: Record<SlotState, string> = {
 	blocked: 'Blocked'
 };
 
+/**
+ * `full` only when paid bookings fill a group; a slot whose last places are
+ * in baskets reads `held`, since it frees up again if those holds lapse.
+ */
 export function slotState(slot: Pick<SlotDetail, 'booked' | 'held' | 'capacity' | 'blockedBy'>): SlotState {
-	if (slot.booked + slot.held >= slot.capacity) return 'full';
+	if (slot.booked >= slot.capacity) return slot.capacity > 1 ? 'full' : 'booked';
+	if (slot.held && slot.booked + slot.held >= slot.capacity) return 'held';
 	if (slot.booked) return 'booked';
 	if (slot.held) return 'held';
 	return slot.blockedBy ? 'blocked' : 'free';
@@ -143,7 +148,7 @@ export function addMonthsToKey(month: string, months: number) {
 /** Format a date key with fixed locale (SSR and browser agree), e.g. "Tuesday 3 November". */
 export function formatDateKey(key: string, options: Intl.DateTimeFormatOptions) {
 	const ms = keyToUtcMs(key);
-	return ms === null ? '' : new Intl.DateTimeFormat('en-GB', { ...options, timeZone: 'UTC' }).format(ms);
+	return ms === null ? '' : new Intl.DateTimeFormat(DISPLAY_LOCALE, { ...options, timeZone: 'UTC' }).format(ms);
 }
 
 /** `09:30` → 570, or null. */
