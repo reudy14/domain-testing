@@ -7,14 +7,15 @@
 	import ClearSlotsModal from '$lib/admin/slots/ClearSlotsModal.svelte';
 	import CopyWeekModal from '$lib/admin/slots/CopyWeekModal.svelte';
 	import GenerateSlotsModal from '$lib/admin/slots/GenerateSlotsModal.svelte';
-	import { WEEKDAYS, addDaysToKey, addMonthsToKey, formatDateKey, mondayOfKey, monthGridKeys } from '$lib/slots';
-	import type { BulkResult } from '$lib/slots';
+	import { SLOT_STATE_LABELS, WEEKDAYS, addDaysToKey, addMonthsToKey, formatDateKey, mondayOfKey, monthGridKeys, slotState } from '$lib/slots';
+	import type { BulkResult, SlotState } from '$lib/slots';
 
 	let { data, form } = $props();
 	let items = $derived(data.items || []);
 	let serviceFilter = $state('');
 	let slots = $derived((data.slots || []).filter((slot) => !serviceFilter || slot.item === serviceFilter));
 	type Slot = (typeof slots)[number];
+	let slotsById = $derived(new Map((data.slots || []).map((slot) => [slot.id, slot])));
 
 	// ── Month grid (date keys in the site timezone) ──
 	const MAX_CHIPS = 4;
@@ -47,14 +48,34 @@
 	function bulkMessage(result: BulkResult) {
 		const n = (count: number) => `${count} slot${count === 1 ? '' : 's'}`;
 		const verb = result.action === 'clear' ? 'Deleted' : 'Created';
-		const failed = result.failed ? ` ${n(result.failed)} could not be ${result.action === 'clear' ? 'deleted (booked or taken in the meantime)' : 'saved'}.` : '';
+		const failed = result.failed ? ` ${n(result.failed)} could not be ${result.action === 'clear' ? 'deleted (places taken in the meantime)' : 'saved'}.` : '';
 		return `${verb} ${n(result.count)}.${failed}`;
 	}
 
-	function statusClass(status: string) {
-		if (status === 'booked') return 'border-info/40 bg-info/15';
-		if (status === 'held') return 'border-warning/50 bg-warning/20';
-		return 'border-success/40 bg-success/10';
+	const STATE_CLASSES: Record<SlotState, string> = {
+		free: 'border-success/40 bg-success/10',
+		held: 'border-warning/50 bg-warning/20',
+		booked: 'border-info/40 bg-info/15',
+		full: 'border-info/60 bg-info/30',
+		blocked: 'border-base-300 bg-base-100 text-base-content/40 line-through'
+	};
+	const BADGE_CLASSES: Record<SlotState, string> = {
+		free: 'badge-success',
+		held: 'badge-warning',
+		booked: 'badge-info badge-soft',
+		full: 'badge-info',
+		blocked: 'badge-ghost'
+	};
+
+	/** "2/8" for group slots, '' for one-to-one. */
+	function places(slot: Slot) {
+		return slot.capacity > 1 ? `${slot.booked + slot.held}/${slot.capacity}` : '';
+	}
+
+	/** Why a slot is blocked, e.g. "Blocked by 10:00 Swedish massage". */
+	function blockedReason(slot: Slot) {
+		const blocker = slotsById.get(slot.blockedBy);
+		return blocker ? `Blocked by ${formatTime(blocker.start, data.timezone)} ${blocker.itemName}` : 'Blocked by an overlapping booking';
 	}
 
 	function openDay(key: string) {
@@ -79,15 +100,17 @@
 		id: string;
 		item: string;
 		start: string;
-		status: string;
-		heldUntil: string;
+		capacity: string;
+		booked: number;
+		held: number;
 		notes: string;
 	};
 
 	let draft = $state<SlotDraft>(emptyDraft());
 	let editorError = $state('');
 	let action = $derived(draft.id ? '?/update' : '?/create');
-	let isHeld = $derived(draft.status === 'held');
+	// Once any place is taken, the service and time are fixed (customers booked them).
+	let taken = $derived(draft.booked + draft.held);
 	let selectedItem = $derived(items.find((item) => item.id === draft.item));
 	let endLabel = $derived.by(() => {
 		if (!selectedItem || !draft.start) return '';
@@ -99,7 +122,7 @@
 
 	function emptyDraft(day = ''): SlotDraft {
 		const start = day ? `${day}T09:00` : toZonedDatetimeInput(new Date().toISOString(), data.timezone);
-		return { id: '', item: serviceFilter, start, status: 'available', heldUntil: '', notes: '' };
+		return { id: '', item: serviceFilter, start, capacity: '', booked: 0, held: 0, notes: '' };
 	}
 
 	// Enhanced so the page keeps its ?month= after saving (a plain POST to
@@ -129,8 +152,9 @@
 			id: slot.id,
 			item: slot.item,
 			start: toZonedDatetimeInput(slot.start, data.timezone),
-			status: slot.status,
-			heldUntil: slot.heldUntil,
+			capacity: String(slot.capacity),
+			booked: slot.booked,
+			held: slot.held,
 			notes: slot.notes
 		};
 		showDay = false;
@@ -157,6 +181,7 @@
 	{#if form?.message}<div class="alert alert-error" role="alert">{form.message}</div>{/if}
 	{#if bulkDone}<div class="alert alert-success" role="status">{bulkMessage(bulkDone)}</div>{/if}
 	{#if !items.length}<div class="alert" role="status">Add a bookable service under Services & products first.</div>{/if}
+	{#if data.slotsError}<div class="alert alert-error" role="alert">Could not load this month’s slots — is the database reachable?</div>{/if}
 
 	<div class="rounded-box bg-base-100 p-5 shadow">
 		<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -189,9 +214,16 @@
 					>
 					<div class="space-y-1">
 						{#each daySlotList.slice(0, MAX_CHIPS) as slot (slot.id)}
-							<button class="block w-full truncate rounded border px-1 text-left text-[0.7rem] leading-5 {statusClass(slot.status)}" type="button" title="{formatTime(slot.start, data.timezone)} {slot.itemName} — {slot.status}" onclick={() => (slot.status === 'booked' ? openDay(key) : editSlot(slot))}>
+							{@const state = slotState(slot)}
+							<button
+								class="block w-full truncate rounded border px-1 text-left text-[0.7rem] leading-5 {STATE_CLASSES[state]}"
+								type="button"
+								title="{formatTime(slot.start, data.timezone)} {slot.itemName} — {state === 'blocked' ? blockedReason(slot) : SLOT_STATE_LABELS[state]}{places(slot) ? ` (${places(slot)})` : ''}"
+								onclick={() => editSlot(slot)}
+							>
 								<span class="font-semibold">{formatTime(slot.start, data.timezone)}</span>
 								<span class="hidden lg:inline">{slot.itemName}</span>
+								{#if places(slot)}<span class="hidden md:inline">· {places(slot)}</span>{/if}
 							</button>
 						{/each}
 						{#if daySlotList.length > MAX_CHIPS}
@@ -203,9 +235,10 @@
 		</div>
 
 		<div class="mt-4 flex flex-wrap gap-4 text-xs text-base-content/70">
-			<span class="flex items-center gap-1"><span class="inline-block size-3 rounded border {statusClass('available')}"></span> Available</span>
-			<span class="flex items-center gap-1"><span class="inline-block size-3 rounded border {statusClass('held')}"></span> In a basket</span>
-			<span class="flex items-center gap-1"><span class="inline-block size-3 rounded border {statusClass('booked')}"></span> Booked</span>
+			{#each Object.entries(SLOT_STATE_LABELS) as [state, label] (state)}
+				<span class="flex items-center gap-1"><span class="inline-block size-3 rounded border {STATE_CLASSES[state as SlotState]}"></span> {label}</span>
+			{/each}
+			<span>— a booking (or basket) at one time blocks every other service overlapping it, including get-ready time.</span>
 		</div>
 	</div>
 
@@ -214,23 +247,19 @@
 		<summary class="collapse-title text-2xl font-bold">All slots in {monthLabel} <span class="text-base font-normal text-base-content/60">({monthSlots.length})</span></summary>
 		<div class="collapse-content overflow-x-auto">
 			<table class="table">
-				<thead><tr><th>Service</th><th>Date</th><th>Duration</th><th>Status</th><th></th></tr></thead>
+				<thead><tr><th>Service</th><th>Date</th><th>Places</th><th>Status</th><th></th></tr></thead>
 				<tbody>
 					{#each monthSlots as slot (slot.id)}
+						{@const state = slotState(slot)}
 						<tr>
 							<td><span class="font-semibold">{slot.itemName}</span></td>
 							<td>{formatDateTime(slot.start, data.timezone)}</td>
-							<td>{slot.itemDuration ? `${slot.itemDuration} min` : '—'}</td>
+							<td>{slot.booked + slot.held}/{slot.capacity}</td>
 							<td>
-								<span
-									class="badge capitalize"
-									class:badge-success={slot.status === 'available'}
-									class:badge-warning={slot.status === 'held'}
-									class:badge-info={slot.status === 'booked'}
-								>{slot.status}</span>
+								<span class="badge {BADGE_CLASSES[state]}" title={state === 'blocked' ? blockedReason(slot) : undefined}>{SLOT_STATE_LABELS[state]}</span>
 							</td>
 							<td class="text-right">
-								<button class="btn btn-sm" type="button" disabled={slot.status === 'booked'} title={slot.status === 'booked' ? 'Booked slots can’t be edited' : undefined} onclick={() => editSlot(slot)}>Edit</button>
+								<button class="btn btn-sm" type="button" onclick={() => editSlot(slot)}>Edit</button>
 							</td>
 						</tr>
 					{:else}
@@ -250,19 +279,16 @@
 	{#if daySlots.length}
 		<ul class="divide-y divide-base-300">
 			{#each daySlots as slot (slot.id)}
+				{@const state = slotState(slot)}
 				<li class="flex items-center gap-3 py-2">
 					<span class="w-28 shrink-0 font-semibold">{formatTime(slot.start, data.timezone)}{slot.end ? `–${formatTime(slot.end, data.timezone)}` : ''}</span>
 					<span class="min-w-0 flex-1">
-						<span class="block truncate">{slot.itemName}</span>
+						<span class="block truncate">{slot.itemName}{slot.capacity > 1 ? ` · ${slot.booked + slot.held}/${slot.capacity} places` : ''}</span>
+						{#if state === 'blocked'}<span class="block truncate text-xs text-base-content/60">{blockedReason(slot)}</span>{/if}
 						{#if slot.notes}<span class="block truncate text-xs text-base-content/60">{slot.notes}</span>{/if}
 					</span>
-					<span
-						class="badge capitalize"
-						class:badge-success={slot.status === 'available'}
-						class:badge-warning={slot.status === 'held'}
-						class:badge-info={slot.status === 'booked'}
-					>{slot.status}</span>
-					<button class="btn btn-sm" type="button" disabled={slot.status === 'booked'} onclick={() => editSlot(slot)}>Edit</button>
+					<span class="badge {BADGE_CLASSES[state]}">{SLOT_STATE_LABELS[state]}</span>
+					<button class="btn btn-sm" type="button" onclick={() => editSlot(slot)}>Edit</button>
 				</li>
 			{/each}
 		</ul>
@@ -284,15 +310,15 @@
 
 		{#if editorError}<div class="alert alert-error mb-2 text-sm" role="alert">{editorError}</div>{/if}
 
-		{#if isHeld}
+		{#if taken}
 			<div class="alert alert-warning mb-2 text-sm">
-				This slot is in a customer’s basket{draft.heldUntil ? ` until ${formatTime(draft.heldUntil, data.timezone)}` : ''} — only the notes can be changed.
+				{[draft.booked && `${draft.booked} booked`, draft.held && `${draft.held} in a customer’s basket`].filter(Boolean).join(', ')} — only the places and notes can be changed.
 			</div>
 		{/if}
 
 		<label class="fieldset">
 			<span class="fieldset-legend">Service</span>
-			<select class="select w-full" name="item" required disabled={isHeld} bind:value={draft.item}>
+			<select class="select w-full" name="item" required disabled={taken > 0} bind:value={draft.item}>
 				<option value="" disabled>Select a service…</option>
 				{#each items as item (item.id)}
 					<option value={item.id}>{item.name}{item.duration ? ` (${item.duration} min)` : ''}</option>
@@ -302,8 +328,14 @@
 
 		<label class="fieldset">
 			<span class="fieldset-legend">Start ({data.timezone})</span>
-			<input class="input w-full" type="datetime-local" name="start" required disabled={isHeld} bind:value={draft.start} />
+			<input class="input w-full" type="datetime-local" name="start" required disabled={taken > 0} bind:value={draft.start} />
 			{#if endLabel}<span class="label">{endLabel}</span>{/if}
+		</label>
+
+		<label class="fieldset">
+			<span class="fieldset-legend">Places</span>
+			<input class="input w-32" type="number" min={Math.max(1, taken)} max="500" step="1" name="capacity" placeholder={String(selectedItem?.capacity ?? 1)} bind:value={draft.capacity} />
+			<span class="label">More than 1 for a group session.{draft.id ? '' : ' Empty = the service’s own.'}</span>
 		</label>
 
 		<label class="fieldset">
@@ -312,7 +344,7 @@
 		</label>
 
 		<div class="modal-action justify-between">
-			{#if draft.id && !isHeld}
+			{#if draft.id && !taken}
 				<button class="btn btn-error btn-outline" type="submit" formaction="?/delete" formnovalidate onclick={confirmSubmit('Delete this slot?')}>Delete</button>
 			{:else}
 				<span></span>

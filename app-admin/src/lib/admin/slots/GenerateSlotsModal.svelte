@@ -6,7 +6,7 @@
 	import BulkActions from './BulkActions.svelte';
 	import { bulkForm } from './bulkForm.svelte';
 
-	type Service = { id: string; name: string; duration: number; bufferMinutes: number };
+	type Service = { id: string; name: string; duration: number; bufferMinutes: number; capacity: number };
 
 	let {
 		open = $bindable(false),
@@ -23,6 +23,7 @@
 		weekdays: [1, 2, 3, 4, 5],
 		windows: [{ from: '09:00', to: '17:00' }] as TimeWindow[],
 		bufferMinutes: '',
+		capacity: '',
 		notes: ''
 	});
 
@@ -50,8 +51,10 @@
 
 	function selectService(id: string) {
 		draft.item = id;
-		// The service's own get-ready time is the default; it can be overridden here.
-		draft.bufferMinutes = String(items.find((item) => item.id === id)?.bufferMinutes ?? 0);
+		// The service's own get-ready time and places are the defaults; both can be overridden here.
+		const item = items.find((item) => item.id === id);
+		draft.bufferMinutes = String(item?.bufferMinutes ?? 0);
+		draft.capacity = String(item?.capacity ?? 1);
 	}
 
 	function addWindow() {
@@ -109,11 +112,18 @@
 			<button class="btn btn-ghost btn-sm mt-1 w-fit" type="button" onclick={addWindow}>+ Add hours (e.g. after a lunch break)</button>
 		</div>
 
-		<label class="fieldset">
-			<span class="fieldset-legend">Get-ready time (minutes)</span>
-			<input class="input w-32" type="number" min="0" step="1" name="bufferMinutes" bind:value={draft.bufferMinutes} />
-			<span class="label">Gap after each appointment. Defaults to the service’s own get-ready time.</span>
-		</label>
+		<div class="grid gap-x-4 md:grid-cols-2">
+			<label class="fieldset">
+				<span class="fieldset-legend">Get-ready time (minutes)</span>
+				<input class="input w-32" type="number" min="0" step="1" name="bufferMinutes" bind:value={draft.bufferMinutes} />
+				<span class="label">Gap after each appointment. Defaults to the service’s own.</span>
+			</label>
+			<label class="fieldset">
+				<span class="fieldset-legend">Places per slot</span>
+				<input class="input w-32" type="number" min="1" max="500" step="1" name="capacity" bind:value={draft.capacity} />
+				<span class="label">More than 1 for a group session. Defaults to the service’s own.</span>
+			</label>
+		</div>
 
 		{#if service}
 			<p class="rounded-box bg-base-200 px-4 py-2 text-sm">

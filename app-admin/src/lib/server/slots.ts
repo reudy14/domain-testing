@@ -1,55 +1,33 @@
-// Server helpers for the /slots bulk actions (generate, copy week, clear).
-// Planning is pure and lives in $shared/slots; this file does the PocketBase
-// reads/writes around it.
+// Server helpers for the /slots page. Planning is pure and lives in
+// $shared/slots; this file does the PocketBase reads/writes around it.
 
-import { instantMs, type PlannedSlot } from '$lib/slots';
+import type { SlotDetail } from '$lib/slots';
 import type { createPocketBase } from '$lib/pb';
 
 type Pb = ReturnType<typeof createPocketBase>;
 
-export type ExistingSlot = PlannedSlot & {
-	id: string;
-	item: string;
-	status: string;
-	heldUntil: string;
-	notes: string;
-};
-
 /** How many PocketBase writes a bulk action runs at once. */
 const WRITE_CONCURRENCY = 5;
 
-/** Held by a basket whose hold hasn't expired yet (expired holds are released lazily). */
-export function isHoldActive(slot: Record<string, any> | null) {
-	if (slot?.status !== 'held') return false;
-	const until = instantMs(String(slot.heldUntil || ''));
-	return Number.isNaN(until) || until > Date.now();
+/**
+ * Slots with their places and blocking, from the shop hook — the same
+ * availability rules the public shop uses (pocketbase/pb_hooks/shop/lib.js).
+ * Either slots starting in `[from, to)` (optionally one service) or one slot by id.
+ */
+export async function loadSlotDetails(pb: Pb, query: { from: string; to: string; item?: string } | { id: string }) {
+	const { slots } = await pb.send<{ slots: SlotDetail[] }>('/api/shop/slots', {
+		query: { detail: 1, ...query },
+		requestKey: null
+	});
+	return slots;
 }
 
-/**
- * Slots starting in `[fromIso, toIso)`, optionally for one service. A slot
- * without an end gets one from its service's duration, so overlap checks
- * always have a real range.
- */
-export async function loadSlotsBetween(pb: Pb, fromIso: string, toIso: string, itemId = ''): Promise<ExistingSlot[]> {
-	const filter = itemId
-		? pb.filter('start >= {:from} && start < {:to} && item = {:item}', { from: new Date(fromIso), to: new Date(toIso), item: itemId })
-		: pb.filter('start >= {:from} && start < {:to}', { from: new Date(fromIso), to: new Date(toIso) });
-	const records = await pb.collection('slots').getFullList({ filter, sort: 'start', expand: 'item' });
-	return records.map((record) => {
-		const start = String(record.start || '');
-		const duration = Number(record.expand?.item?.duration) || 0;
-		const end = record.end ? String(record.end) : new Date(instantMs(start) + duration * 60_000).toISOString();
-		return {
-			id: record.id,
-			item: String(record.item || ''),
-			start,
-			end,
-			status: String(record.status || 'available'),
-			heldUntil: record.heldUntil ? String(record.heldUntil) : '',
-			notes: String(record.notes || '')
-		};
-	});
+/** One slot's details, or null if it doesn't exist (any other failure throws). */
+export async function loadSlotDetail(pb: Pb, id: string) {
+	return (await loadSlotDetails(pb, { id }))[0] ?? null;
 }
+
+export const seatsTaken = (slot: Pick<SlotDetail, 'booked' | 'held'>) => slot.booked + slot.held;
 
 /** Run `fn` over `values` a few at a time; returns how many succeeded. */
 export async function runInBatches<T>(values: T[], label: string, fn: (value: T) => Promise<unknown>) {

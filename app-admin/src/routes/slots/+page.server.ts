@@ -3,7 +3,7 @@ import { fail } from '@sveltejs/kit';
 import { toZonedDatetimeInput, zonedInputToIso } from '$lib/calendar';
 import type { createPocketBase } from '$lib/pb';
 import { attempt } from '$lib/server/actions';
-import { isHoldActive, loadSlotsBetween, runInBatches, type ExistingSlot } from '$lib/server/slots';
+import { loadSlotDetail, loadSlotDetails, runInBatches, seatsTaken } from '$lib/server/slots';
 import {
 	MAX_BULK_SLOTS,
 	addDaysToKey,
@@ -18,16 +18,19 @@ import {
 	timeToMinutes,
 	type BulkResult,
 	type PlannedSlot,
+	type SlotDetail,
 	type TimeWindow
 } from '$lib/slots';
-import type { SlotStatus } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
 
 type Pb = ReturnType<typeof createPocketBase>;
 
 type SlotPayload =
-	| { payload: { item: string; start: string; end: string; notes: string } }
+	| { payload: { item: string; start: string; end: string; capacity: number; notes: string } }
 	| { error: string };
+
+/** A slot to create: planned times plus what it copies (service, places, notes). */
+type Candidate = PlannedSlot & { item: string; capacity: number; notes: string };
 
 const siteTimezone = () => env.SITE_TIMEZONE || 'Europe/Oslo';
 const todayKey = () => toZonedDatetimeInput(new Date().toISOString(), siteTimezone()).slice(0, 10);
@@ -36,6 +39,19 @@ const dayStartIso = (key: string) => zonedInputToIso(`${key}T00:00`, siteTimezon
 
 const MAX_RANGE_DAYS = 366;
 const MAX_COPY_WEEKS = 12;
+const MAX_CAPACITY = 500;
+
+/**
+ * Places from the form: a whole number 1–500, or the service's own
+ * capacity (default 1) when the field is left empty.
+ */
+function parseCapacity(data: FormData, item: Record<string, any>): number | { error: string } {
+	const raw = String(data.get('capacity') ?? '').trim();
+	if (raw === '') return Math.max(1, Number(item.capacity) || 1);
+	const capacity = Number(raw);
+	if (!Number.isInteger(capacity) || capacity < 1 || capacity > MAX_CAPACITY) return { error: `Places must be a whole number from 1 to ${MAX_CAPACITY}.` };
+	return capacity;
+}
 
 async function slotPayload(data: FormData, pb: Pb): Promise<SlotPayload> {
 	const itemId = String(data.get('item') || '').trim();
@@ -57,12 +73,15 @@ async function slotPayload(data: FormData, pb: Pb): Promise<SlotPayload> {
 	}
 	if (item.type !== 'item_with_time') return { error: 'Selected service must be a bookable service.' };
 
+	const capacity = parseCapacity(data, item);
+	if (typeof capacity !== 'number') return capacity;
+
 	const duration = Number(item.duration) || 0;
 	const end = new Date(start.getTime() + duration * 60_000);
 
-	// Status is never taken from the form: it is owned by the booking flow
-	// (held by a basket, booked by a paid order). New slots start available.
-	return { payload: { item: itemId, start: start.toISOString(), end: end.toISOString(), notes } };
+	// Bookings are never stored on the slot: places are counted from orders
+	// and basket holds by the shop hook, which also works out blocking.
+	return { payload: { item: itemId, start: start.toISOString(), end: end.toISOString(), capacity, notes } };
 }
 
 /** Validated `from`/`to` date keys from a bulk form, or an error message. */
@@ -75,6 +94,14 @@ function dateRange(data: FormData): { fromDate: string; toDate: string } | { err
 	return { fromDate, toDate };
 }
 
+/** Slot details for the days `fromKey`–`toKey` (inclusive), or null if PocketBase can't be read. */
+function slotsForDays(pb: Pb, fromKey: string, toKey: string, item = '') {
+	return loadSlotDetails(pb, { from: dayStartIso(fromKey), to: dayStartIso(addDaysToKey(toKey, 1)), item }).catch((e) => {
+		console.error('[slots] could not load slot details', e);
+		return null;
+	});
+}
+
 async function bookableService(pb: Pb, itemId: string) {
 	if (!itemId) return null;
 	const item = await pb.collection('items').getOne(itemId).catch(() => null);
@@ -84,14 +111,14 @@ async function bookableService(pb: Pb, itemId: string) {
 /**
  * Drop candidates that start in the past or overlap a slot of the same
  * service (existing, or accepted earlier in this run). Different services
- * may overlap freely — there is no cross-service collision detection.
+ * may share a time: whichever is booked first blocks the others.
  */
-function filterCandidates(candidates: (PlannedSlot & { item: string })[], existing: ExistingSlot[]) {
+function filterCandidates(candidates: Candidate[], existing: SlotDetail[]) {
 	const now = Date.now();
 	const taken = new Map<string, PlannedSlot[]>();
 	for (const slot of existing) taken.set(slot.item, [...(taken.get(slot.item) ?? []), slot]);
 
-	const accepted: typeof candidates = [];
+	const accepted: Candidate[] = [];
 	let skippedPast = 0;
 	let skippedOverlap = 0;
 	for (const candidate of candidates) {
@@ -117,13 +144,7 @@ function bulkResult(fields: Partial<BulkResult> & Pick<BulkResult, 'action' | 'i
 }
 
 /** Preview, or create, the accepted candidates. */
-async function previewOrCreate(
-	pb: Pb,
-	action: 'generate' | 'copy',
-	intent: string,
-	result: ReturnType<typeof filterCandidates>,
-	notesFor: (slot: PlannedSlot & { item: string }) => string
-) {
+async function previewOrCreate(pb: Pb, action: 'generate' | 'copy', intent: string, result: ReturnType<typeof filterCandidates>) {
 	const { accepted, skippedPast, skippedOverlap } = result;
 	if (accepted.length > MAX_BULK_SLOTS) {
 		return fail(400, { message: `That would create ${accepted.length} slots — at most ${MAX_BULK_SLOTS} at once. Choose a shorter range.` });
@@ -138,7 +159,7 @@ async function previewOrCreate(
 	if (intent !== 'create') return bulkResult({ ...summary, intent: 'preview', count: accepted.length });
 
 	const created = await runInBatches(accepted, 'create', (slot) =>
-		pb.collection('slots').create({ item: slot.item, start: slot.start, end: slot.end, notes: notesFor(slot), status: 'available' })
+		pb.collection('slots').create({ item: slot.item, start: slot.start, end: slot.end, capacity: slot.capacity, notes: slot.notes })
 	);
 	return bulkResult({ ...summary, intent: 'done', count: created, failed: accepted.length - created });
 }
@@ -156,36 +177,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		id: record.id,
 		name: String(record.name || ''),
 		duration: Number(record.duration) || 0,
-		bufferMinutes: Number(record.bufferMinutes) || 0
+		bufferMinutes: Number(record.bufferMinutes) || 0,
+		capacity: Math.max(1, Number(record.capacity) || 1)
 	}));
 
 	// Only the slots shown in the month grid (which spans whole weeks).
 	const grid = monthGridKeys(month);
-	const slotRecords = await locals.pb
-		.collection('slots')
-		.getFullList({
-			filter: locals.pb.filter('start >= {:from} && start < {:to}', {
-				from: new Date(dayStartIso(grid[0])),
-				to: new Date(dayStartIso(addDaysToKey(grid[grid.length - 1], 1)))
-			}),
-			sort: 'start',
-			expand: 'item'
-		})
-		.catch(() => []);
-	const slots = slotRecords.map((record) => ({
-		id: record.id,
-		item: String(record.item || ''),
-		itemName: String(record.expand?.item?.name || 'Unknown service'),
-		itemDuration: record.expand?.item?.duration ?? null,
-		start: String(record.start || ''),
-		end: record.end ? String(record.end) : '',
-		status: String(record.status || 'available') as SlotStatus,
-		heldUntil: record.heldUntil ? String(record.heldUntil) : '',
-		order: record.order ? String(record.order) : '',
-		notes: String(record.notes || '')
-	}));
+	const slots = await slotsForDays(locals.pb, grid[0], grid[grid.length - 1]);
 
-	return { items, slots, month, today };
+	return { items, slots: slots ?? [], slotsError: slots === null, month, today };
 };
 
 export const actions: Actions = {
@@ -193,9 +193,7 @@ export const actions: Actions = {
 		const data = await request.formData();
 		const result = await slotPayload(data, locals.pb);
 		if ('error' in result) return fail(400, { message: result.error });
-		const created = await attempt('Could not create the slot.', () =>
-			locals.pb.collection('slots').create({ ...result.payload, status: 'available' })
-		);
+		const created = await attempt('Could not create the slot.', () => locals.pb.collection('slots').create(result.payload));
 		if (!created.ok) return created.failure;
 		return { ok: true };
 	},
@@ -204,15 +202,20 @@ export const actions: Actions = {
 		const id = String(data.get('id') || '');
 		if (!id) return fail(400, { message: 'Slot id is required.' });
 
-		// Re-read the slot: the page may be stale, and a customer may have
-		// held or booked it since. Only notes can change while it's held.
-		const current = await locals.pb.collection('slots').getOne(id).catch(() => null);
+		// Re-read the slot: the page may be stale, and customers may have
+		// booked or held places since. Once any place is taken, the service
+		// and time are fixed; places can't go below what's taken.
+		const current = await loadSlotDetail(locals.pb, id).catch(() => undefined);
+		if (current === undefined) return fail(400, { message: 'Could not read the slot — is the database reachable?' });
 		if (!current) return fail(404, { message: 'This slot no longer exists.' });
-		if (current.status === 'booked') return fail(400, { message: 'Booked slots cannot be edited.' });
 
-		let patch: Record<string, string>;
-		if (isHoldActive(current)) {
-			patch = { notes: String(data.get('notes') || '').trim() };
+		const taken = seatsTaken(current);
+		let patch: Record<string, string | number>;
+		if (taken > 0) {
+			const capacity = parseCapacity(data, { capacity: current.capacity });
+			if (typeof capacity !== 'number') return fail(400, { message: capacity.error });
+			if (capacity < taken) return fail(400, { message: `${taken} place${taken === 1 ? ' is' : 's are'} already taken — places can’t go below that.` });
+			patch = { capacity, notes: String(data.get('notes') || '').trim() };
 		} else {
 			const result = await slotPayload(data, locals.pb);
 			if ('error' in result) return fail(400, { message: result.error });
@@ -226,9 +229,10 @@ export const actions: Actions = {
 		const data = await request.formData();
 		const id = String(data.get('id') || '');
 		if (!id) return fail(400, { message: 'Slot id is required.' });
-		const record = await locals.pb.collection('slots').getOne(id).catch(() => null);
-		if (record && record.status === 'booked') return fail(400, { message: 'Booked slots cannot be deleted.' });
-		if (isHoldActive(record)) return fail(400, { message: 'This slot is in a customer’s basket right now — try again in a few minutes.' });
+		const current = await loadSlotDetail(locals.pb, id).catch(() => undefined);
+		if (current === undefined) return fail(400, { message: 'Could not read the slot — is the database reachable?' });
+		if (current?.booked) return fail(400, { message: 'This slot has bookings and can’t be deleted.' });
+		if (current?.held) return fail(400, { message: 'This slot is in a customer’s basket right now — try again in a few minutes.' });
 		const deleted = await attempt('Could not delete the slot.', () => locals.pb.collection('slots').delete(id));
 		if (!deleted.ok) return deleted.failure;
 		return { ok: true };
@@ -245,6 +249,8 @@ export const actions: Actions = {
 		if (!item) return fail(400, { message: 'Choose a bookable service.' });
 		const duration = Number(item.duration) || 0;
 		if (duration <= 0) return fail(400, { message: `“${item.name}” has no duration — set one under Services & products.` });
+		const capacity = parseCapacity(data, item);
+		if (typeof capacity !== 'number') return fail(400, { message: capacity.error });
 
 		const weekdays = data.getAll('weekday').map(Number).filter((day) => day >= 0 && day <= 6);
 		if (!weekdays.length) return fail(400, { message: 'Choose at least one weekday.' });
@@ -267,17 +273,12 @@ export const actions: Actions = {
 		const planned = planGeneratedSlots({ ...range, weekdays, windows, durationMinutes: duration, bufferMinutes, timeZone: siteTimezone() });
 		if (!planned.length) return fail(400, { message: 'No slots fit those days and times.' });
 
-		const existing = await loadSlotsBetween(
-			locals.pb,
-			dayStartIso(range.fromDate),
-			dayStartIso(addDaysToKey(range.toDate, 1)),
-			item.id
-		).catch(() => null);
+		const existing = await slotsForDays(locals.pb, range.fromDate, range.toDate, item.id);
 		if (!existing) return fail(400, { message: 'Could not check existing slots — is the database reachable?' });
 
 		const notes = String(data.get('notes') || '').trim();
-		const result = filterCandidates(planned.map((slot) => ({ ...slot, item: item.id })), existing);
-		return previewOrCreate(locals.pb, 'generate', intent, result, () => notes);
+		const result = filterCandidates(planned.map((slot) => ({ ...slot, item: item.id, capacity, notes })), existing);
+		return previewOrCreate(locals.pb, 'generate', intent, result);
 	},
 
 	/** Repeat one week's slots (all services, or one) for the following weeks. */
@@ -290,33 +291,26 @@ export const actions: Actions = {
 		if (!(weeks >= 1 && weeks <= MAX_COPY_WEEKS)) return fail(400, { message: `Copy to between 1 and ${MAX_COPY_WEEKS} weeks.` });
 		const itemId = String(data.get('item') || '');
 
-		const source = await loadSlotsBetween(locals.pb, dayStartIso(sourceWeek), dayStartIso(addDaysToKey(sourceWeek, 7)), itemId).catch(() => null);
-		const existing = await loadSlotsBetween(
-			locals.pb,
-			dayStartIso(addDaysToKey(sourceWeek, 7)),
-			dayStartIso(addDaysToKey(sourceWeek, 7 * (weeks + 1))),
-			itemId
-		).catch(() => null);
+		const source = await slotsForDays(locals.pb, sourceWeek, addDaysToKey(sourceWeek, 6), itemId);
+		const existing = await slotsForDays(locals.pb, addDaysToKey(sourceWeek, 7), addDaysToKey(sourceWeek, 7 * (weeks + 1) - 1), itemId);
 		if (!source || !existing) return fail(400, { message: 'Could not read slots — is the database reachable?' });
 		if (!source.length) return fail(400, { message: 'That week has no slots to copy.' });
 
-		const notesByStart = new Map<string, string>();
-		const candidates: (PlannedSlot & { item: string })[] = [];
+		// Copies are new, empty slots: same service, places and notes.
+		const candidates: Candidate[] = [];
 		for (let week = 1; week <= weeks; week++) {
 			for (const slot of source) {
 				const start = shiftByDays(slot.start, 7 * week, siteTimezone());
 				if (!start) continue;
 				const end = new Date(instantMs(start) + (instantMs(slot.end) - instantMs(slot.start))).toISOString();
-				candidates.push({ item: slot.item, start, end });
-				notesByStart.set(`${slot.item}|${start}`, slot.notes);
+				candidates.push({ item: slot.item, start, end, capacity: slot.capacity, notes: slot.notes });
 			}
 		}
 
-		const result = filterCandidates(candidates, existing);
-		return previewOrCreate(locals.pb, 'copy', intent, result, (slot) => notesByStart.get(`${slot.item}|${slot.start}`) ?? '');
+		return previewOrCreate(locals.pb, 'copy', intent, filterCandidates(candidates, existing));
 	},
 
-	/** Delete the free slots in a date range. Booked and currently-held slots stay. */
+	/** Delete the slots in a date range that have no places taken. */
 	clear: async ({ request, locals }) => {
 		const data = await request.formData();
 		const intent = String(data.get('intent') || 'preview');
@@ -324,10 +318,10 @@ export const actions: Actions = {
 		if ('error' in range) return fail(400, { message: range.error });
 		const itemId = String(data.get('item') || '');
 
-		const slots = await loadSlotsBetween(locals.pb, dayStartIso(range.fromDate), dayStartIso(addDaysToKey(range.toDate, 1)), itemId).catch(() => null);
+		const slots = await slotsForDays(locals.pb, range.fromDate, range.toDate, itemId);
 		if (!slots) return fail(400, { message: 'Could not read slots — is the database reachable?' });
 
-		const removable = slots.filter((slot) => slot.status !== 'booked' && !isHoldActive(slot));
+		const removable = slots.filter((slot) => seatsTaken(slot) === 0);
 		const summary = {
 			action: 'clear' as const,
 			kept: slots.length - removable.length,
@@ -339,8 +333,8 @@ export const actions: Actions = {
 		// Re-check each slot just before deleting it: a customer may have put
 		// it in their basket since the list was read.
 		const deleted = await runInBatches(removable, 'delete', async (slot) => {
-			const fresh = await locals.pb.collection('slots').getOne(slot.id);
-			if (fresh.status === 'booked' || isHoldActive(fresh)) throw new Error('taken since the preview');
+			const fresh = await loadSlotDetail(locals.pb, slot.id);
+			if (fresh && seatsTaken(fresh) > 0) throw new Error('taken since the preview');
 			await locals.pb.collection('slots').delete(slot.id);
 		});
 		return bulkResult({ ...summary, intent: 'done', count: deleted, failed: removable.length - deleted });

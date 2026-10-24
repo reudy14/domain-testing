@@ -42,6 +42,40 @@ export type BulkResult = {
 	failed: number;
 };
 
+/**
+ * A slot with its places and blocking, as the shop hook reports it to the
+ * admin (GET /api/shop/slots?detail=1). Places are taken by paid orders
+ * (`booked`) and by baskets whose hold hasn't lapsed (`held`); `blockedBy`
+ * is the overlapping slot whose booking/hold blocks this one.
+ */
+export type SlotDetail = PlannedSlot & {
+	id: string;
+	item: string;
+	itemName: string;
+	capacity: number;
+	notes: string;
+	booked: number;
+	held: number;
+	blockedBy: string;
+};
+
+export type SlotState = 'free' | 'held' | 'booked' | 'full' | 'blocked';
+
+export const SLOT_STATE_LABELS: Record<SlotState, string> = {
+	free: 'Available',
+	held: 'In a basket',
+	booked: 'Booked',
+	full: 'Full',
+	blocked: 'Blocked'
+};
+
+export function slotState(slot: Pick<SlotDetail, 'booked' | 'held' | 'capacity' | 'blockedBy'>): SlotState {
+	if (slot.booked + slot.held >= slot.capacity) return 'full';
+	if (slot.booked) return 'booked';
+	if (slot.held) return 'held';
+	return slot.blockedBy ? 'blocked' : 'free';
+}
+
 /** One generate/copy run may create at most this many slots. */
 export const MAX_BULK_SLOTS = 1000;
 
