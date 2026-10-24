@@ -629,6 +629,9 @@ function createOrderFromIntent(app, intent) {
 		// Basket done — order_lines hold the snapshot.
 		for (const line of lines) tx.delete(line);
 		basket.set('status', 'completed');
+		// The order now holds the customer's details; keep only that copy.
+		basket.set('email', '');
+		basket.set('customerDetails', null);
 		tx.save(basket);
 		orderId = order.id;
 	});

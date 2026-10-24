@@ -32,6 +32,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		customerEmailSentAt: String(record.customerEmailSentAt || ''),
 		clientEmailSentAt: String(record.clientEmailSentAt || ''),
 		emailError: String(record.emailError || ''),
+		anonymisedAt: String(record.anonymisedAt || ''),
 		lines: (linesByOrder.get(record.id) ?? []).map((line) => ({
 			id: line.id,
 			name: String(line.name || ''),

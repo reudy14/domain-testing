@@ -38,6 +38,7 @@
 			title: 'Bookings',
 			links: [
 				{ href: '/orders', label: 'Orders' },
+				{ href: '/customers', label: 'Customers' },
 				{ href: '/slots', label: 'Slots' },
 				{ href: '/items', label: 'Services & products' },
 				{ href: '/calendar', label: 'Events' }
