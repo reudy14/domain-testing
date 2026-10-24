@@ -240,7 +240,8 @@
 						<p class="text-sm text-fg-body/70">{currency.format(line.itemPrice ?? 0)}</p>
 					</div>
 
-					{#if line.lineType === 'item'}
+					<!-- Products, and places in a group session (capacity > 1); the server checks what's left. -->
+					{#if line.lineType === 'item' || (line.slotCapacity ?? 1) > 1}
 						<div class="flex items-center gap-2">
 							<button
 								type="button"

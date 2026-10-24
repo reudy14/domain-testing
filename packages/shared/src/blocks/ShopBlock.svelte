@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
 	import type { ShopBlockData, ItemRecord, SlotRecord } from '$shared/types';
 	import { getBasketContext } from '$shared/basket.svelte';
 	import { getCurrentAndNextMonths } from '$shared/calendar';
@@ -112,6 +113,9 @@
 		try {
 			await basket.addSlotLine(slotId);
 			state.justAdded = true;
+			// A booking can block other times (one practitioner) or fill a
+			// group session — reload the listing so the picker shows that.
+			await invalidateAll();
 		} catch (e) {
 			state.errorMsg = errorMessage(e, 'Could not book this time slot.');
 		} finally {
@@ -281,13 +285,16 @@
 							<p class="mt-4 mb-2 text-sm font-medium text-charcoal/70">Available times</p>
 							<div class="flex flex-wrap gap-2">
 								{#each daySlots as slot (slot.id)}
-									{@const slotInBasket = basket.lines.some((l) => l.slot === slot.id)}
+									{@const seatsInBasket = basket.lines.find((l) => l.slot === slot.id)?.quantity ?? 0}
+									{@const slotInBasket = seatsInBasket > 0}
+									{@const isGroup = slot.capacity > 1}
 									<button
 										type="button"
-										disabled={slotInBasket || ui.adding}
+										disabled={(slotInBasket && !isGroup) || ui.adding}
+										title={isGroup && slotInBasket ? 'Add another place' : undefined}
 										onclick={() => addSlot(item.id, slot.id)}
 										class="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition {slotInBasket
-											? 'cursor-not-allowed border-transparent bg-sage/15 text-sage-dark'
+											? `border-transparent bg-sage/15 text-sage-dark ${isGroup ? 'hover:bg-sage/30' : 'cursor-not-allowed'}`
 											: 'border-charcoal/15 bg-white text-charcoal hover:border-sage hover:bg-sage/10'} disabled:opacity-60 {ui.adding &&
 										!slotInBasket
 											? 'cursor-wait'
@@ -296,9 +303,9 @@
 										{#if ui.pendingSlotId === slot.id}
 											<span class="loading loading-spinner loading-xs"></span>
 										{/if}
-										{formatTime(slot.start)}{item.duration != null ? ` · ${item.duration} min` : ''}{slotInBasket
-											? ' · In basket'
-											: ''}
+										{formatTime(slot.start)}{item.duration != null ? ` · ${item.duration} min` : ''}{isGroup
+											? ` · ${slot.free} ${slot.free === 1 ? 'place' : 'places'} left`
+											: ''}{slotInBasket ? (isGroup ? ` · ${seatsInBasket} in basket` : ' · In basket') : ''}
 									</button>
 								{/each}
 							</div>
