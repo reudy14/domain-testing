@@ -144,7 +144,7 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
   - Create/edit forms open in `$lib/admin/Modal.svelte`; destructive submits use `confirmSubmit()` from `$lib/admin/confirm` (returning `false` from a handler does not cancel).
   - Server actions wrap PocketBase writes in `attempt()` from `$lib/server/actions` so failures show as an error banner, not a 500.
   - Editors with unsaved state use `use:enhance` + `warnOnUnsavedChanges()`.
-- **Dates, times and prices shown to people** use `DISPLAY_LOCALE` (`en-GB`: day-month-year, 24-hour clock) and the helpers in `$shared/calendar` (`formatInstant`, `formatPrice`, `formatDateTime`) — never `toLocale*(undefined)`, which renders US formats on the server. Booking times on the public site are shown in `SITE_TIMEZONE` too (layout data `timezone`, read by blocks via `page.data.timezone`). Native `<input type="date">` fields follow the visitor's browser language and can't be changed from the page.
+- **Dates, times and prices shown to people** use `DISPLAY_LOCALE` (`en-GB`: day-month-year, 24-hour clock) and the helpers in `$shared/calendar` (`formatInstant`, `formatPrice` with the shop `currency`, `formatDateTime`) — never `toLocale*(undefined)`, which renders US formats on the server. Booking times on the public site are shown in `SITE_TIMEZONE` too (layout data `timezone`, read by blocks via `page.data.timezone`). Native `<input type="date">` fields follow the visitor's browser language and can't be changed from the page.
 - **Dates/times in admin**: entered and displayed in `SITE_TIMEZONE` (layout data `timezone`), via `toZonedDatetimeInput`, `zonedInputToIso`, `formatDateTime` in `$shared/calendar`. Never `new Date(localInput)` on the server — the container runs in UTC.
 - **Prose**: `.prose-wellness` class for rich text content styling
 
@@ -185,6 +185,7 @@ cd app-public && npm run build
 - `PUBLIC_SITE_URL` — public site URL used by the admin app for cross-subdomain preview links (`<scheme>://www.${DOMAIN}<port>`).
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`, `EMAIL_FROM_NAME` — Brevo SMTP relay for booking emails (both apps). Empty `SMTP_HOST` = log emails instead of sending.
 - `SITE_TIMEZONE` — IANA timezone for booking times in emails (default `Europe/Oslo`).
+- `STRIPE_CURRENCY` — shop currency (ISO 4217, default `eur`; e.g. `nok`). One setting for what Stripe charges and how prices are shown: PocketBase, both apps' layout data (`currency`, read by blocks via `page.data.currency`) and booking emails. Format prices with `formatPrice(amount, currency)` from `$shared/calendar` — never hard-code a currency.
 - Secrets (Stripe, `INTERNAL_API_SECRET`, SMTP) are read from a root-level `.env` next to `docker-compose.yml`; see `.env.example`.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` → PocketBase only. `INTERNAL_API_SECRET` → PocketBase and app-public (booking-email status). No app gets PocketBase superuser credentials.
 - Shop listings are public data, loaded anonymously by `loadShopData()` in `packages/shared/src/server/shop.ts` (public layout and admin `/preview`; slots via `GET /api/shop/slots`); if a Shop block has nothing to show it says "Nothing is available".

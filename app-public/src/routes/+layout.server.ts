@@ -2,7 +2,7 @@ import { defaultColors, defaultFooter, defaultHeader } from '$lib/types';
 import type { ItemRecord, SlotRecord } from '$lib/types';
 import { BASKET_COOKIE, getBasket } from '$lib/server/shop';
 import { loadShopData } from '$shared/server/shop';
-import { DEFAULT_TIMEZONE } from '$shared/calendar';
+import { DEFAULT_TIMEZONE, shopCurrency } from '$shared/calendar';
 import { env } from '$env/dynamic/private';
 import type { LayoutServerLoad } from './$types';
 
@@ -44,6 +44,8 @@ export const load: LayoutServerLoad = async ({ locals, cookies, url }) => {
 
 	// Booking times are shown in the studio's timezone, wherever the visitor is.
 	const timezone = env.SITE_TIMEZONE || DEFAULT_TIMEZONE;
+	// Prices are shown in the currency Stripe charges in.
+	const currency = shopCurrency(env.STRIPE_CURRENCY);
 
-	return { header, footer, colors, user: locals.user, basket, items, slots, timezone };
+	return { header, footer, colors, user: locals.user, basket, items, slots, timezone, currency };
 };
