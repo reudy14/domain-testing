@@ -1,12 +1,19 @@
 import type PocketBase from 'pocketbase';
 import { getFileUrl } from '../pb';
 import { parseDurations } from '../items';
-import type { BookableTime, ItemRecord } from '../types';
+import type { BookableTime, BundlePart, ItemRecord, ItemType } from '../types';
+
+/** A bundle's `bundleParts` field (JSON) → valid parts. */
+export function parseBundleParts(raw: unknown): BundlePart[] {
+	return (Array.isArray(raw) ? raw : [])
+		.map((p) => ({ item: String(p?.item || ''), minutes: p?.minutes ? Math.floor(Number(p.minutes)) : null, count: Math.floor(Number(p?.count)) || 0 }))
+		.filter((p) => p.item && p.count > 0);
+}
 
 /** An `items` record (with `expand.image`) → `ItemRecord`. */
 export function mapItemRecord(record: Record<string, any>): ItemRecord {
 	const media = record.expand?.image;
-	const type = record.type === 'item_with_time' ? 'item_with_time' : 'item';
+	const type: ItemType = record.type === 'item_with_time' || record.type === 'bundle' ? record.type : 'item';
 	return {
 		id: record.id,
 		name: String(record.name || ''),
@@ -15,8 +22,11 @@ export function mapItemRecord(record: Record<string, any>): ItemRecord {
 		image: String(record.image || ''),
 		imageUrl: media ? getFileUrl('media', media.id, media.file) : '',
 		type,
-		stock: record.stock ?? null,
+		// null = unlimited: PocketBase reads an empty number back as 0, so `trackStock` says whether it counts.
+		stock: type === 'item' && record.trackStock ? Number(record.stock) || 0 : null,
 		durations: type === 'item_with_time' ? parseDurations(record.durations) : [],
+		bundleParts: type === 'bundle' ? parseBundleParts(record.bundleParts) : [],
+		validMonths: type === 'bundle' ? Number(record.validMonths) || null : null,
 		bufferMinutes: record.bufferMinutes ?? null,
 		capacity: record.capacity ?? null,
 		active: record.active !== false

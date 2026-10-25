@@ -490,7 +490,7 @@ function normaliseCode(value) {
 		.replace(/[^A-Z0-9]/g, '');
 }
 
-/** `ABCD2345` → `ABCD-2345`, as shown to people. */
+/** `ABCD2345` → `ABCD-2345`, as shown to people (formatCode in packages/shared/src/items.ts does the same). */
 function formatCode(code) {
 	return code.length === CODE_LENGTH ? code.slice(0, 4) + '-' + code.slice(4) : code;
 }
@@ -628,8 +628,7 @@ function stockProblem(app, needs) {
 	for (const id of Object.keys(needs)) {
 		const item = findOrNull(app, 'items', id);
 		if (!item) continue;
-		const stock = item.get('stock');
-		if (stock != null && stock !== '' && needs[id] > item.getInt('stock')) {
+		if (item.getBool('trackStock') && needs[id] > item.getInt('stock')) {
 			return conflict(item.getInt('stock') > 0 ? `Only ${item.getInt('stock')} of "${item.getString('name')}" left in stock` : `"${item.getString('name')}" is sold out`);
 		}
 	}
@@ -1176,7 +1175,7 @@ function createOrderFromIntent(app, intent) {
 }
 
 function takeStock(app, item, quantity) {
-	if (!item || item.get('stock') == null || item.get('stock') === '') return;
+	if (!item || !item.getBool('trackStock')) return;
 	item.set('stock', Math.max(0, item.getInt('stock') - quantity));
 	app.save(item);
 }

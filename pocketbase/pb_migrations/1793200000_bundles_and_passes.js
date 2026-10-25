@@ -13,6 +13,11 @@
 // - baskets.pass: the code applied at checkout. basket_lines.pass /
 //   order_lines.pass: the pass that pays for that booking.
 // - basket_lines.giftTo / giftMessage: who a bundle in the basket is for.
+// - items.trackStock: whether `stock` is enforced. PocketBase can't store an
+//   empty number (it reads back as 0), so "unlimited when empty" never
+//   worked — every product without stock was sold out. Existing products
+//   get trackStock = true: nothing that sells today changes; clearing the
+//   stock field in the admin makes a product unlimited.
 // - Not required any more, as PocketBase counts 0 / '' as blank:
 //   order_lines.price (a booking paid with a code, or a product inside a
 //   bundle, costs 0), orders.total and orders.stripePaymentIntentId (an
@@ -42,6 +47,18 @@ migrate(
 
 		const type = items.fields.getByName('type');
 		if (type && type.values.indexOf('bundle') < 0) type.values = [...type.values, 'bundle'];
+		if (!items.fields.getByName('trackStock')) {
+			items.fields.add(new BoolField({ id: 'bool_itemtrackst', name: 'trackStock' }));
+			app.save(items);
+			for (const item of app.findRecordsByFilter('items', "type = 'item'", '', 0, 0)) {
+				item.set('trackStock', true);
+				try {
+					app.saveNoValidate(item);
+				} catch (e) {
+					console.log(`[migration] could not set trackStock on item ${item.id}: ${e}`);
+				}
+			}
+		}
 		if (!items.fields.getByName('bundleParts')) {
 			items.fields.add(new JSONField({ id: 'json_itembundle1', name: 'bundleParts', maxSize: 20000 }));
 			items.fields.add(new NumberField({ id: 'num_itemvalidmo1', name: 'validMonths', min: 1, max: 120, onlyInt: true }));
@@ -133,7 +150,7 @@ migrate(
 			}
 			const type = items.fields.getByName('type');
 			if (type) type.values = type.values.filter((value) => value !== 'bundle');
-			for (const name of ['bundleParts', 'validMonths']) {
+			for (const name of ['bundleParts', 'validMonths', 'trackStock']) {
 				if (items.fields.getByName(name)) items.fields.removeByName(name);
 			}
 			app.save(items);

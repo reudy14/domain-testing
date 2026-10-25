@@ -330,6 +330,7 @@
       { "id": "rel_itemimage01", "name": "image", "type": "relation", "system": false, "required": false, "presentable": false, "unique": false, "collectionId": "pbc_media00001", "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
       { "id": "sel_itemtype001", "name": "type", "type": "select", "system": false, "required": true, "presentable": false, "unique": false, "maxSelect": 1, "values": ["item", "item_with_time", "bundle"] },
       { "id": "num_itemstock01", "name": "stock", "type": "number", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": 0, "max": null } },
+      { "id": "bool_itemtrackst", "name": "trackStock", "type": "bool", "system": false, "required": false, "presentable": false, "hidden": false },
       { "id": "json_itemdurations", "name": "durations", "type": "json", "system": false, "required": false, "presentable": false, "hidden": false, "maxSize": 20000 },
       { "id": "json_itembundle1", "name": "bundleParts", "type": "json", "system": false, "required": false, "presentable": false, "hidden": false, "maxSize": 20000 },
       { "id": "num_itemvalidmo1", "name": "validMonths", "type": "number", "system": false, "required": false, "presentable": false, "hidden": false, "min": 1, "max": 120, "onlyInt": true },
