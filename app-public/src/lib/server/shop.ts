@@ -1,7 +1,7 @@
 import { error, isHttpError, json, type RequestHandler } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { getFileUrl } from '$lib/pb';
-import type { Basket, BasketLine, OrderRecord } from '$lib/types';
+import type { Basket, BasketLine, OrderRecord, PassSummary } from '$lib/types';
 import { sendOrderEmailsFromData, type OrderEmailData } from '$lib/server/email';
 
 // Client for the shop API in PocketBase (pocketbase/pb_hooks/shop). All
@@ -51,7 +51,7 @@ export function postJson<T>(path: string, data: unknown): Promise<T> {
 	});
 }
 
-type BasketPayload = { record: Record<string, any>; lines: Record<string, any>[] } | null;
+type BasketPayload = { record: Record<string, any>; lines: Record<string, any>[]; pass?: PassSummary | null } | null;
 
 /** PocketBase's "2026-01-01 10:00:00.000Z" → ISO. */
 const pbInstant = (value: string) => new Date(String(value).replace(' ', 'T')).toISOString();
@@ -59,7 +59,7 @@ const pbInstant = (value: string) => new Date(String(value).replace(' ', 'T')).t
 /** Map the API's raw basket records (plus `unitPrice`/`end` per line) to the `Basket` type used by the UI. */
 export function mapBasket(payload: BasketPayload): Basket | null {
 	if (!payload) return null;
-	const { record, lines } = payload;
+	const { record, lines, pass } = payload;
 	const mappedLines: BasketLine[] = lines.map((line) => {
 		const item = line.expand?.item;
 		const slot = line.expand?.slot;
@@ -79,6 +79,10 @@ export function mapBasket(payload: BasketPayload): Basket | null {
 			itemImageUrl: media ? getFileUrl('media', media.id, media.file) : undefined,
 			slotKind: slot?.kind,
 			slotCapacity: slot?.capacity,
+			passCovered: !!line.pass,
+			giftTo: line.giftTo || '',
+			giftMessage: line.giftMessage || '',
+			bundle: line.bundle || undefined,
 			heldUntil: line.heldUntil ? pbInstant(line.heldUntil) : undefined
 		};
 	});
@@ -90,6 +94,7 @@ export function mapBasket(payload: BasketPayload): Basket | null {
 		customerDetails: record.customerDetails || null,
 		stripePaymentIntentId: record.stripePaymentIntentId || null,
 		lines: mappedLines,
+		pass: pass ?? null,
 		serverNow: Date.now()
 	};
 }
@@ -102,7 +107,7 @@ export async function getBasket(basketId: string | undefined): Promise<Basket | 
 	return mapBasket(basket);
 }
 
-export function mapOrder(order: Record<string, any>, lines: Record<string, any>[]): OrderRecord {
+export function mapOrder(order: Record<string, any>, lines: Record<string, any>[], passes: PassSummary[] = []): OrderRecord {
 	return {
 		id: order.id,
 		basket: order.basket,
@@ -122,8 +127,10 @@ export function mapOrder(order: Record<string, any>, lines: Record<string, any>[
 			name: l.name,
 			price: l.price,
 			start: l.start || null,
-			minutes: l.minutes || null
-		}))
+			minutes: l.minutes || null,
+			passCode: l.passCode || ''
+		})),
+		passes
 	};
 }
 

@@ -11,7 +11,8 @@ import {
 	type FooterGlobal
 } from '../../types';
 import { normalizeEmailTemplate } from '../../email/defaults';
-import { renderEmail, sampleEmailContext, type EmailContext, type EmailLine } from '../../email/render';
+import { renderEmail, sampleEmailContext, type EmailContext, type EmailLine, type EmailPass } from '../../email/render';
+import { formatCode } from '../../items';
 import { buildIcs } from './ics';
 import { sendEmail, type SendResult } from './transport';
 
@@ -113,8 +114,10 @@ function bookingIcs(ctx: EmailContext, lineIds: string[], settings: EmailSetting
  */
 export type OrderEmailData = {
 	order: Record<string, any>;
-	/** order_lines with `expand.slot` and `expand.item` */
+	/** order_lines with `expand.slot`, `expand.item` and `expand.pass` */
 	lines: Record<string, any>[];
+	/** passes this order bought (codes) */
+	passes?: Record<string, any>[];
 	templates: Partial<Record<EmailTemplateKey, Record<string, any> | null>>;
 	footer: Partial<FooterGlobal> | null;
 	colors: Partial<ColorsGlobal> | null;
@@ -132,15 +135,16 @@ export async function loadOrderEmailData(pb: PocketBase, orderId: string): Promi
 			.collection('email_templates')
 			.getFirstListItem(pb.filter('key = {:key}', { key }))
 			.catch(() => null);
-	const [order, lines, customer_confirmation, client_alert, footer, colors] = await Promise.all([
+	const [order, lines, passes, customer_confirmation, client_alert, footer, colors] = await Promise.all([
 		pb.collection('orders').getOne(orderId),
-		pb.collection('order_lines').getFullList({ filter: pb.filter('order = {:orderId}', { orderId }), expand: 'slot,item', sort: 'start' }),
+		pb.collection('order_lines').getFullList({ filter: pb.filter('order = {:orderId}', { orderId }), expand: 'slot,item,pass', sort: 'start' }),
+		pb.collection('passes').getFullList({ filter: pb.filter('order = {:orderId}', { orderId }), sort: 'created' }),
 		template('customer_confirmation'),
 		template('client_alert'),
 		globalData('footer'),
 		globalData('colors')
 	]);
-	return { order, lines, templates: { customer_confirmation, client_alert }, footer, colors };
+	return { order, lines, passes, templates: { customer_confirmation, client_alert }, footer, colors };
 }
 
 function orderEmailContext(data: OrderEmailData, settings: EmailSettings) {
@@ -159,9 +163,23 @@ function orderEmailContext(data: OrderEmailData, settings: EmailSettings) {
 			price: Number(line.price) || 0,
 			quantity: Number(line.quantity) || 1,
 			start,
-			end
+			end,
+			passCode: line.expand?.pass?.code ? formatCode(String(line.expand.pass.code)) : undefined
 		};
 	});
+
+	const passes: EmailPass[] = (data.passes ?? []).map((pass) => ({
+		code: formatCode(String(pass.code || '')),
+		name: String(pass.name || ''),
+		expiresAt: pass.expiresAt ? new Date(String(pass.expiresAt).replace(' ', 'T')).toISOString() : '',
+		recipientName: String(pass.recipientName || ''),
+		message: String(pass.message || ''),
+		parts: (Array.isArray(pass.parts) ? pass.parts : []).map((part: Record<string, any>) => ({
+			name: String(part.name || ''),
+			minutes: part.minutes ? Number(part.minutes) : null,
+			count: Number(part.count) || 0
+		}))
+	}));
 
 	const details = (order.customerDetails || {}) as Partial<CustomerDetails>;
 	const customer: CustomerDetails = {
@@ -176,6 +194,7 @@ function orderEmailContext(data: OrderEmailData, settings: EmailSettings) {
 		total: Number(order.total) || 0,
 		customer,
 		lines,
+		passes,
 		...settings
 	};
 	return { ctx, lineIds: lineRecords.map((line) => line.id) };

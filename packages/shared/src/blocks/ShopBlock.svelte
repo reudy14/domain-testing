@@ -49,7 +49,7 @@
 
 	let visibleItems: ItemRecord[] = $derived.by(() => {
 		let result: ItemRecord[] = items;
-		if (data.itemTypeFilter === 'item' || data.itemTypeFilter === 'item_with_time') {
+		if (data.itemTypeFilter && data.itemTypeFilter !== 'all') {
 			result = result.filter((i) => i.type === data.itemTypeFilter);
 		}
 		if (data.itemIds?.length) {
@@ -62,6 +62,9 @@
 	});
 
 	let isList = $derived(data.layout === 'list');
+
+	/** Item id → name, for what bundles contain. */
+	let itemNames = $derived(new Map(items.map((item: ItemRecord) => [item.id, item.name])));
 
 	/** Changes whenever the basket's bookings do, so open pickers reload (a booking blocks other times). */
 	let basketBookingsKey = $derived(
@@ -290,7 +293,7 @@
 			{@const isService = item.type === 'item_with_time'}
 			{@const duration = isService ? selectedDuration(item, ui) : null}
 			{@const bookable = !isService || !!duration}
-			{@const soldOut = !isService && item.stock === 0}
+			{@const soldOut = item.type === 'item' && item.stock === 0}
 			{@const itemInBasket = !isService && basket.lines.some((l) => l.item === item.id)}
 			<article
 				class={isList
@@ -318,6 +321,17 @@
 					<h3 class="font-serif text-xl text-charcoal">{item.name}</h3>
 					{#if item.description}
 						<p class="mt-1 line-clamp-3 text-sm text-charcoal/70">{item.description}</p>
+					{/if}
+					{#if item.type === 'bundle'}
+						<!-- What the bundle contains; its code books the sessions later. -->
+						<ul class="mt-2 space-y-0.5 text-sm text-charcoal/80">
+							{#each item.bundleParts as part (`${part.item}|${part.minutes}`)}
+								<li>{part.count}× {itemNames.get(part.item) ?? 'Item'}{part.minutes ? ` (${formatDuration(part.minutes)})` : ''}</li>
+							{/each}
+						</ul>
+						<p class="mt-1 text-xs text-charcoal/60">
+							You get a code to book the sessions whenever suits you{item.validMonths ? ` — valid ${item.validMonths} months` : ''}. It can be given as a gift.
+						</p>
 					{/if}
 
 					<div class="mt-auto pt-3">

@@ -24,6 +24,9 @@ export const POST: RequestHandler = jsonErrors(async ({ request, cookies }) => {
 		minutes: body.minutes,
 		start: body.start,
 		seats: body.seats,
+		code: body.code,
+		giftTo: body.giftTo,
+		giftMessage: body.giftMessage,
 		lineId: body.lineId,
 		quantity: body.quantity,
 		basketId: cookies.get(BASKET_COOKIE) || ''
