@@ -28,7 +28,8 @@
 	const typeFilterLabels: Record<string, string> = {
 		all: 'All',
 		item: 'Products',
-		item_with_time: 'Services'
+		item_with_time: 'Services',
+		bundle: 'Bundles'
 	};
 </script>
 
@@ -48,7 +49,7 @@
 
 	<SegmentedControl
 		label="Item type"
-		options={['all', 'item', 'item_with_time']}
+		options={['all', 'item', 'item_with_time', 'bundle']}
 		value={block.data.itemTypeFilter || 'all'}
 		onChange={(v) => updateData({ itemTypeFilter: v as ShopBlockData['itemTypeFilter'] })}
 		formatLabel={(v) => typeFilterLabels[String(v)] || String(v)}

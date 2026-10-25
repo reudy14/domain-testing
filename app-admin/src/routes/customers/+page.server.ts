@@ -63,10 +63,11 @@ export const actions: Actions = {
 		const email = String((await request.formData()).get('email') || '');
 		const result = await attempt('Could not erase the customer.', () => eraseCustomer(locals.pb, email));
 		if (!result.ok) return result.failure;
-		const { ordersAnonymised, basketsDeleted } = result.value;
+		const { ordersAnonymised, basketsDeleted, passesAnonymised } = result.value;
+		const codes = passesAnonymised ? `, ${passesAnonymised} code${passesAnonymised === 1 ? '' : 's'} anonymised (still usable)` : '';
 		return {
 			ok: true,
-			message: `Erased: ${ordersAnonymised} order${ordersAnonymised === 1 ? '' : 's'} anonymised, ${basketsDeleted} unpaid checkout${basketsDeleted === 1 ? '' : 's'} deleted.`
+			message: `Erased: ${ordersAnonymised} order${ordersAnonymised === 1 ? '' : 's'} anonymised, ${basketsDeleted} unpaid checkout${basketsDeleted === 1 ? '' : 's'} deleted${codes}.`
 		};
 	},
 

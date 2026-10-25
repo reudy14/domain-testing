@@ -1,5 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import { sendOrderEmails, type EmailKind } from '$lib/server/email';
+import { formatCode } from '$shared/items';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -8,13 +9,20 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// can't be ordered chronologically).
 	const records = await locals.pb.collection('orders').getFullList({ sort: '-created,-id' }).catch(() => []);
 
-	// All lines in one request (previously one request per order).
-	const lineRecords = records.length
-		? await locals.pb
-				.collection('order_lines')
-				.getFullList({ sort: 'start' })
-				.catch(() => [])
-		: [];
+	// All lines in one request (previously one request per order), with the
+	// code that paid each; and the codes each order bought.
+	const [lineRecords, passRecords] = records.length
+		? await Promise.all([
+				locals.pb
+					.collection('order_lines')
+					.getFullList({ sort: 'start', expand: 'pass' })
+					.catch(() => []),
+				locals.pb
+					.collection('passes')
+					.getFullList({ filter: "order != ''", sort: 'created', fields: 'order,code,name,recipientName' })
+					.catch(() => [])
+			])
+		: [[], []];
 	const linesByOrder = new Map<string, typeof lineRecords>();
 	for (const line of lineRecords) {
 		const list = linesByOrder.get(line.order) ?? [];
@@ -40,8 +48,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 			quantity: Number(line.quantity) || 1,
 			lineType: String(line.lineType || 'item'),
 			start: line.start ? String(line.start) : '',
-			minutes: Number(line.minutes) || 0
-		}))
+			minutes: Number(line.minutes) || 0,
+			passCode: line.expand?.pass?.code ? formatCode(String(line.expand.pass.code)) : ''
+		})),
+		passes: passRecords
+			.filter((pass) => pass.order === record.id)
+			.map((pass) => ({ code: formatCode(String(pass.code)), name: String(pass.name || ''), recipientName: String(pass.recipientName || '') }))
 	}));
 
 	return { orders };

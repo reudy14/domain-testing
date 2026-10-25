@@ -75,9 +75,18 @@
 						{#if line.lineType === 'slot' && line.start}
 							<span class="block text-sm text-base-content/60">{formatDateTime(line.start, data.timezone)}{line.minutes ? ` · ${formatDuration(line.minutes)}` : ''}</span>
 						{/if}
+						{#if line.passCode}
+							<span class="block text-sm text-base-content/60">Paid with code <a class="link font-mono" href="/passes?q={encodeURIComponent(line.passCode)}">{line.passCode}</a></span>
+						{/if}
 					</li>
 				{/each}
 			</ul>
+			{#if order.passes.length}
+				<p class="mt-2 text-sm">
+					{order.passes.length === 1 ? 'Code' : 'Codes'} bought:
+					{#each order.passes as pass, i (pass.code)}{i ? ', ' : ''}<a class="link font-mono" href="/passes?q={encodeURIComponent(pass.code)}">{pass.code}</a>{pass.recipientName ? ` (for ${pass.recipientName})` : ''}{/each}
+				</p>
+			{/if}
 
 			{#if order.customerDetails?.notes}
 				<p class="mt-3 text-sm italic text-base-content/60">"{order.customerDetails.notes}"</p>

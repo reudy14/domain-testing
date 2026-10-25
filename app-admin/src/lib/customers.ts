@@ -28,4 +28,6 @@ export type CustomerData = {
 		lines: { name: string; quantity: number; price: number; start: string }[];
 	}[];
 	unpaidBaskets: { id: string; updated: string; status: string; customerDetails: CustomerDetails }[];
+	/** Bundle/voucher codes bought with this email, and who they're for. */
+	codes: { code: string; name: string; created: string; expiresAt: string; status: string; recipientName: string; message: string }[];
 };
