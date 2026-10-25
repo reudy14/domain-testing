@@ -3,16 +3,17 @@
 /// treats its input as untrusted. The basket id acts as the customer's
 /// bearer token, exactly like the cookie it comes from.
 
-// Slot availability (seats + cross-service blocking, see lib.js). Anyone
-// gets the bookable future slots; a signed-in admin can ask for `detail`.
+// Slot availability (windows, group sessions, blocking — see lib.js).
+// Anyone gets the bookable times for one service and duration
+// (?item=&minutes=&from=&to=); a signed-in admin can ask for `detail`.
 routerAdd('GET', '/api/shop/slots', (e) => {
 	const shop = require(`${__hooks}/shop/lib.js`);
 	const query = e.request.url.query();
 	if (query.get('detail')) {
 		if (!e.auth) throw new UnauthorizedError('Sign in to see slot details');
-		return e.json(200, { slots: shop.slotDetails($app, { from: query.get('from'), to: query.get('to'), item: query.get('item'), id: query.get('id') }) });
+		return e.json(200, shop.slotDetails($app, { from: query.get('from'), to: query.get('to'), item: query.get('item'), id: query.get('id') }));
 	}
-	return e.json(200, { slots: shop.bookableSlots($app) });
+	return e.json(200, shop.bookableTimes($app, { item: query.get('item'), minutes: query.get('minutes'), from: query.get('from'), to: query.get('to') }));
 });
 
 routerAdd('GET', '/api/shop/basket/{id}', (e) => {

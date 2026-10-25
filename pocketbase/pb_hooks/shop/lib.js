@@ -62,148 +62,344 @@ function pbDate(ms) {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+const MINUTE_MS = 60 * 1000;
+/** Window start times in `grid` mode are this far apart, from the window's start. */
+const GRID_MS = 30 * MINUTE_MS;
+/** In `edges` mode, a free stretch that has already begun starts at the next quarter hour. */
+const EDGE_ROUND_MS = 15 * MINUTE_MS;
+
+/** A JSON field's value (PocketBase hands JSVM raw bytes), or `fallback`. */
+function jsonValue(value, fallback) {
+	try {
+		const parsed = JSON.parse(toString(value) || 'null');
+		return parsed == null ? fallback : parsed;
+	} catch (_) {
+		return fallback;
+	}
+}
+
+// ── Services: durations and prices ──────────────────────────────────────
+
+function isService(item) {
+	return !!item && item.getString('type') === 'item_with_time';
+}
+
+/** A service's durations, `[{ minutes, price }]` by length; invalid entries are left out. */
+function itemDurations(item) {
+	const list = jsonValue(item.get('durations'), []);
+	return (Array.isArray(list) ? list : [])
+		.map((d) => ({ minutes: Math.floor(Number(d && d.minutes)), price: Number(d && d.price) }))
+		.filter((d) => d.minutes > 0 && d.price >= 0 && Number.isFinite(d.price))
+		.sort((a, b) => a.minutes - b.minutes);
+}
+
+/** Price of one unit: a product's price, or a service's price for `minutes` (null when not offered). */
+function unitPrice(item, minutes) {
+	if (!isService(item)) return item.getFloat('price');
+	const duration = itemDurations(item).find((d) => d.minutes === minutes);
+	return duration ? duration.price : null;
+}
+
+function bookableService(item, minutes) {
+	return isService(item) && item.getBool('active') && unitPrice(item, minutes) !== null;
+}
+
+function bufferMs(item) {
+	return Math.max(0, item ? item.getInt('bufferMinutes') : 0) * MINUTE_MS;
+}
+
+/** Items by id, read once per call. */
+function itemLookup(app) {
+	const cache = {};
+	return (id) => {
+		if (!(id in cache)) cache[id] = findOrNull(app, 'items', id);
+		return cache[id];
+	};
+}
+
 // ── Slot availability ───────────────────────────────────────────────────
 //
-// Nothing about bookings is stored on a slot. Its seats are taken by paid
-// order lines and by basket lines whose hold (`heldUntil`) hasn't lapsed;
-// it has `capacity` seats (1 for a one-to-one massage, more for a group).
+// Nothing about bookings is stored on a slot. Bookings are paid order lines
+// and basket lines whose hold (`heldUntil`) hasn't lapsed; each has its own
+// `start` and `minutes`, and keeps the practitioner busy until its service's
+// get-ready time is over (`readyAt`). One practitioner works every service,
+// so any booking blocks every other one it overlaps.
 //
-// One practitioner works all services, so a slot with any seat taken
-// BLOCKS every other slot it overlaps — whatever the service — including
-// each service's get-ready time after it. The client can offer three
-// massages at 10:00; once one is booked (or in a basket), the others go.
+// A slot is either
+// - a `window` (09:00–12:00 with the services that can be booked in it):
+//   a booking may start wherever its length plus get-ready time is free.
+//   `startTimes` = `grid`: every 30 minutes from the window's start;
+//   `edges`: only right at the start or end of a free stretch, so the
+//   window shrinks from either end and no unusable gaps are left. A
+//   booking must end inside the window; its get-ready time may run past.
+// - a `session`: one service at a fixed time with `capacity` places (a
+//   group class). Any place taken makes its whole time busy; it can't be
+//   booked while something else overlaps it.
 
 /**
- * Occupancy and blocking for the slots starting in [rangeStart, rangeEnd) (epoch ms).
- * `options.excludeLineId` leaves one basket line's seats out (used when
- * changing that line's quantity). Must run inside a transaction when the
- * result decides a write: PocketBase runs transactions one at a time, so
- * the check and the write can't interleave with another customer's.
+ * Bookings starting in [rangeStart - 1 day, rangeEnd + 1 day), sorted by
+ * start: `{ lineId, slot, item, itemName, start, end, readyAt, quantity,
+ * status: 'booked' | 'held' }`. `options.excludeLineId` leaves one basket
+ * line out (when re-checking that line itself).
  */
-function slotStates(app, rangeStart, rangeEnd, options) {
+function busyTimes(app, rangeStart, rangeEnd, item, options) {
 	const opts = options || {};
-	// Slots just outside the range can still block ones inside it.
 	const range = { from: pbDate(rangeStart - DAY_MS), to: pbDate(rangeEnd + DAY_MS) };
-	const records = findAll(app, 'slots', 'start >= {:from} && start < {:to}', range, 'start');
-	if (!records.length) return [];
-
-	const items = {};
-	const byId = {};
-	const states = records.map((record) => {
-		const itemId = record.getString('item');
-		if (!(itemId in items)) items[itemId] = findOrNull(app, 'items', itemId);
-		const item = items[itemId];
-		const start = toMs(record.getString('start'));
-		const storedEnd = toMs(record.getString('end'));
-		const end = Number.isNaN(storedEnd) ? start + (item ? item.getInt('duration') : 0) * 60000 : storedEnd;
-		const state = {
-			id: record.id,
-			item: itemId,
-			itemName: item ? item.getString('name') : '',
-			bookable: !!item && item.getBool('active') && item.getString('type') === 'item_with_time',
+	const busy = [];
+	const add = (line, status) => {
+		const start = toMs(line.getString('start'));
+		if (Number.isNaN(start)) return;
+		const service = item(line.getString('item'));
+		const end = start + line.getInt('minutes') * MINUTE_MS;
+		busy.push({
+			lineId: line.id,
+			slot: line.getString('slot'),
+			item: line.getString('item'),
+			itemName: service ? service.getString('name') : '',
 			start,
 			end,
-			readyAt: end + Math.max(0, item ? item.getInt('bufferMinutes') : 0) * 60000,
-			capacity: Math.max(1, record.getInt('capacity')),
-			notes: record.getString('notes'),
-			booked: 0,
-			held: 0,
-			blockedBy: ''
-		};
-		byId[record.id] = state;
-		return state;
-	});
-
-	const lineRange = 'slot.start >= {:from} && slot.start < {:to}';
-	for (const line of findAll(app, 'order_lines', "lineType = 'slot' && order.status != 'refunded' && " + lineRange, range)) {
-		const state = byId[line.getString('slot')];
-		if (state) state.booked += line.getInt('quantity');
+			readyAt: end + bufferMs(service),
+			quantity: line.getInt('quantity'),
+			status
+		});
+	};
+	const inRange = 'start >= {:from} && start < {:to}';
+	for (const line of findAll(app, 'order_lines', "lineType = 'slot' && order.status != 'refunded' && " + inRange, range)) add(line, 'booked');
+	const held = Object.assign({ now: pbDate(Date.now()) }, range);
+	for (const line of findAll(app, 'basket_lines', "lineType = 'slot' && heldUntil > {:now} && " + inRange, held)) {
+		if (line.id !== opts.excludeLineId) add(line, 'held');
 	}
-	const heldParams = Object.assign({ now: pbDate(Date.now()) }, range);
-	for (const line of findAll(app, 'basket_lines', "lineType = 'slot' && heldUntil > {:now} && " + lineRange, heldParams)) {
-		const state = byId[line.getString('slot')];
-		if (state && line.id !== opts.excludeLineId) state.held += line.getInt('quantity');
-	}
-
-	const occupied = states.filter((s) => s.booked + s.held > 0);
-	for (const state of states) {
-		const blocker = occupied.find((o) => o.id !== state.id && state.start < o.readyAt && o.start < state.readyAt);
-		if (blocker) state.blockedBy = blocker.id;
-	}
-	return states.filter((s) => s.start >= rangeStart && s.start < rangeEnd);
+	return busy.sort((a, b) => a.start - b.start);
 }
 
-/** One slot's state (see slotStates), or null if it doesn't exist. */
-function slotState(app, slotId, options) {
-	const record = findOrNull(app, 'slots', slotId);
-	if (!record) return null;
-	const start = toMs(record.getString('start'));
-	return slotStates(app, start, start + 1, options).find((s) => s.id === slotId) || null;
-}
-
-function freeSeats(state) {
-	return state.capacity - state.booked - state.held;
-}
-
-/** Future slots a customer can book right now — the public shop listing. */
-function bookableSlots(app) {
-	const now = Date.now();
-	return slotStates(app, now, now + 366 * DAY_MS)
-		.filter((s) => s.bookable && !s.blockedBy && freeSeats(s) > 0)
-		.map((s) => ({
-			id: s.id,
-			item: s.item,
-			start: new Date(s.start).toISOString(),
-			end: new Date(s.end).toISOString(),
-			capacity: s.capacity,
-			free: freeSeats(s)
-		}));
+function overlapsBusy(busy, start, until) {
+	return busy.find((b) => b.start < until && start < b.readyAt) || null;
 }
 
 /**
- * Every slot in a range (or one slot by id) with its seats and blocking —
- * for the signed-in admin. `query`: from/to (ISO), optional item, or id.
+ * Slots starting in [rangeStart, rangeEnd) (epoch ms) with what's booked
+ * in and around them. Returns `{ slots, busy }`. Must run inside a
+ * transaction when the result decides a write: PocketBase runs
+ * transactions one at a time, so the check and the write can't interleave
+ * with another customer's.
+ */
+function availability(app, rangeStart, rangeEnd, options) {
+	const item = itemLookup(app);
+	const busy = busyTimes(app, rangeStart, rangeEnd, item, options);
+	const range = { from: pbDate(rangeStart), to: pbDate(rangeEnd) };
+	const slots = findAll(app, 'slots', 'start >= {:from} && start < {:to}', range, 'start').map((record) => {
+		const items = record.getStringSlice('items');
+		const start = toMs(record.getString('start'));
+		const end = toMs(record.getString('end'));
+		const slot = {
+			id: record.id,
+			kind: record.getString('kind') === 'session' ? 'session' : 'window',
+			items,
+			itemNames: items.map((id) => (item(id) ? item(id).getString('name') : '')),
+			start,
+			end,
+			notes: record.getString('notes')
+		};
+		const own = busy.filter((b) => b.slot === record.id);
+		const count = (status) => own.filter((b) => b.status === status).reduce((sum, b) => sum + b.quantity, 0);
+		slot.booked = count('booked');
+		slot.held = count('held');
+		if (slot.kind === 'window') {
+			slot.startTimes = record.getString('startTimes') === 'edges' ? 'edges' : 'grid';
+			return slot;
+		}
+		const service = item(items[0]);
+		slot.minutes = Math.round((end - start) / MINUTE_MS);
+		slot.readyAt = end + bufferMs(service);
+		slot.capacity = Math.max(1, record.getInt('capacity'));
+		slot.bookable = bookableService(service, slot.minutes);
+		slot.blockedBy = overlapsBusy(busy.filter((b) => b.slot !== record.id), start, slot.readyAt);
+		return slot;
+	});
+	return { slots, busy };
+}
+
+function freeSeats(session) {
+	return session.capacity - session.booked - session.held;
+}
+
+/** The free stretches of a window, `[{ start, end }]`: its time minus every booking's time and get-ready time. */
+function freeTimes(window, busy) {
+	const free = [];
+	let cursor = window.start;
+	for (const b of busy) {
+		if (b.readyAt <= window.start || b.start >= window.end) continue;
+		if (b.start > cursor) free.push({ start: cursor, end: b.start });
+		cursor = Math.max(cursor, b.readyAt);
+	}
+	if (cursor < window.end) free.push({ start: cursor, end: window.end });
+	return free;
+}
+
+/** Where `item` for `minutes` can start in `window` now (epoch ms, ascending). */
+function windowStartTimes(window, item, minutes, busy, now) {
+	if (!item || window.items.indexOf(item.id) < 0 || !bookableService(item, minutes)) return [];
+	const length = minutes * MINUTE_MS;
+	const until = length + bufferMs(item);
+	const fits = (start) => start > now && start >= window.start && start + length <= window.end && !overlapsBusy(busy, start, start + until);
+
+	const candidates = [];
+	if (window.startTimes === 'edges') {
+		for (const stretch of freeTimes(window, busy)) {
+			// The latest start keeps this booking's get-ready time clear of the next booking.
+			const next = busy.find((b) => b.start >= stretch.end);
+			candidates.push(Math.max(stretch.start, Math.ceil(now / EDGE_ROUND_MS) * EDGE_ROUND_MS));
+			candidates.push(Math.min(window.end - length, (next ? next.start : Infinity) - until));
+		}
+	} else {
+		for (let start = window.start; start + length <= window.end; start += GRID_MS) candidates.push(start);
+	}
+	return candidates.filter((start, i) => candidates.indexOf(start) === i && fits(start)).sort((a, b) => a - b);
+}
+
+/**
+ * Bookable times for one service and duration starting in [from, to):
+ * window start times and group sessions with places left.
+ */
+function timesFor(app, item, minutes, from, to) {
+	const now = Date.now();
+	const { slots, busy } = availability(app, from, to);
+	const times = [];
+	for (const slot of slots) {
+		if (slot.kind === 'window') {
+			for (const start of windowStartTimes(slot, item, minutes, busy, now)) {
+				times.push({ slot: slot.id, kind: 'window', start, end: start + minutes * MINUTE_MS, capacity: 1, free: 1 });
+			}
+		} else if (slot.items[0] === item.id && slot.minutes === minutes && slot.bookable && !slot.blockedBy && slot.start > now && freeSeats(slot) > 0) {
+			times.push({ slot: slot.id, kind: 'session', start: slot.start, end: slot.end, capacity: slot.capacity, free: freeSeats(slot) });
+		}
+	}
+	return times.sort((a, b) => a.start - b.start);
+}
+
+/**
+ * The public shop listing (GET /api/shop/slots): times a customer can book
+ * now for `item` at `minutes`, starting in [from, to). When there are none,
+ * `next` is the first bookable time after `to` (within a year), so the shop
+ * can point to it.
+ */
+function bookableTimes(app, query) {
+	const empty = { times: [], next: null };
+	const item = findOrNull(app, 'items', String(query.item || ''));
+	const minutes = Math.floor(Number(query.minutes));
+	if (!bookableService(item, minutes)) return empty;
+	const now = Date.now();
+	const from = Math.max(now, toMs(query.from));
+	const to = toMs(query.to);
+	if (Number.isNaN(from) || Number.isNaN(to)) throw new BadRequestError('from and to are required');
+	if (to - from > 100 * DAY_MS) throw new BadRequestError('Range too long');
+
+	const iso = (ms) => new Date(ms).toISOString();
+	const listed = (t) => ({ slot: t.slot, kind: t.kind, start: iso(t.start), end: iso(t.end), capacity: t.capacity, free: t.free });
+	const times = to > from ? timesFor(app, item, minutes, from, to) : [];
+	if (times.length) return { times: times.map(listed), next: null };
+	for (let start = Math.max(from, to); start < now + 366 * DAY_MS; start += 31 * DAY_MS) {
+		const later = timesFor(app, item, minutes, start, start + 31 * DAY_MS);
+		if (later.length) return { times: [], next: iso(later[0].start) };
+	}
+	return empty;
+}
+
+/**
+ * Every slot in a range (or one slot by id) with its bookings — for the
+ * signed-in admin. `query`: from/to (ISO), optional item, or id.
  */
 function slotDetails(app, query) {
-	let states;
+	let slots;
+	let busy;
+	let from;
+	let to;
 	if (query.id) {
-		const state = slotState(app, String(query.id));
-		states = state ? [state] : [];
+		const record = findOrNull(app, 'slots', String(query.id));
+		if (!record) return { slots: [], bookings: [] };
+		from = toMs(record.getString('start'));
+		to = from + 1;
+		({ slots, busy } = availability(app, from, to));
 	} else {
-		const from = toMs(query.from);
-		const to = toMs(query.to);
+		from = toMs(query.from);
+		to = toMs(query.to);
 		if (Number.isNaN(from) || Number.isNaN(to) || to <= from) throw new BadRequestError('from and to are required');
 		if (to - from > 400 * DAY_MS) throw new BadRequestError('Range too long');
-		states = slotStates(app, from, to);
-		if (query.item) states = states.filter((s) => s.item === query.item);
+		({ slots, busy } = availability(app, from, to));
+		if (query.item) slots = slots.filter((s) => s.items.indexOf(String(query.item)) >= 0);
 	}
-	return states.map((s) => ({
-		id: s.id,
-		item: s.item,
-		itemName: s.itemName,
-		start: new Date(s.start).toISOString(),
-		end: new Date(s.end).toISOString(),
-		capacity: s.capacity,
-		notes: s.notes,
-		booked: s.booked,
-		held: s.held,
-		blockedBy: s.blockedBy
-	}));
+	const iso = (ms) => new Date(ms).toISOString();
+	const booking = (b) => ({ slot: b.slot, item: b.item, itemName: b.itemName, start: iso(b.start), end: iso(b.end), readyAt: iso(b.readyAt), quantity: b.quantity, status: b.status });
+	return {
+		slots: slots.map((s) => {
+			const detail = { id: s.id, kind: s.kind, items: s.items, itemNames: s.itemNames, start: iso(s.start), end: iso(s.end), notes: s.notes, booked: s.booked, held: s.held };
+			if (s.kind === 'window') {
+				detail.startTimes = s.startTimes;
+				detail.free = freeTimes(s, busy).map((f) => ({ start: iso(f.start), end: iso(f.end) }));
+			} else {
+				detail.minutes = s.minutes;
+				detail.capacity = s.capacity;
+				detail.blockedBy = s.blockedBy ? booking(s.blockedBy) : null;
+			}
+			return detail;
+		}),
+		bookings: busy.filter((b) => b.start >= from && b.start < to).map(booking)
+	};
 }
 
-/**
- * Check a slot can take `seats` more seats; returns an ApiError to throw,
- * or null. Call inside the transaction that then writes the hold.
- */
-function seatProblem(state, seats) {
-	if (!state || !state.bookable) return new NotFoundError('Slot not found');
-	if (state.start <= Date.now()) return conflict('This time has already passed — please pick another');
-	if (state.blockedBy) return conflict('This time is no longer available — please pick another');
-	const free = freeSeats(state);
+/** Check a session can take `seats` more places; returns an ApiError to throw, or null. */
+function seatProblem(session, seats) {
+	if (!session.bookable) return new NotFoundError('This session is no longer offered');
+	if (session.start <= Date.now()) return conflict('This time has already passed — please pick another');
+	if (session.blockedBy) return conflict('This time is no longer available — please pick another');
+	const free = freeSeats(session);
 	if (seats > free) {
 		return conflict(free <= 0 ? 'This time is fully booked — please pick another' : `Only ${free} place${free === 1 ? '' : 's'} left at this time`);
 	}
 	return null;
+}
+
+/**
+ * Check a booking request — `{ slotId, itemId, minutes, start (ms), seats }`
+ * — against availability. Returns `{ error }` (an ApiError to throw) or
+ * `{ booking: { slot, kind, item, start, minutes } }` (for a session, its
+ * own service and time; itemId/minutes/start are ignored). Call inside the
+ * transaction that then writes the hold.
+ */
+function checkBooking(app, request, options) {
+	const record = findOrNull(app, 'slots', String(request.slotId || ''));
+	if (!record) return { error: new NotFoundError('This time is no longer offered — please pick another') };
+	const slotStart = toMs(record.getString('start'));
+	const { slots, busy } = availability(app, slotStart, slotStart + 1, options);
+	const slot = slots.find((s) => s.id === record.id);
+	if (!slot) return { error: new NotFoundError('This time is no longer offered — please pick another') };
+
+	if (slot.kind === 'session') {
+		const problem = seatProblem(slot, request.seats);
+		if (problem) return { error: problem };
+		return { booking: { slot: slot.id, kind: 'session', item: slot.items[0], start: slot.start, minutes: slot.minutes } };
+	}
+
+	const now = Date.now();
+	const item = findOrNull(app, 'items', String(request.itemId || ''));
+	const minutes = Math.floor(Number(request.minutes));
+	if (!bookableService(item, minutes)) return { error: new NotFoundError('This service is not offered at this length any more') };
+	if (!(request.start > now)) return { error: conflict('This time has already passed — please pick another') };
+	if (windowStartTimes(slot, item, minutes, busy, now).indexOf(request.start) < 0) {
+		return { error: conflict('This time is no longer available — please pick another') };
+	}
+	return { booking: { slot: slot.id, kind: 'window', item: item.id, start: request.start, minutes } };
+}
+
+/** What a basket line asks for, in checkBooking's terms. */
+function lineRequest(line) {
+	return {
+		slotId: line.getString('slot'),
+		itemId: line.getString('item'),
+		minutes: line.getInt('minutes'),
+		start: toMs(line.getString('start')),
+		seats: line.getInt('quantity')
+	};
 }
 
 /**
@@ -259,12 +455,26 @@ function basketLines(app, basketId) {
 	return findAll(app, 'basket_lines', 'basket = {:basket}', { basket: basketId });
 }
 
-/** The basket as returned to the public app, which maps it to the `Basket` type. */
+/**
+ * The basket as returned to the public app, which maps it to the `Basket`
+ * type. Each line also gets `unitPrice` (null: the service is no longer
+ * offered at that length) and, for a booking, `end`.
+ */
 function basketPayload(app, basket) {
 	if (!basket) return null;
 	const lines = basketLines(app, basket.id);
 	for (const line of lines) app.expandRecord(line, ['item', 'slot', 'item.image'], null);
-	return { record: plain(basket), lines: lines.map(plain) };
+	return {
+		record: plain(basket),
+		lines: lines.map((line) => {
+			const json = plain(line);
+			const item = line.expandedOne('item');
+			json.unitPrice = item ? unitPrice(item, line.getInt('minutes')) : null;
+			const start = toMs(line.getString('start'));
+			if (!Number.isNaN(start)) json.end = new Date(start + line.getInt('minutes') * MINUTE_MS).toISOString();
+			return json;
+		})
+	};
 }
 
 function createBasket(app) {
@@ -277,10 +487,10 @@ function createBasket(app) {
  * Renew the hold on every slot line in a basket. Used at checkout start
  * (30 min), after a failed payment (10 min, so the customer can retry) and
  * when the customer asks for more time (`renew_holds`, 10 min). A live hold
- * is extended, never shortened (its seats are already counted). A lapsed
- * one that hasn't been swept yet is rescued only if its seats are still
- * free and nothing has blocked the time since — otherwise it's left for
- * the sweep, and checkout tells the customer the slot expired.
+ * is extended, never shortened (it's already counted). A lapsed one that
+ * hasn't been swept yet is rescued only if its time could still be booked
+ * now — otherwise it's left for the sweep, and checkout tells the customer
+ * the time expired.
  */
 function extendBasketHolds(app, basketId, durationMs) {
 	const now = Date.now();
@@ -297,7 +507,7 @@ function extendBasketHolds(app, basketId, durationMs) {
 		try {
 			app.runInTransaction((tx) => {
 				const fresh = tx.findRecordById('basket_lines', line.id);
-				if (seatProblem(slotState(tx, fresh.getString('slot')), fresh.getInt('quantity'))) return;
+				if (checkBooking(tx, lineRequest(fresh), { excludeLineId: fresh.id }).error) return;
 				fresh.set('heldUntil', until);
 				tx.save(fresh);
 			});
@@ -343,15 +553,35 @@ function basketAction(app, body) {
 		}
 
 		case 'add_slot': {
-			// Adding a slot that's already in the basket adds seats to that line.
-			const slotId = String(body.slotId || '');
-			const seats = Math.max(1, Math.floor(Number(body.seats)) || 1);
+			// A window booking: `slotId` (the window), `itemId`, `minutes` and
+			// `start` (one of the listed times). A group session: `slotId` and
+			// `seats`; adding a session already in the basket adds places to
+			// that line.
+			const request = {
+				slotId: String(body.slotId || ''),
+				itemId: String(body.itemId || ''),
+				minutes: Math.floor(Number(body.minutes)),
+				start: toMs(body.start),
+				seats: Math.max(1, Math.floor(Number(body.seats)) || 1)
+			};
 			guardedTransaction(app, 'Could not reserve this time — please try again', (tx) => {
-				const problem = seatProblem(slotState(tx, slotId), seats);
-				if (problem) return problem;
-				const existing = findAll(tx, 'basket_lines', 'basket = {:basket} && slot = {:slot}', { basket: basket.id, slot: slotId })[0];
-				const line = existing || newRecord(tx, 'basket_lines', { basket: basket.id, item: tx.findRecordById('slots', slotId).getString('item'), slot: slotId, quantity: 0, lineType: 'slot' });
-				line.set('quantity', line.getInt('quantity') + seats);
+				const check = checkBooking(tx, request);
+				if (check.error) return check.error;
+				const booking = check.booking;
+				const existing =
+					booking.kind === 'session' ? findAll(tx, 'basket_lines', 'basket = {:basket} && slot = {:slot}', { basket: basket.id, slot: booking.slot })[0] : null;
+				const line =
+					existing ||
+					newRecord(tx, 'basket_lines', {
+						basket: basket.id,
+						item: booking.item,
+						slot: booking.slot,
+						start: new Date(booking.start).toISOString(),
+						minutes: booking.minutes,
+						quantity: 0,
+						lineType: 'slot'
+					});
+				line.set('quantity', line.getInt('quantity') + (booking.kind === 'session' ? request.seats : 1));
 				line.set('heldUntil', isoIn(SLOT_HOLD_MS));
 				tx.save(line);
 			});
@@ -364,11 +594,13 @@ function basketAction(app, body) {
 			const quantity = Number(body.quantity);
 			if (!Number.isInteger(quantity) || quantity < 1) throw new BadRequestError('Quantity must be a positive integer');
 			if (line.getString('lineType') === 'slot') {
-				// Seats for a group session: re-check capacity without this line's current seats.
+				// Places in a group session: re-check capacity without this line's current places.
 				guardedTransaction(app, 'Could not change the number of places — please try again', (tx) => {
 					const fresh = tx.findRecordById('basket_lines', line.id);
-					const problem = seatProblem(slotState(tx, fresh.getString('slot'), { excludeLineId: fresh.id }), quantity);
-					if (problem) return problem;
+					const slot = findOrNull(tx, 'slots', fresh.getString('slot'));
+					if (!slot || slot.getString('kind') !== 'session') return new BadRequestError('Only group sessions have more than one place');
+					const check = checkBooking(tx, Object.assign(lineRequest(fresh), { seats: quantity }), { excludeLineId: fresh.id });
+					if (check.error) return check.error;
 					fresh.set('quantity', quantity);
 					fresh.set('heldUntil', isoIn(SLOT_HOLD_MS));
 					tx.save(fresh);
@@ -489,7 +721,9 @@ function startCheckout(app, body) {
 				throw conflict(`Only ${item.getInt('stock')} of "${item.getString('name')}" left in stock`);
 			}
 		}
-		totalCents += Math.round(item.getFloat('price') * 100) * quantity;
+		const price = unitPrice(item, line.getInt('minutes'));
+		if (price === null) throw conflict(`"${item.getString('name')}" is no longer offered for ${line.getInt('minutes')} minutes — please pick it again`);
+		totalCents += Math.round(price * 100) * quantity;
 		summary.push(`${quantity}× ${item.getString('name')}`);
 	}
 	if (totalCents <= 0) throw new BadRequestError('Basket total must be positive');
@@ -602,12 +836,11 @@ function createOrderFromIntent(app, intent) {
 		});
 		tx.save(order);
 
-		// Snapshot lines and decrement stock. A slot's seats move from the
+		// Snapshot lines and decrement stock. A booked time moves from the
 		// basket line (a hold) to the order line (a booking) in this same
-		// transaction, so availability never sees them free in between.
+		// transaction, so availability never sees it free in between.
 		for (const line of lines) {
 			const item = findOrNull(tx, 'items', line.getString('item'));
-			const slot = findOrNull(tx, 'slots', line.getString('slot'));
 			tx.save(
 				newRecord(tx, 'order_lines', {
 					order: order.id,
@@ -616,8 +849,9 @@ function createOrderFromIntent(app, intent) {
 					quantity: line.getInt('quantity'),
 					lineType: line.getString('lineType'),
 					name: item ? item.getString('name') : 'Unknown item',
-					price: item ? item.getFloat('price') : 0,
-					start: slot ? slot.getString('start') : ''
+					price: (item && unitPrice(item, line.getInt('minutes'))) || 0,
+					start: line.getString('start'),
+					minutes: line.getInt('minutes')
 				})
 			);
 			if (line.getString('lineType') === 'item' && item && item.get('stock') != null && item.get('stock') !== '') {
@@ -715,7 +949,7 @@ function recordEmailStatus(app, secretHeader, body) {
 }
 
 module.exports = {
-	bookableSlots,
+	bookableTimes,
 	slotDetails,
 	sweepExpiredHolds,
 	loadActiveBasket,
