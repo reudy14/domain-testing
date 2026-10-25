@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { formatDateTime } from '$lib/calendar';
+	import { formatDuration } from '$shared/items';
 
 	let { data, form } = $props();
 	let orders = $derived(data.orders || []);
@@ -72,7 +73,7 @@
 					<li>
 						{line.quantity}× {line.name} — {money.format(line.price)}
 						{#if line.lineType === 'slot' && line.start}
-							<span class="block text-sm text-base-content/60">{formatDateTime(line.start, data.timezone)}</span>
+							<span class="block text-sm text-base-content/60">{formatDateTime(line.start, data.timezone)}{line.minutes ? ` · ${formatDuration(line.minutes)}` : ''}</span>
 						{/if}
 					</li>
 				{/each}

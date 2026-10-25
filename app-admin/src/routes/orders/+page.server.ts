@@ -39,7 +39,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			price: Number(line.price) || 0,
 			quantity: Number(line.quantity) || 1,
 			lineType: String(line.lineType || 'item'),
-			start: line.start ? String(line.start) : ''
+			start: line.start ? String(line.start) : '',
+			minutes: Number(line.minutes) || 0
 		}))
 	}));
 

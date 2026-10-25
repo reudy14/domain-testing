@@ -33,7 +33,7 @@
 
 <Modal bind:open title="Clear slots" wide>
 	<form method="POST" action="?/clear" use:enhance={bulk.submit} class="space-y-1">
-		<p class="text-sm text-base-content/70">Delete the free slots in a date range. Booked slots, and slots in a customer’s basket right now, are always kept.</p>
+		<p class="text-sm text-base-content/70">Delete the windows and group sessions in a date range that have nothing booked. Slots with a booking, or with a time in a customer’s basket right now, are always kept.</p>
 
 		<div class="grid gap-x-4 md:grid-cols-2">
 			<label class="fieldset">
@@ -49,7 +49,7 @@
 		<label class="fieldset">
 			<span class="fieldset-legend">Services</span>
 			<select class="select w-full" name="item" bind:value={draft.item}>
-				<option value="">All services</option>
+				<option value="">All slots</option>
 				{#each items as item (item.id)}<option value={item.id}>{item.name}</option>{/each}
 			</select>
 		</label>

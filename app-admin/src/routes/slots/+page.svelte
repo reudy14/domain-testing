@@ -4,33 +4,39 @@
 	import { formatDateTime, formatTime, toZonedDatetimeInput, zonedInputToIso } from '$lib/calendar';
 	import { confirmSubmit } from '$lib/admin/confirm';
 	import Modal from '$lib/admin/Modal.svelte';
+	import SegmentedControl from '$lib/admin/editors/SegmentedControl.svelte';
 	import ClearSlotsModal from '$lib/admin/slots/ClearSlotsModal.svelte';
 	import CopyWeekModal from '$lib/admin/slots/CopyWeekModal.svelte';
 	import GenerateSlotsModal from '$lib/admin/slots/GenerateSlotsModal.svelte';
-	import { SLOT_STATE_LABELS, WEEKDAYS, addDaysToKey, addMonthsToKey, formatDateKey, mondayOfKey, monthGridKeys, slotState } from '$lib/slots';
+	import { SLOT_STATE_LABELS, START_TIMES_HINTS, START_TIMES_LABELS, WEEKDAYS, addDaysToKey, addMonthsToKey, formatDateKey, mondayOfKey, monthGridKeys, slotState } from '$lib/slots';
 	import type { BulkResult, SlotState } from '$lib/slots';
+	import type { SlotKind, StartTimesMode } from '$lib/types';
+	import { formatDuration } from '$shared/items';
 
 	let { data, form } = $props();
 	let items = $derived(data.items || []);
 	let serviceFilter = $state('');
-	let slots = $derived((data.slots || []).filter((slot) => !serviceFilter || slot.item === serviceFilter));
+	let slots = $derived((data.slots || []).filter((slot) => !serviceFilter || slot.items.includes(serviceFilter)));
 	type Slot = (typeof slots)[number];
-	let slotsById = $derived(new Map((data.slots || []).map((slot) => [slot.id, slot])));
+	type Booking = (typeof data.bookings)[number];
 
 	// ── Month grid (date keys in the site timezone) ──
 	const MAX_CHIPS = 4;
+	const dayKeyOf = (iso: string) => toZonedDatetimeInput(iso, data.timezone).slice(0, 10);
 	let gridKeys = $derived(monthGridKeys(data.month));
 	let monthLabel = $derived(formatDateKey(`${data.month}-01`, { month: 'long', year: 'numeric' }));
 	let monthEnd = $derived(addDaysToKey(`${addMonthsToKey(data.month, 1)}-01`, -1));
 	let slotsByDay = $derived.by(() => {
 		const byDay = new Map<string, Slot[]>();
-		for (const slot of slots) {
-			const key = toZonedDatetimeInput(slot.start, data.timezone).slice(0, 10);
-			byDay.set(key, [...(byDay.get(key) ?? []), slot]);
-		}
+		for (const slot of slots) byDay.set(dayKeyOf(slot.start), [...(byDay.get(dayKeyOf(slot.start)) ?? []), slot]);
 		return byDay;
 	});
-	let monthSlots = $derived(slots.filter((slot) => toZonedDatetimeInput(slot.start, data.timezone).startsWith(data.month)));
+	let bookingsByDay = $derived.by(() => {
+		const byDay = new Map<string, Booking[]>();
+		for (const booking of data.bookings || []) byDay.set(dayKeyOf(booking.start), [...(byDay.get(dayKeyOf(booking.start)) ?? []), booking]);
+		return byDay;
+	});
+	let monthSlots = $derived(slots.filter((slot) => dayKeyOf(slot.start).startsWith(data.month)));
 
 	// ── Modals ──
 	let showEditor = $state(false);
@@ -42,13 +48,14 @@
 	let copyFrom = $state('');
 	let clearRange = $state({ from: '', to: '' });
 	let daySlots = $derived(slotsByDay.get(dayKey) ?? []);
+	let dayBookings = $derived(bookingsByDay.get(dayKey) ?? []);
 
 	let bulkDone = $derived(form && 'bulk' in form && form.bulk?.intent === 'done' ? (form.bulk as BulkResult) : null);
 
 	function bulkMessage(result: BulkResult) {
 		const n = (count: number) => `${count} slot${count === 1 ? '' : 's'}`;
 		const verb = result.action === 'clear' ? 'Deleted' : 'Created';
-		const failed = result.failed ? ` ${n(result.failed)} could not be ${result.action === 'clear' ? 'deleted (places taken in the meantime)' : 'saved'}.` : '';
+		const failed = result.failed ? ` ${n(result.failed)} could not be ${result.action === 'clear' ? 'deleted (booked in the meantime)' : 'saved'}.` : '';
 		return `${verb} ${n(result.count)}.${failed}`;
 	}
 
@@ -67,15 +74,26 @@
 		blocked: 'badge-ghost'
 	};
 
-	/** "2/8" for group slots, '' for one-to-one. */
+	const range = (start: string, end: string) => `${formatTime(start, data.timezone)}–${formatTime(end, data.timezone)}`;
+
+	/** "Massage, Facial" — or the one service of a session. */
+	const serviceNames = (slot: Slot) => slot.itemNames.filter(Boolean).join(', ') || 'No services';
+
+	/** "2/8" for group sessions, '' otherwise. */
 	function places(slot: Slot) {
-		return slot.capacity > 1 ? `${slot.booked + slot.held}/${slot.capacity}` : '';
+		return slot.kind === 'session' && (slot.capacity ?? 1) > 1 ? `${slot.booked + slot.held}/${slot.capacity}` : '';
 	}
 
-	/** Why a slot is blocked, e.g. "Blocked by 10:00 Swedish massage". */
-	function blockedReason(slot: Slot) {
-		const blocker = slotsById.get(slot.blockedBy);
-		return blocker ? `Blocked by ${formatTime(blocker.start, data.timezone)} ${blocker.itemName}` : 'Blocked by an overlapping booking';
+	/** What a window has left, e.g. "Free 10:15–12:00". */
+	function freeLabel(slot: Slot) {
+		if (!slot.free?.length) return 'No free time left';
+		return `Free ${slot.free.map((f) => range(f.start, f.end)).join(', ')}`;
+	}
+
+	function describe(slot: Slot, state: SlotState) {
+		if (slot.kind === 'window') return `${serviceNames(slot)} — ${freeLabel(slot)}`;
+		if (state === 'blocked' && slot.blockedBy) return `Blocked by ${range(slot.blockedBy.start, slot.blockedBy.end)} ${slot.blockedBy.itemName}`;
+		return `${SLOT_STATE_LABELS[state]}${places(slot) ? ` (${places(slot)})` : ''}`;
 	}
 
 	function openDay(key: string) {
@@ -95,10 +113,19 @@
 		showClear = true;
 	}
 
-	// ── Single slot editor ──
+	// ── Slot editor (a window or a group session) ──
 	type SlotDraft = {
 		id: string;
+		kind: SlotKind;
+		// window
+		date: string;
+		from: string;
+		to: string;
+		items: string[];
+		startTimes: StartTimesMode;
+		// session
 		item: string;
+		minutes: string;
 		start: string;
 		capacity: string;
 		booked: number;
@@ -106,23 +133,51 @@
 		notes: string;
 	};
 
-	let draft = $state<SlotDraft>(emptyDraft());
+	let draft = $state<SlotDraft>(emptyDraft('window'));
 	let editorError = $state('');
 	let action = $derived(draft.id ? '?/update' : '?/create');
-	// Once any place is taken, the service and time are fixed (customers booked them).
 	let taken = $derived(draft.booked + draft.held);
+	// Once a place in a session is taken, its service and time are fixed (customers booked them).
+	let sessionLocked = $derived(draft.kind === 'session' && taken > 0);
 	let selectedItem = $derived(items.find((item) => item.id === draft.item));
 	let endLabel = $derived.by(() => {
-		if (!selectedItem || !draft.start) return '';
+		if (!draft.start || !draft.minutes) return '';
 		const startIso = zonedInputToIso(draft.start, data.timezone);
 		if (!startIso) return '';
-		const end = new Date(new Date(startIso).getTime() + (Number(selectedItem.duration) || 0) * 60_000);
-		return `Ends at ${formatTime(end.toISOString(), data.timezone)}`;
+		return `Ends at ${formatTime(new Date(new Date(startIso).getTime() + Number(draft.minutes) * 60_000).toISOString(), data.timezone)}`;
 	});
 
-	function emptyDraft(day = ''): SlotDraft {
-		const start = day ? `${day}T09:00` : toZonedDatetimeInput(new Date().toISOString(), data.timezone);
-		return { id: '', item: serviceFilter, start, capacity: '', booked: 0, held: 0, notes: '' };
+	function emptyDraft(kind: SlotKind, day = ''): SlotDraft {
+		const date = day || data.today;
+		const service = items.find((item) => item.id === serviceFilter);
+		return {
+			id: '',
+			kind,
+			date,
+			from: '09:00',
+			to: '12:00',
+			items: serviceFilter ? [serviceFilter] : oneToOneServices(items),
+			startTimes: 'grid',
+			item: serviceFilter,
+			minutes: service?.durations[0] ? String(service.durations[0].minutes) : '',
+			start: `${date}T09:00`,
+			capacity: '',
+			booked: 0,
+			held: 0,
+			notes: ''
+		};
+	}
+
+	/** What a new window offers by default: the one-to-one services (group classes get sessions), or all if there are none. */
+	function oneToOneServices(list: typeof items) {
+		const ids = list.filter((item) => item.capacity <= 1).map((item) => item.id);
+		return ids.length ? ids : list.map((item) => item.id);
+	}
+
+	function selectSessionService(id: string) {
+		draft.item = id;
+		const service = items.find((item) => item.id === id);
+		if (!service?.durations.some((d) => String(d.minutes) === draft.minutes)) draft.minutes = service?.durations[0] ? String(service.durations[0].minutes) : '';
 	}
 
 	// Enhanced so the page keeps its ?month= after saving (a plain POST to
@@ -139,20 +194,28 @@
 		};
 	};
 
-	function createSlot(day = '') {
+	function createSlot(kind: SlotKind, day = '') {
 		editorError = '';
-		draft = emptyDraft(day);
+		draft = emptyDraft(kind, day);
 		showDay = false;
 		showEditor = true;
 	}
 
 	function editSlot(slot: Slot) {
 		editorError = '';
+		const start = toZonedDatetimeInput(slot.start, data.timezone);
 		draft = {
+			...emptyDraft(slot.kind),
 			id: slot.id,
-			item: slot.item,
-			start: toZonedDatetimeInput(slot.start, data.timezone),
-			capacity: String(slot.capacity),
+			date: start.slice(0, 10),
+			from: start.slice(11, 16),
+			to: toZonedDatetimeInput(slot.end, data.timezone).slice(11, 16),
+			items: [...slot.items],
+			startTimes: slot.startTimes ?? 'grid',
+			item: slot.items[0] ?? '',
+			minutes: String(slot.minutes ?? ''),
+			start,
+			capacity: String(slot.capacity ?? ''),
 			booked: slot.booked,
 			held: slot.held,
 			notes: slot.notes
@@ -165,13 +228,16 @@
 <svelte:head><title>Slots | CMS</title></svelte:head>
 
 <div class="space-y-6">
-	<div class="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+	<div class="flex flex-col gap-4">
 		<div>
 			<h1 class="text-3xl font-bold">Slots</h1>
-			<p class="text-base-content/60">Bookable time slots for your services. Times are in {data.timezone}.</p>
+			<p class="max-w-4xl text-base-content/60">
+				When you can be booked. A <strong>window</strong> (e.g. 09:00–12:00) takes bookings of the services you choose, at any of their lengths; each booking takes its time plus get-ready time out of the window. A <strong>group session</strong> is one service at a fixed time with places. Times are in {data.timezone}.
+			</p>
 		</div>
 		<div class="flex flex-wrap gap-2">
-			<button class="btn" type="button" onclick={() => createSlot()}>Create slot</button>
+			<button class="btn" type="button" disabled={!items.length} onclick={() => createSlot('window')}>Add window</button>
+			<button class="btn" type="button" disabled={!items.length} onclick={() => createSlot('session')}>Add group session</button>
 			<button class="btn" type="button" onclick={() => openCopy(data.today)}>Copy a week</button>
 			<button class="btn" type="button" onclick={() => openClear(data.today > `${data.month}-01` ? data.today : `${data.month}-01`, monthEnd)}>Clear slots</button>
 			<button class="btn btn-primary" type="button" disabled={!items.length} onclick={() => (showGenerate = true)}>Generate slots</button>
@@ -218,12 +284,17 @@
 							<button
 								class="block w-full truncate rounded border px-1 text-left text-[0.7rem] leading-5 {STATE_CLASSES[state]}"
 								type="button"
-								title="{formatTime(slot.start, data.timezone)} {slot.itemName} — {state === 'blocked' ? blockedReason(slot) : SLOT_STATE_LABELS[state]}{places(slot) ? ` (${places(slot)})` : ''}"
-								onclick={() => editSlot(slot)}
+								title="{range(slot.start, slot.end)} {slot.kind === 'window' ? 'window' : serviceNames(slot)} — {describe(slot, state)}"
+								onclick={() => openDay(key)}
 							>
-								<span class="font-semibold">{formatTime(slot.start, data.timezone)}</span>
-								<span class="hidden lg:inline">{slot.itemName}</span>
-								{#if places(slot)}<span class="hidden md:inline">· {places(slot)}</span>{/if}
+								{#if slot.kind === 'window'}
+									<span class="font-semibold">{range(slot.start, slot.end)}</span>
+									{#if slot.booked + slot.held}<span class="hidden md:inline">· {slot.booked + slot.held} booked</span>{/if}
+								{:else}
+									<span class="font-semibold">{formatTime(slot.start, data.timezone)}</span>
+									<span class="hidden lg:inline">{serviceNames(slot)}</span>
+									{#if places(slot)}<span class="hidden md:inline">· {places(slot)}</span>{/if}
+								{/if}
 							</button>
 						{/each}
 						{#if daySlotList.length > MAX_CHIPS}
@@ -238,32 +309,29 @@
 			{#each Object.entries(SLOT_STATE_LABELS) as [state, label] (state)}
 				<span class="flex items-center gap-1"><span class="inline-block size-3 rounded border {STATE_CLASSES[state as SlotState]}"></span> {label}</span>
 			{/each}
-			<span>— a booking (or basket) at one time blocks every other service overlapping it, including get-ready time.</span>
+			<span>— a booking blocks every other one overlapping it, including get-ready time. Click a day for its bookings and free time.</span>
 		</div>
 	</div>
 
-	<!-- Collapsed by default: a generated month is hundreds of rows, and the calendar covers day-to-day use. -->
+	<!-- Collapsed by default: a generated month is many rows, and the calendar covers day-to-day use. -->
 	<details class="collapse collapse-arrow rounded-box bg-base-100 shadow">
 		<summary class="collapse-title text-2xl font-bold">All slots in {monthLabel} <span class="text-base font-normal text-base-content/60">({monthSlots.length})</span></summary>
 		<div class="collapse-content overflow-x-auto">
 			<table class="table">
-				<thead><tr><th>Service</th><th>Date</th><th>Places</th><th>Status</th><th></th></tr></thead>
+				<thead><tr><th>When</th><th>Kind</th><th>Services</th><th>Booked</th><th>Status</th><th></th></tr></thead>
 				<tbody>
 					{#each monthSlots as slot (slot.id)}
 						{@const state = slotState(slot)}
 						<tr>
-							<td><span class="font-semibold">{slot.itemName}</span></td>
-							<td>{formatDateTime(slot.start, data.timezone)}</td>
-							<td>{slot.booked + slot.held}/{slot.capacity}</td>
-							<td>
-								<span class="badge {BADGE_CLASSES[state]}" title={state === 'blocked' ? blockedReason(slot) : undefined}>{SLOT_STATE_LABELS[state]}</span>
-							</td>
-							<td class="text-right">
-								<button class="btn btn-sm" type="button" onclick={() => editSlot(slot)}>Edit</button>
-							</td>
+							<td>{formatDateTime(slot.start, data.timezone)}–{formatTime(slot.end, data.timezone)}</td>
+							<td>{slot.kind === 'window' ? 'Window' : 'Group session'}</td>
+							<td>{serviceNames(slot)}</td>
+							<td>{slot.kind === 'session' ? `${slot.booked + slot.held}/${slot.capacity}` : slot.booked + slot.held}</td>
+							<td><span class="badge {BADGE_CLASSES[state]}" title={describe(slot, state)}>{SLOT_STATE_LABELS[state]}</span></td>
+							<td class="text-right"><button class="btn btn-sm" type="button" onclick={() => editSlot(slot)}>Edit</button></td>
 						</tr>
 					{:else}
-						<tr><td colspan="5" class="py-10 text-center text-base-content/60">No slots this month — use “Generate slots” to fill it.</td></tr>
+						<tr><td colspan="6" class="py-10 text-center text-base-content/60">No slots this month — use “Generate slots” to fill it.</td></tr>
 					{/each}
 				</tbody>
 			</table>
@@ -281,10 +349,14 @@
 			{#each daySlots as slot (slot.id)}
 				{@const state = slotState(slot)}
 				<li class="flex items-center gap-3 py-2">
-					<span class="w-28 shrink-0 font-semibold">{formatTime(slot.start, data.timezone)}{slot.end ? `–${formatTime(slot.end, data.timezone)}` : ''}</span>
+					<span class="w-28 shrink-0 font-semibold">{range(slot.start, slot.end)}</span>
 					<span class="min-w-0 flex-1">
-						<span class="block truncate">{slot.itemName}{slot.capacity > 1 ? ` · ${slot.booked + slot.held}/${slot.capacity} places` : ''}</span>
-						{#if state === 'blocked'}<span class="block truncate text-xs text-base-content/60">{blockedReason(slot)}</span>{/if}
+						<span class="block truncate">
+							{slot.kind === 'window' ? 'Window' : 'Group session'} · {serviceNames(slot)}{places(slot) ? ` · ${places(slot)} places` : ''}
+						</span>
+						<span class="block truncate text-xs text-base-content/60">
+							{#if slot.kind === 'window'}{freeLabel(slot)} · {START_TIMES_LABELS[slot.startTimes ?? 'grid']}{:else if state === 'blocked'}{describe(slot, state)}{:else}{formatDuration(slot.minutes ?? 0)}{/if}
+						</span>
 						{#if slot.notes}<span class="block truncate text-xs text-base-content/60">{slot.notes}</span>{/if}
 					</span>
 					<span class="badge {BADGE_CLASSES[state]}">{SLOT_STATE_LABELS[state]}</span>
@@ -295,48 +367,135 @@
 	{:else}
 		<p class="py-6 text-center text-base-content/60">No slots on this day{serviceFilter ? ' for this service' : ''}.</p>
 	{/if}
+
+	{#if dayBookings.length}
+		<h3 class="mt-4 font-semibold">Bookings</h3>
+		<ul class="mt-1 divide-y divide-base-300 text-sm">
+			{#each dayBookings as booking (`${booking.slot}|${booking.start}|${booking.status}|${booking.item}`)}
+				<li class="flex items-center gap-3 py-1.5">
+					<span class="w-28 shrink-0 font-semibold">{range(booking.start, booking.end)}</span>
+					<span class="min-w-0 flex-1 truncate">
+						{booking.itemName}{booking.quantity > 1 ? ` · ${booking.quantity} places` : ''}
+						{#if booking.readyAt !== booking.end}<span class="text-base-content/60"> · ready again {formatTime(booking.readyAt, data.timezone)}</span>{/if}
+					</span>
+					<span class="badge badge-sm {booking.status === 'booked' ? 'badge-info badge-soft' : 'badge-warning'}">{booking.status === 'booked' ? 'Booked' : 'In a basket'}</span>
+				</li>
+			{/each}
+		</ul>
+		<p class="mt-1 text-xs text-base-content/60">Customer details are under Orders.</p>
+	{/if}
+
 	<div class="modal-action flex-wrap justify-between">
 		<div class="flex flex-wrap gap-2">
 			<button class="btn btn-sm" type="button" onclick={() => openCopy(dayKey)}>Copy this week</button>
 			{#if daySlots.length}<button class="btn btn-sm" type="button" onclick={() => openClear(dayKey, dayKey)}>Clear this day</button>{/if}
 		</div>
-		<button class="btn btn-primary btn-sm" type="button" disabled={!items.length} onclick={() => createSlot(dayKey)}>Add slot</button>
+		<div class="flex flex-wrap gap-2">
+			<button class="btn btn-sm" type="button" disabled={!items.length} onclick={() => createSlot('session', dayKey)}>Add group session</button>
+			<button class="btn btn-primary btn-sm" type="button" disabled={!items.length} onclick={() => createSlot('window', dayKey)}>Add window</button>
+		</div>
 	</div>
 </Modal>
 
-<Modal bind:open={showEditor} title={draft.id ? 'Edit slot' : 'Create slot'}>
+<Modal bind:open={showEditor} title={draft.id ? (draft.kind === 'window' ? 'Edit window' : 'Edit group session') : 'Add a slot'} wide>
 	<form method="POST" action={action} use:enhance={submitSlot} class="space-y-1">
 		<input type="hidden" name="id" value={draft.id} />
+		<input type="hidden" name="kind" value={draft.kind} />
 
 		{#if editorError}<div class="alert alert-error mb-2 text-sm" role="alert">{editorError}</div>{/if}
 
-		{#if taken}
-			<div class="alert alert-warning mb-2 text-sm">
-				{[draft.booked && `${draft.booked} booked`, draft.held && `${draft.held} in a customer’s basket`].filter(Boolean).join(', ')} — only the places and notes can be changed.
-			</div>
+		{#if !draft.id}
+			<SegmentedControl
+				label="Kind"
+				class="mb-2"
+				options={['window', 'session']}
+				value={draft.kind}
+				formatLabel={(v) => (v === 'window' ? 'Window' : 'Group session')}
+				onChange={(v) => (draft.kind = v as SlotKind)}
+			/>
 		{/if}
 
-		<label class="fieldset">
-			<span class="fieldset-legend">Service</span>
-			<select class="select w-full" name="item" required disabled={taken > 0} bind:value={draft.item}>
-				<option value="" disabled>Select a service…</option>
-				{#each items as item (item.id)}
-					<option value={item.id}>{item.name}{item.duration ? ` (${item.duration} min)` : ''}</option>
-				{/each}
-			</select>
-		</label>
+		{#if draft.kind === 'window'}
+			{#if taken}
+				<div class="alert alert-warning mb-2 text-sm">
+					{[draft.booked && `${draft.booked} booked`, draft.held && `${draft.held} in a customer’s basket`].filter(Boolean).join(', ')} — the window can grow or change services, but must still cover every booked time.
+				</div>
+			{/if}
 
-		<label class="fieldset">
-			<span class="fieldset-legend">Start ({data.timezone})</span>
-			<input class="input w-full" type="datetime-local" name="start" required disabled={taken > 0} bind:value={draft.start} />
-			{#if endLabel}<span class="label">{endLabel}</span>{/if}
-		</label>
+			<div class="grid gap-x-4 md:grid-cols-3">
+				<label class="fieldset">
+					<span class="fieldset-legend">Date</span>
+					<input class="input w-full" type="date" name="date" required bind:value={draft.date} />
+				</label>
+				<label class="fieldset">
+					<span class="fieldset-legend">From ({data.timezone})</span>
+					<input class="input w-full" type="time" name="from" required bind:value={draft.from} />
+				</label>
+				<label class="fieldset">
+					<span class="fieldset-legend">To</span>
+					<input class="input w-full" type="time" name="to" required bind:value={draft.to} />
+				</label>
+			</div>
 
-		<label class="fieldset">
-			<span class="fieldset-legend">Places</span>
-			<input class="input w-32" type="number" min={Math.max(1, taken)} max="500" step="1" name="capacity" placeholder={String(selectedItem?.capacity ?? 1)} bind:value={draft.capacity} />
-			<span class="label">More than 1 for a group session.{draft.id ? '' : ' Empty = the service’s own.'}</span>
-		</label>
+			<div class="fieldset">
+				<span class="fieldset-legend">Services that can be booked in this window</span>
+				<div class="grid gap-1 sm:grid-cols-2">
+					{#each items as item (item.id)}
+						<label class="label cursor-pointer gap-2 text-base-content">
+							<input class="checkbox checkbox-sm" type="checkbox" name="items" value={item.id} bind:group={draft.items} />
+							{item.name}
+							<span class="text-xs text-base-content/50">{item.durations.map((d) => formatDuration(d.minutes)).join(' / ')}</span>
+						</label>
+					{/each}
+				</div>
+			</div>
+
+			<div class="fieldset">
+				<input type="hidden" name="startTimes" value={draft.startTimes} />
+				<SegmentedControl
+					label="Start times"
+					options={['grid', 'edges']}
+					value={draft.startTimes}
+					formatLabel={(v) => START_TIMES_LABELS[v as StartTimesMode]}
+					onChange={(v) => (draft.startTimes = v as StartTimesMode)}
+				/>
+				<span class="label whitespace-normal">{START_TIMES_HINTS[draft.startTimes]}</span>
+			</div>
+		{:else}
+			{#if sessionLocked}
+				<div class="alert alert-warning mb-2 text-sm">
+					{[draft.booked && `${draft.booked} booked`, draft.held && `${draft.held} in a customer’s basket`].filter(Boolean).join(', ')} — only the places and notes can be changed.
+				</div>
+			{/if}
+
+			<div class="grid gap-x-4 md:grid-cols-2">
+				<label class="fieldset">
+					<span class="fieldset-legend">Service</span>
+					<select class="select w-full" name="item" required disabled={sessionLocked} value={draft.item} onchange={(e) => selectSessionService(e.currentTarget.value)}>
+						<option value="" disabled>Select a service…</option>
+						{#each items as item (item.id)}<option value={item.id}>{item.name}</option>{/each}
+					</select>
+				</label>
+				<label class="fieldset">
+					<span class="fieldset-legend">Length</span>
+					<select class="select w-full" name="minutes" required disabled={sessionLocked || !selectedItem} bind:value={draft.minutes}>
+						{#each selectedItem?.durations ?? [] as duration (duration.minutes)}
+							<option value={String(duration.minutes)}>{formatDuration(duration.minutes)}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="fieldset">
+					<span class="fieldset-legend">Start ({data.timezone})</span>
+					<input class="input w-full" type="datetime-local" name="start" required disabled={sessionLocked} bind:value={draft.start} />
+					{#if endLabel}<span class="label">{endLabel}</span>{/if}
+				</label>
+				<label class="fieldset">
+					<span class="fieldset-legend">Places</span>
+					<input class="input w-32" type="number" min={Math.max(1, taken)} max="500" step="1" name="capacity" placeholder={String(selectedItem?.capacity ?? 1)} bind:value={draft.capacity} />
+					<span class="label">{draft.id ? 'How many people can book it.' : 'Empty = the service’s own.'}</span>
+				</label>
+			</div>
+		{/if}
 
 		<label class="fieldset">
 			<span class="fieldset-legend">Notes</span>
@@ -351,7 +510,7 @@
 			{/if}
 			<div class="flex gap-2">
 				<button class="btn" type="button" onclick={() => (showEditor = false)}>Cancel</button>
-				<button class="btn btn-primary" type="submit">Save slot</button>
+				<button class="btn btn-primary" type="submit">Save</button>
 			</div>
 		</div>
 	</form>

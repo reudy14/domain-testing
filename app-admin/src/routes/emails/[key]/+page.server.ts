@@ -1,5 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { emailTemplateMeta, isEmailTemplateKey } from '$lib/email';
+import { parseDurations } from '$shared/items';
 import { isEmailConfigured, loadEmailSettings, loadEmailTemplate, sendTestEmail } from '$lib/server/email';
 import type { EmailBlock } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
@@ -20,7 +21,10 @@ async function findSampleService(pb: App.Locals['pb']) {
 	return pb
 		.collection('items')
 		.getFirstListItem("type = 'item_with_time' && active = true", { sort: 'name' })
-		.then((item) => ({ name: String(item.name), price: Number(item.price) || 0, duration: Number(item.duration) || null }))
+		.then((item) => {
+			const duration = parseDurations(item.durations)[0];
+			return { name: String(item.name), price: duration?.price ?? (Number(item.price) || 0), duration: duration?.minutes ?? null };
+		})
 		.catch(() => undefined);
 }
 

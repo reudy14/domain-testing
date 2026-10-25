@@ -14,6 +14,7 @@ import {
 	monthGridKeys,
 	overlapsAny,
 	planGeneratedSlots,
+	planWindows,
 	shiftByDays,
 	timeToMinutes,
 	type BulkResult,
@@ -21,16 +22,24 @@ import {
 	type SlotDetail,
 	type TimeWindow
 } from '$lib/slots';
+import type { SlotKind, StartTimesMode } from '$lib/types';
+import { parseDurations } from '$shared/items';
 import type { Actions, PageServerLoad } from './$types';
 
 type Pb = ReturnType<typeof createPocketBase>;
 
-type SlotPayload =
-	| { payload: { item: string; start: string; end: string; capacity: number; notes: string } }
-	| { error: string };
+/** What a slot record is saved with. */
+type SlotFields = {
+	kind: SlotKind;
+	items: string[];
+	start: string;
+	end: string;
+	startTimes: StartTimesMode | '';
+	capacity: number | null;
+	notes: string;
+};
 
-/** A slot to create: planned times plus what it copies (service, places, notes). */
-type Candidate = PlannedSlot & { item: string; capacity: number; notes: string };
+type Service = { id: string; name: string; durations: { minutes: number; price: number }[]; bufferMinutes: number; capacity: number };
 
 const siteTimezone = () => env.SITE_TIMEZONE || 'Europe/Oslo';
 const todayKey = () => toZonedDatetimeInput(new Date().toISOString(), siteTimezone()).slice(0, 10);
@@ -41,47 +50,93 @@ const MAX_RANGE_DAYS = 366;
 const MAX_COPY_WEEKS = 12;
 const MAX_CAPACITY = 500;
 
+/** Active bookable services, with what the slot forms need. */
+async function loadServices(pb: Pb): Promise<Service[]> {
+	const records = await pb.collection('items').getFullList({ filter: "type = 'item_with_time' && active = true", sort: 'name' });
+	return records.map((record) => ({
+		id: record.id,
+		name: String(record.name || ''),
+		durations: parseDurations(record.durations),
+		bufferMinutes: Number(record.bufferMinutes) || 0,
+		capacity: Math.max(1, Number(record.capacity) || 1)
+	}));
+}
+
 /**
- * Places from the form: a whole number 1–500, or the service's own
- * capacity (default 1) when the field is left empty.
+ * Places from the form: a whole number 1–500, or `fallback` (the service's
+ * own capacity) when the field is left empty.
  */
-function parseCapacity(data: FormData, item: Record<string, any>): number | { error: string } {
+function parseCapacity(data: FormData, fallback: number): number | { error: string } {
 	const raw = String(data.get('capacity') ?? '').trim();
-	if (raw === '') return Math.max(1, Number(item.capacity) || 1);
+	if (raw === '') return fallback;
 	const capacity = Number(raw);
 	if (!Number.isInteger(capacity) || capacity < 1 || capacity > MAX_CAPACITY) return { error: `Places must be a whole number from 1 to ${MAX_CAPACITY}.` };
 	return capacity;
 }
 
-async function slotPayload(data: FormData, pb: Pb): Promise<SlotPayload> {
-	const itemId = String(data.get('item') || '').trim();
-	const startValue = String(data.get('start') || '').trim();
-	const notes = String(data.get('notes') || '').trim();
+function parseStartTimes(data: FormData): StartTimesMode {
+	return String(data.get('startTimes')) === 'edges' ? 'edges' : 'grid';
+}
 
-	if (!itemId || !startValue) return { error: 'Service and start are required.' };
+/** The services ticked in a window form, all of them active services. */
+function chosenServices(data: FormData, services: Service[]): string[] | { error: string } {
+	const ids = [...new Set(data.getAll('items').map(String))];
+	if (!ids.length) return { error: 'Choose at least one service that can be booked in this window.' };
+	if (ids.some((id) => !services.some((s) => s.id === id))) return { error: 'A chosen service was not found or is inactive.' };
+	return ids;
+}
 
+/** A window from the form: a date, from/to times (site timezone) and its services. */
+function windowFields(data: FormData, services: Service[]): SlotFields | { error: string } {
+	const date = String(data.get('date') || '');
+	const from = String(data.get('from') || '');
+	const to = String(data.get('to') || '');
+	if (!isDateKey(date) || timeToMinutes(from) === null || timeToMinutes(to) === null) return { error: 'Choose a date and the start and end times.' };
+	if (timeToMinutes(to)! <= timeToMinutes(from)!) return { error: 'The window must end after it starts.' };
+	const items = chosenServices(data, services);
+	if ('error' in items) return items;
+	const start = zonedInputToIso(`${date}T${from}`, siteTimezone());
+	const end = zonedInputToIso(`${date}T${to}`, siteTimezone());
+	if (!start || !end) return { error: 'Invalid date or time.' };
+	return { kind: 'window', items, start, end, startTimes: parseStartTimes(data), capacity: null, notes: String(data.get('notes') || '').trim() };
+}
+
+/** A group session from the form: one service at one of its lengths, a start and places. */
+function sessionFields(data: FormData, services: Service[]): SlotFields | { error: string } {
+	const service = services.find((s) => s.id === String(data.get('item') || ''));
+	if (!service) return { error: 'Choose a service.' };
+	const minutes = Number(data.get('minutes'));
+	if (!service.durations.some((d) => d.minutes === minutes)) return { error: `Choose one of the lengths “${service.name}” is offered for.` };
 	// The form sends a wall-clock time in the site's timezone.
-	const startIso = zonedInputToIso(startValue, siteTimezone());
-	if (!startIso) return { error: 'Invalid start time.' };
-	const start = new Date(startIso);
-
-	let item: Record<string, any>;
-	try {
-		item = await pb.collection('items').getOne(itemId);
-	} catch {
-		return { error: 'Selected service was not found.' };
-	}
-	if (item.type !== 'item_with_time') return { error: 'Selected service must be a bookable service.' };
-
-	const capacity = parseCapacity(data, item);
+	const start = zonedInputToIso(String(data.get('start') || ''), siteTimezone());
+	if (!start) return { error: 'Choose a start time.' };
+	const capacity = parseCapacity(data, service.capacity);
 	if (typeof capacity !== 'number') return capacity;
+	const end = new Date(instantMs(start) + minutes * 60_000).toISOString();
+	return { kind: 'session', items: [service.id], start, end, startTimes: '', capacity, notes: String(data.get('notes') || '').trim() };
+}
 
-	const duration = Number(item.duration) || 0;
-	const end = new Date(start.getTime() + duration * 60_000);
+/**
+ * Slots that may not overlap: windows with any other window (one
+ * practitioner, one opening time), a group session with another session of
+ * the same service. A session may overlap a window — whichever is booked
+ * first blocks the other (see the README's Slot availability).
+ */
+function clashKey(slot: Pick<SlotFields, 'kind' | 'items'>) {
+	return slot.kind === 'window' ? 'window' : `session:${slot.items[0] ?? ''}`;
+}
 
-	// Bookings are never stored on the slot: places are counted from orders
-	// and basket holds by the shop hook, which also works out blocking.
-	return { payload: { item: itemId, start: start.toISOString(), end: end.toISOString(), capacity, notes } };
+/** A slot that `fields` would overlap (ignoring `exceptId`), or null — or undefined if PocketBase can't be read. */
+async function clashingSlot(pb: Pb, fields: SlotFields, exceptId = '') {
+	const key = toZonedDatetimeInput(fields.start, siteTimezone()).slice(0, 10);
+	const existing = await slotsForDays(pb, addDaysToKey(key, -1), addDaysToKey(key, 1));
+	if (!existing) return undefined;
+	return existing.slots.find((slot) => slot.id !== exceptId && clashKey(slot) === clashKey(fields) && overlapsAny(fields, [slot])) ?? null;
+}
+
+function clashMessage(slot: SlotDetail) {
+	const time = `${toZonedDatetimeInput(slot.start, siteTimezone()).replace('T', ' ')}–${toZonedDatetimeInput(slot.end, siteTimezone()).slice(11)}`;
+	return slot.kind === 'window' ? `This overlaps the window ${time}. Change that one instead.` : `This overlaps another ${slot.itemNames[0] ?? ''} session (${time}).`;
 }
 
 /** Validated `from`/`to` date keys from a bulk form, or an error message. */
@@ -102,23 +157,16 @@ function slotsForDays(pb: Pb, fromKey: string, toKey: string, item = '') {
 	});
 }
 
-async function bookableService(pb: Pb, itemId: string) {
-	if (!itemId) return null;
-	const item = await pb.collection('items').getOne(itemId).catch(() => null);
-	return item && item.type === 'item_with_time' ? item : null;
-}
-
 /**
- * Drop candidates that start in the past or overlap a slot of the same
- * service (existing, or accepted earlier in this run). Different services
- * may share a time: whichever is booked first blocks the others.
+ * Drop candidates that start in the past or overlap a slot they may not
+ * overlap (existing, or accepted earlier in this run — see clashKey).
  */
-function filterCandidates(candidates: Candidate[], existing: SlotDetail[]) {
+function filterCandidates(candidates: SlotFields[], existing: SlotDetail[]) {
 	const now = Date.now();
 	const taken = new Map<string, PlannedSlot[]>();
-	for (const slot of existing) taken.set(slot.item, [...(taken.get(slot.item) ?? []), slot]);
+	for (const slot of existing) taken.set(clashKey(slot), [...(taken.get(clashKey(slot)) ?? []), slot]);
 
-	const accepted: Candidate[] = [];
+	const accepted: SlotFields[] = [];
 	let skippedPast = 0;
 	let skippedOverlap = 0;
 	for (const candidate of candidates) {
@@ -126,13 +174,13 @@ function filterCandidates(candidates: Candidate[], existing: SlotDetail[]) {
 			skippedPast++;
 			continue;
 		}
-		const ranges = taken.get(candidate.item) ?? [];
+		const ranges = taken.get(clashKey(candidate)) ?? [];
 		if (overlapsAny(candidate, ranges)) {
 			skippedOverlap++;
 			continue;
 		}
 		ranges.push(candidate);
-		taken.set(candidate.item, ranges);
+		taken.set(clashKey(candidate), ranges);
 		accepted.push(candidate);
 	}
 	accepted.sort((a, b) => instantMs(a.start) - instantMs(b.start));
@@ -158,10 +206,25 @@ async function previewOrCreate(pb: Pb, action: 'generate' | 'copy', intent: stri
 	};
 	if (intent !== 'create') return bulkResult({ ...summary, intent: 'preview', count: accepted.length });
 
-	const created = await runInBatches(accepted, 'create', (slot) =>
-		pb.collection('slots').create({ item: slot.item, start: slot.start, end: slot.end, capacity: slot.capacity, notes: slot.notes })
-	);
+	const created = await runInBatches(accepted, 'create', (slot) => pb.collection('slots').create(slot));
 	return bulkResult({ ...summary, intent: 'done', count: created, failed: accepted.length - created });
+}
+
+/** Weekdays and opening hours from a generate form, or an error. */
+function weekdaysAndHours(data: FormData): { weekdays: number[]; windows: TimeWindow[] } | { error: string } {
+	const weekdays = data.getAll('weekday').map(Number).filter((day) => day >= 0 && day <= 6);
+	if (!weekdays.length) return { error: 'Choose at least one weekday.' };
+	const froms = data.getAll('windowFrom').map(String);
+	const tos = data.getAll('windowTo').map(String);
+	const windows: TimeWindow[] = froms.map((from, i) => ({ from, to: tos[i] ?? '' }));
+	if (!windows.length) return { error: 'Add at least one time window.' };
+	for (const window of windows) {
+		const from = timeToMinutes(window.from);
+		const to = timeToMinutes(window.to);
+		if (from === null || to === null) return { error: 'Every time window needs a start and an end time.' };
+		if (to <= from) return { error: `The hours ${window.from}–${window.to} end before they start.` };
+	}
+	return { weekdays, windows };
 }
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -169,31 +232,25 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const monthParam = url.searchParams.get('month') || '';
 	const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(monthParam) ? monthParam : today.slice(0, 7);
 
-	const itemRecords = await locals.pb
-		.collection('items')
-		.getFullList({ filter: "type = 'item_with_time' && active = true", sort: 'name' })
-		.catch(() => []);
-	const items = itemRecords.map((record) => ({
-		id: record.id,
-		name: String(record.name || ''),
-		duration: Number(record.duration) || 0,
-		bufferMinutes: Number(record.bufferMinutes) || 0,
-		capacity: Math.max(1, Number(record.capacity) || 1)
-	}));
+	const items = await loadServices(locals.pb).catch(() => []);
 
 	// Only the slots shown in the month grid (which spans whole weeks).
 	const grid = monthGridKeys(month);
-	const slots = await slotsForDays(locals.pb, grid[0], grid[grid.length - 1]);
+	const details = await slotsForDays(locals.pb, grid[0], grid[grid.length - 1]);
 
-	return { items, slots: slots ?? [], slotsError: slots === null, month, today };
+	return { items, slots: details?.slots ?? [], bookings: details?.bookings ?? [], slotsError: details === null, month, today };
 };
 
 export const actions: Actions = {
 	create: async ({ request, locals }) => {
 		const data = await request.formData();
-		const result = await slotPayload(data, locals.pb);
-		if ('error' in result) return fail(400, { message: result.error });
-		const created = await attempt('Could not create the slot.', () => locals.pb.collection('slots').create(result.payload));
+		const services = await loadServices(locals.pb).catch(() => []);
+		const fields = String(data.get('kind')) === 'session' ? sessionFields(data, services) : windowFields(data, services);
+		if ('error' in fields) return fail(400, { message: fields.error });
+		const clash = await clashingSlot(locals.pb, fields);
+		if (clash === undefined) return fail(400, { message: 'Could not check existing slots — is the database reachable?' });
+		if (clash) return fail(400, { message: clashMessage(clash) });
+		const created = await attempt('Could not create the slot.', () => locals.pb.collection('slots').create(fields));
 		if (!created.ok) return created.failure;
 		return { ok: true };
 	},
@@ -203,23 +260,31 @@ export const actions: Actions = {
 		if (!id) return fail(400, { message: 'Slot id is required.' });
 
 		// Re-read the slot: the page may be stale, and customers may have
-		// booked or held places since. Once any place is taken, the service
-		// and time are fixed; places can't go below what's taken.
+		// booked or held times since.
 		const current = await loadSlotDetail(locals.pb, id).catch(() => undefined);
 		if (current === undefined) return fail(400, { message: 'Could not read the slot — is the database reachable?' });
 		if (!current) return fail(404, { message: 'This slot no longer exists.' });
-
+		const services = await loadServices(locals.pb).catch(() => []);
 		const taken = seatsTaken(current);
-		let patch: Record<string, string | number>;
-		if (taken > 0) {
-			const capacity = parseCapacity(data, { capacity: current.capacity });
+
+		let patch: Partial<SlotFields>;
+		if (current.kind === 'session' && taken > 0) {
+			// Customers booked this time and service: only places and notes can change.
+			const capacity = parseCapacity(data, current.capacity ?? 1);
 			if (typeof capacity !== 'number') return fail(400, { message: capacity.error });
 			if (capacity < taken) return fail(400, { message: `${taken} place${taken === 1 ? ' is' : 's are'} already taken — places can’t go below that.` });
 			patch = { capacity, notes: String(data.get('notes') || '').trim() };
 		} else {
-			const result = await slotPayload(data, locals.pb);
-			if ('error' in result) return fail(400, { message: result.error });
-			patch = result.payload;
+			const fields = current.kind === 'session' ? sessionFields(data, services) : windowFields(data, services);
+			if ('error' in fields) return fail(400, { message: fields.error });
+			// A window keeps the times already booked in it: it can grow or
+			// change services, but not shrink past a booking.
+			const outside = current.bookings.find((b) => instantMs(b.start) < instantMs(fields.start) || instantMs(b.end) > instantMs(fields.end));
+			if (outside) return fail(400, { message: 'A booking in this window would fall outside the new times — the window must still cover every booked time.' });
+			const clash = await clashingSlot(locals.pb, fields, id);
+			if (clash === undefined) return fail(400, { message: 'Could not check existing slots — is the database reachable?' });
+			if (clash) return fail(400, { message: clashMessage(clash) });
+			patch = fields;
 		}
 		const updated = await attempt('Could not save the slot.', () => locals.pb.collection('slots').update(id, patch));
 		if (!updated.ok) return updated.failure;
@@ -232,56 +297,55 @@ export const actions: Actions = {
 		const current = await loadSlotDetail(locals.pb, id).catch(() => undefined);
 		if (current === undefined) return fail(400, { message: 'Could not read the slot — is the database reachable?' });
 		if (current?.booked) return fail(400, { message: 'This slot has bookings and can’t be deleted.' });
-		if (current?.held) return fail(400, { message: 'This slot is in a customer’s basket right now — try again in a few minutes.' });
+		if (current?.held) return fail(400, { message: 'A time in this slot is in a customer’s basket right now — try again in a few minutes.' });
 		const deleted = await attempt('Could not delete the slot.', () => locals.pb.collection('slots').delete(id));
 		if (!deleted.ok) return deleted.failure;
 		return { ok: true };
 	},
 
-	/** Fill a date range with slots: chosen weekdays, time windows, get-ready gap. */
+	/**
+	 * Fill a date range: windows (the opening hours on the chosen weekdays,
+	 * with the chosen services) or group sessions (one service, spaced by
+	 * its length + get-ready time within the hours).
+	 */
 	generate: async ({ request, locals }) => {
 		const data = await request.formData();
 		const intent = String(data.get('intent') || 'preview');
 		const range = dateRange(data);
 		if ('error' in range) return fail(400, { message: range.error });
-
-		const item = await bookableService(locals.pb, String(data.get('item') || ''));
-		if (!item) return fail(400, { message: 'Choose a bookable service.' });
-		const duration = Number(item.duration) || 0;
-		if (duration <= 0) return fail(400, { message: `“${item.name}” has no duration — set one under Services & products.` });
-		const capacity = parseCapacity(data, item);
-		if (typeof capacity !== 'number') return fail(400, { message: capacity.error });
-
-		const weekdays = data.getAll('weekday').map(Number).filter((day) => day >= 0 && day <= 6);
-		if (!weekdays.length) return fail(400, { message: 'Choose at least one weekday.' });
-
-		const froms = data.getAll('windowFrom').map(String);
-		const tos = data.getAll('windowTo').map(String);
-		const windows: TimeWindow[] = froms.map((from, i) => ({ from, to: tos[i] ?? '' }));
-		if (!windows.length) return fail(400, { message: 'Add at least one time window.' });
-		for (const window of windows) {
-			const from = timeToMinutes(window.from);
-			const to = timeToMinutes(window.to);
-			if (from === null || to === null) return fail(400, { message: 'Every time window needs a start and an end time.' });
-			if (to - from < duration) return fail(400, { message: `The window ${window.from}–${window.to} is shorter than one ${duration}-minute appointment.` });
-		}
-
-		const rawBuffer = String(data.get('bufferMinutes') ?? '').trim();
-		const bufferMinutes = rawBuffer === '' ? Number(item.bufferMinutes) || 0 : parseInt(rawBuffer, 10);
-		if (Number.isNaN(bufferMinutes) || bufferMinutes < 0) return fail(400, { message: 'Get-ready time must be 0 or more minutes.' });
-
-		const planned = planGeneratedSlots({ ...range, weekdays, windows, durationMinutes: duration, bufferMinutes, timeZone: siteTimezone() });
-		if (!planned.length) return fail(400, { message: 'No slots fit those days and times.' });
-
-		const existing = await slotsForDays(locals.pb, range.fromDate, range.toDate, item.id);
-		if (!existing) return fail(400, { message: 'Could not check existing slots — is the database reachable?' });
-
+		const days = weekdaysAndHours(data);
+		if ('error' in days) return fail(400, { message: days.error });
+		const services = await loadServices(locals.pb).catch(() => null);
+		if (!services) return fail(400, { message: 'Could not read the services — is the database reachable?' });
 		const notes = String(data.get('notes') || '').trim();
-		const result = filterCandidates(planned.map((slot) => ({ ...slot, item: item.id, capacity, notes })), existing);
-		return previewOrCreate(locals.pb, 'generate', intent, result);
+
+		let candidates: SlotFields[];
+		if (String(data.get('kind')) === 'session') {
+			const service = services.find((s) => s.id === String(data.get('item') || ''));
+			if (!service) return fail(400, { message: 'Choose a service.' });
+			const minutes = Number(data.get('minutes'));
+			if (!service.durations.some((d) => d.minutes === minutes)) return fail(400, { message: `Choose one of the lengths “${service.name}” is offered for.` });
+			const capacity = parseCapacity(data, service.capacity);
+			if (typeof capacity !== 'number') return fail(400, { message: capacity.error });
+			const rawBuffer = String(data.get('bufferMinutes') ?? '').trim();
+			const bufferMinutes = rawBuffer === '' ? service.bufferMinutes : parseInt(rawBuffer, 10);
+			if (Number.isNaN(bufferMinutes) || bufferMinutes < 0) return fail(400, { message: 'Get-ready time must be 0 or more minutes.' });
+			const planned = planGeneratedSlots({ ...range, ...days, durationMinutes: minutes, bufferMinutes, timeZone: siteTimezone() });
+			candidates = planned.map((slot) => ({ ...slot, kind: 'session', items: [service.id], startTimes: '', capacity, notes }));
+		} else {
+			const items = chosenServices(data, services);
+			if ('error' in items) return fail(400, { message: items.error });
+			const startTimes = parseStartTimes(data);
+			candidates = planWindows({ ...range, ...days, timeZone: siteTimezone() }).map((slot) => ({ ...slot, kind: 'window', items, startTimes, capacity: null, notes }));
+		}
+		if (!candidates.length) return fail(400, { message: 'Nothing fits those days and times.' });
+
+		const existing = await slotsForDays(locals.pb, addDaysToKey(range.fromDate, -1), addDaysToKey(range.toDate, 1));
+		if (!existing) return fail(400, { message: 'Could not check existing slots — is the database reachable?' });
+		return previewOrCreate(locals.pb, 'generate', intent, filterCandidates(candidates, existing.slots));
 	},
 
-	/** Repeat one week's slots (all services, or one) for the following weeks. */
+	/** Repeat one week's slots (all, or those offering one service) for the following weeks. */
 	copy: async ({ request, locals }) => {
 		const data = await request.formData();
 		const intent = String(data.get('intent') || 'preview');
@@ -292,25 +356,25 @@ export const actions: Actions = {
 		const itemId = String(data.get('item') || '');
 
 		const source = await slotsForDays(locals.pb, sourceWeek, addDaysToKey(sourceWeek, 6), itemId);
-		const existing = await slotsForDays(locals.pb, addDaysToKey(sourceWeek, 7), addDaysToKey(sourceWeek, 7 * (weeks + 1) - 1), itemId);
+		const existing = await slotsForDays(locals.pb, addDaysToKey(sourceWeek, 6), addDaysToKey(sourceWeek, 7 * (weeks + 1)));
 		if (!source || !existing) return fail(400, { message: 'Could not read slots — is the database reachable?' });
-		if (!source.length) return fail(400, { message: 'That week has no slots to copy.' });
+		if (!source.slots.length) return fail(400, { message: 'That week has no slots to copy.' });
 
-		// Copies are new, empty slots: same service, places and notes.
-		const candidates: Candidate[] = [];
+		// Copies are new, empty slots: same kind, services, places, start times and notes.
+		const candidates: SlotFields[] = [];
 		for (let week = 1; week <= weeks; week++) {
-			for (const slot of source) {
+			for (const slot of source.slots) {
 				const start = shiftByDays(slot.start, 7 * week, siteTimezone());
-				if (!start) continue;
-				const end = new Date(instantMs(start) + (instantMs(slot.end) - instantMs(slot.start))).toISOString();
-				candidates.push({ item: slot.item, start, end, capacity: slot.capacity, notes: slot.notes });
+				const end = shiftByDays(slot.end, 7 * week, siteTimezone());
+				if (!start || !end) continue;
+				candidates.push({ kind: slot.kind, items: slot.items, start, end, startTimes: slot.startTimes ?? '', capacity: slot.capacity ?? null, notes: slot.notes });
 			}
 		}
 
-		return previewOrCreate(locals.pb, 'copy', intent, filterCandidates(candidates, existing));
+		return previewOrCreate(locals.pb, 'copy', intent, filterCandidates(candidates, existing.slots));
 	},
 
-	/** Delete the slots in a date range that have no places taken. */
+	/** Delete the slots in a date range that have nothing booked or held. */
 	clear: async ({ request, locals }) => {
 		const data = await request.formData();
 		const intent = String(data.get('intent') || 'preview');
@@ -318,20 +382,20 @@ export const actions: Actions = {
 		if ('error' in range) return fail(400, { message: range.error });
 		const itemId = String(data.get('item') || '');
 
-		const slots = await slotsForDays(locals.pb, range.fromDate, range.toDate, itemId);
-		if (!slots) return fail(400, { message: 'Could not read slots — is the database reachable?' });
+		const details = await slotsForDays(locals.pb, range.fromDate, range.toDate, itemId);
+		if (!details) return fail(400, { message: 'Could not read slots — is the database reachable?' });
 
-		const removable = slots.filter((slot) => seatsTaken(slot) === 0);
+		const removable = details.slots.filter((slot) => seatsTaken(slot) === 0);
 		const summary = {
 			action: 'clear' as const,
-			kept: slots.length - removable.length,
+			kept: details.slots.length - removable.length,
 			firstStart: removable[0]?.start ?? '',
 			lastStart: removable.at(-1)?.start ?? ''
 		};
 		if (intent !== 'create') return bulkResult({ ...summary, intent: 'preview', count: removable.length });
 
 		// Re-check each slot just before deleting it: a customer may have put
-		// it in their basket since the list was read.
+		// a time in it into their basket since the list was read.
 		const deleted = await runInBatches(removable, 'delete', async (slot) => {
 			const fresh = await loadSlotDetail(locals.pb, slot.id);
 			if (fresh && seatsTaken(fresh) > 0) throw new Error('taken since the preview');
