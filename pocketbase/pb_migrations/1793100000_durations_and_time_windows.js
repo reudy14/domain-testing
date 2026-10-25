@@ -11,7 +11,7 @@
 // - slots.kind: `window` — a stretch of time (09:00–12:00) in which any of
 //   its `items` can be booked, for any of their durations; each booking
 //   takes its time plus get-ready time out of the window. `startTimes`
-//   says where bookings may start: `grid` (every 30 min) or `edges` (only
+//   says where bookings may start: `grid` (every `gridMinutes`, default 30) or `edges` (only
 //   right at the start or end of the free time, so no gaps are left).
 //   `session` — a fixed time for one service with `capacity` places (a
 //   group class), as slots were before.
@@ -113,6 +113,7 @@ migrate(
 			slots.fields.add(new SelectField({ id: 'sel_slotkind001', name: 'kind', values: ['window', 'session'], maxSelect: 1, required: true }));
 			slots.fields.add(new RelationField({ id: 'rel_slotitems01', name: 'items', collectionId: items ? items.id : 'pbc_items00001', maxSelect: 50, cascadeDelete: false }));
 			slots.fields.add(new SelectField({ id: 'sel_slotstarts1', name: 'startTimes', values: ['grid', 'edges'], maxSelect: 1 }));
+			slots.fields.add(new NumberField({ id: 'num_slotgridmin1', name: 'gridMinutes', min: 5, max: 240, onlyInt: true }));
 			app.save(slots);
 		}
 	},
@@ -141,7 +142,7 @@ migrate(
 		if (slots && !slots.fields.getByName('item')) {
 			for (const line of app.findRecordsByFilter('basket_lines', "lineType = 'slot'", '', 0, 0)) app.delete(line);
 			for (const slot of app.findAllRecords('slots')) app.delete(slot);
-			for (const name of ['kind', 'items', 'startTimes']) {
+			for (const name of ['kind', 'items', 'startTimes', 'gridMinutes']) {
 				if (slots.fields.getByName(name)) slots.fields.removeByName(name);
 			}
 			slots.fields.add(new RelationField({ id: 'rel_slotitem001', name: 'item', required: true, collectionId: items ? items.id : 'pbc_items00001', maxSelect: 1, cascadeDelete: true }));

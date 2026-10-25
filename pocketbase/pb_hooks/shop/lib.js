@@ -63,8 +63,8 @@ function pbDate(ms) {
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const MINUTE_MS = 60 * 1000;
-/** Window start times in `grid` mode are this far apart, from the window's start. */
-const GRID_MS = 30 * MINUTE_MS;
+/** Window start times in `grid` mode are `gridMinutes` apart, from the window's start; this when unset. */
+const DEFAULT_GRID_MINUTES = 30;
 /** In `edges` mode, a free stretch that has already begun starts at the next quarter hour. */
 const EDGE_ROUND_MS = 15 * MINUTE_MS;
 
@@ -128,7 +128,7 @@ function itemLookup(app) {
 // A slot is either
 // - a `window` (09:00–12:00 with the services that can be booked in it):
 //   a booking may start wherever its length plus get-ready time is free.
-//   `startTimes` = `grid`: every 30 minutes from the window's start;
+//   `startTimes` = `grid`: every `gridMinutes` (default 30) from the window's start;
 //   `edges`: only right at the start or end of a free stretch, so the
 //   window shrinks from either end and no unusable gaps are left. A
 //   booking must end inside the window; its get-ready time may run past.
@@ -206,6 +206,7 @@ function availability(app, rangeStart, rangeEnd, options) {
 		slot.held = count('held');
 		if (slot.kind === 'window') {
 			slot.startTimes = record.getString('startTimes') === 'edges' ? 'edges' : 'grid';
+			slot.gridMinutes = Math.max(5, record.getInt('gridMinutes') || DEFAULT_GRID_MINUTES);
 			return slot;
 		}
 		const service = item(items[0]);
@@ -252,7 +253,7 @@ function windowStartTimes(window, item, minutes, busy, now) {
 			candidates.push(Math.min(window.end - length, (next ? next.start : Infinity) - until));
 		}
 	} else {
-		for (let start = window.start; start + length <= window.end; start += GRID_MS) candidates.push(start);
+		for (let start = window.start; start + length <= window.end; start += window.gridMinutes * MINUTE_MS) candidates.push(start);
 	}
 	return candidates.filter((start, i) => candidates.indexOf(start) === i && fits(start)).sort((a, b) => a - b);
 }
@@ -337,6 +338,7 @@ function slotDetails(app, query) {
 			const detail = { id: s.id, kind: s.kind, items: s.items, itemNames: s.itemNames, start: iso(s.start), end: iso(s.end), notes: s.notes, booked: s.booked, held: s.held };
 			if (s.kind === 'window') {
 				detail.startTimes = s.startTimes;
+				detail.gridMinutes = s.gridMinutes;
 				detail.free = freeTimes(s, busy).map((f) => ({ start: iso(f.start), end: iso(f.end) }));
 			} else {
 				detail.minutes = s.minutes;

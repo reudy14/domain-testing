@@ -72,6 +72,8 @@ export type SlotDetail = PlannedSlot & {
 	held: number;
 	// window
 	startTimes?: StartTimesMode;
+	/** `grid` windows: minutes between start times. */
+	gridMinutes?: number;
 	free?: PlannedSlot[];
 	// session
 	minutes?: number;
@@ -80,14 +82,25 @@ export type SlotDetail = PlannedSlot & {
 };
 
 export const START_TIMES_LABELS: Record<StartTimesMode, string> = {
-	grid: 'Every 30 min',
+	grid: 'Fixed steps',
 	edges: 'Next free time'
 };
 
-export const START_TIMES_HINTS: Record<StartTimesMode, string> = {
-	grid: 'Customers can start at any half hour where their booking fits.',
-	edges: 'Customers can only book right at the start or the end of the free time, so the window shrinks from either end and no gaps are left.'
-};
+/** Step choices for `grid` windows, in minutes; 30 is the default. */
+export const GRID_STEP_OPTIONS = [10, 15, 20, 30, 45, 60];
+export const DEFAULT_GRID_MINUTES = 30;
+
+/** What a window's start-times setting means, for the admin forms and day view. */
+export function startTimesHint(mode: StartTimesMode, gridMinutes = DEFAULT_GRID_MINUTES) {
+	return mode === 'grid'
+		? `Customers can start every ${gridMinutes} minutes from the window’s start, wherever their booking fits.`
+		: 'Customers can only book right at the start or the end of the free time, so the window shrinks from either end and no gaps are left.';
+}
+
+/** "Every 15 min" / "Next free time". */
+export function startTimesLabel(mode: StartTimesMode, gridMinutes = DEFAULT_GRID_MINUTES) {
+	return mode === 'grid' ? `Every ${gridMinutes} min` : START_TIMES_LABELS.edges;
+}
 
 export type SlotState = 'free' | 'held' | 'booked' | 'full' | 'blocked';
 

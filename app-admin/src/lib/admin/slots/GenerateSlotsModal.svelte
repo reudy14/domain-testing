@@ -3,7 +3,7 @@
 	import { enhance } from '$app/forms';
 	import Modal from '$lib/admin/Modal.svelte';
 	import SegmentedControl from '$lib/admin/editors/SegmentedControl.svelte';
-	import { START_TIMES_HINTS, START_TIMES_LABELS, WEEKDAYS, addDaysToKey, startTimesInWindows, timeToMinutes, type TimeWindow } from '$lib/slots';
+	import { DEFAULT_GRID_MINUTES, GRID_STEP_OPTIONS, START_TIMES_LABELS, WEEKDAYS, startTimesHint, addDaysToKey, startTimesInWindows, timeToMinutes, type TimeWindow } from '$lib/slots';
 	import type { ItemDuration, SlotKind, StartTimesMode } from '$lib/types';
 	import { formatDuration } from '$shared/items';
 	import BulkActions from './BulkActions.svelte';
@@ -29,6 +29,7 @@
 		// windows
 		items: [] as string[],
 		startTimes: 'grid' as StartTimesMode,
+		gridMinutes: DEFAULT_GRID_MINUTES,
 		// group sessions
 		item: '',
 		minutes: '',
@@ -149,7 +150,15 @@
 					formatLabel={(v) => START_TIMES_LABELS[v as StartTimesMode]}
 					onChange={(v) => (draft.startTimes = v as StartTimesMode)}
 				/>
-				<span class="label whitespace-normal">{START_TIMES_HINTS[draft.startTimes]}</span>
+				{#if draft.startTimes === 'grid'}
+					<label class="mt-2 flex items-center gap-3">
+						<span class="w-28 shrink-0 text-sm font-medium">Step</span>
+						<select class="select select-sm w-40" name="gridMinutes" bind:value={draft.gridMinutes}>
+							{#each GRID_STEP_OPTIONS as step (step)}<option value={step}>Every {step} min</option>{/each}
+						</select>
+					</label>
+				{/if}
+				<span class="label whitespace-normal">{startTimesHint(draft.startTimes, draft.gridMinutes)}</span>
 			</div>
 			<p class="rounded-box bg-base-200 px-4 py-2 text-sm">
 				{draft.windows.length} window{draft.windows.length === 1 ? '' : 's'} per chosen day, {windowHours} hours in total.

@@ -8,7 +8,7 @@
 	import ClearSlotsModal from '$lib/admin/slots/ClearSlotsModal.svelte';
 	import CopyWeekModal from '$lib/admin/slots/CopyWeekModal.svelte';
 	import GenerateSlotsModal from '$lib/admin/slots/GenerateSlotsModal.svelte';
-	import { SLOT_STATE_LABELS, START_TIMES_HINTS, START_TIMES_LABELS, WEEKDAYS, addDaysToKey, addMonthsToKey, formatDateKey, mondayOfKey, monthGridKeys, slotState } from '$lib/slots';
+	import { DEFAULT_GRID_MINUTES, GRID_STEP_OPTIONS, SLOT_STATE_LABELS, START_TIMES_LABELS, WEEKDAYS, startTimesHint, startTimesLabel, addDaysToKey, addMonthsToKey, formatDateKey, mondayOfKey, monthGridKeys, slotState } from '$lib/slots';
 	import type { BulkResult, SlotState } from '$lib/slots';
 	import type { SlotKind, StartTimesMode } from '$lib/types';
 	import { formatDuration } from '$shared/items';
@@ -123,6 +123,7 @@
 		to: string;
 		items: string[];
 		startTimes: StartTimesMode;
+		gridMinutes: number;
 		// session
 		item: string;
 		minutes: string;
@@ -158,6 +159,7 @@
 			to: '12:00',
 			items: serviceFilter ? [serviceFilter] : oneToOneServices(items),
 			startTimes: 'grid',
+			gridMinutes: DEFAULT_GRID_MINUTES,
 			item: serviceFilter,
 			minutes: service?.durations[0] ? String(service.durations[0].minutes) : '',
 			start: `${date}T09:00`,
@@ -212,6 +214,7 @@
 			to: toZonedDatetimeInput(slot.end, data.timezone).slice(11, 16),
 			items: [...slot.items],
 			startTimes: slot.startTimes ?? 'grid',
+			gridMinutes: slot.gridMinutes ?? DEFAULT_GRID_MINUTES,
 			item: slot.items[0] ?? '',
 			minutes: String(slot.minutes ?? ''),
 			start,
@@ -355,7 +358,7 @@
 							{slot.kind === 'window' ? 'Window' : 'Group session'} · {serviceNames(slot)}{places(slot) ? ` · ${places(slot)} places` : ''}
 						</span>
 						<span class="block truncate text-xs text-base-content/60">
-							{#if slot.kind === 'window'}{freeLabel(slot)} · {START_TIMES_LABELS[slot.startTimes ?? 'grid']}{:else if state === 'blocked'}{describe(slot, state)}{:else}{formatDuration(slot.minutes ?? 0)}{/if}
+							{#if slot.kind === 'window'}{freeLabel(slot)} · {startTimesLabel(slot.startTimes ?? 'grid', slot.gridMinutes)}{:else if state === 'blocked'}{describe(slot, state)}{:else}{formatDuration(slot.minutes ?? 0)}{/if}
 						</span>
 						{#if slot.notes}<span class="block truncate text-xs text-base-content/60">{slot.notes}</span>{/if}
 					</span>
@@ -459,7 +462,15 @@
 					formatLabel={(v) => START_TIMES_LABELS[v as StartTimesMode]}
 					onChange={(v) => (draft.startTimes = v as StartTimesMode)}
 				/>
-				<span class="label whitespace-normal">{START_TIMES_HINTS[draft.startTimes]}</span>
+				{#if draft.startTimes === 'grid'}
+					<label class="mt-2 flex items-center gap-3">
+						<span class="w-28 shrink-0 text-sm font-medium">Step</span>
+						<select class="select select-sm w-40" name="gridMinutes" bind:value={draft.gridMinutes}>
+							{#each GRID_STEP_OPTIONS as step (step)}<option value={step}>Every {step} min</option>{/each}
+						</select>
+					</label>
+				{/if}
+				<span class="label whitespace-normal">{startTimesHint(draft.startTimes, draft.gridMinutes)}</span>
 			</div>
 		{:else}
 			{#if sessionLocked}

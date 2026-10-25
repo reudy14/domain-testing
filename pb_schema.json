@@ -356,6 +356,7 @@
       { "id": "sel_slotkind001", "name": "kind", "type": "select", "system": false, "required": true, "presentable": false, "hidden": false, "maxSelect": 1, "values": ["window", "session"] },
       { "id": "rel_slotitems01", "name": "items", "type": "relation", "system": false, "required": false, "presentable": false, "hidden": false, "collectionId": "pbc_items00001", "cascadeDelete": false, "minSelect": 0, "maxSelect": 50 },
       { "id": "sel_slotstarts1", "name": "startTimes", "type": "select", "system": false, "required": false, "presentable": false, "hidden": false, "maxSelect": 1, "values": ["grid", "edges"] },
+      { "id": "num_slotgridmin1", "name": "gridMinutes", "type": "number", "system": false, "required": false, "presentable": false, "hidden": false, "min": 5, "max": 240, "onlyInt": true },
       { "id": "date_slotstart0", "name": "start", "type": "date", "system": false, "required": true, "presentable": false, "unique": false, "options": { "min": "", "max": "" } },
       { "id": "date_slotend000", "name": "end", "type": "date", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": "", "max": "" } },
       { "id": "num_slotcapacity", "name": "capacity", "type": "number", "system": false, "required": false, "presentable": false, "min": 1, "max": null, "onlyInt": true },

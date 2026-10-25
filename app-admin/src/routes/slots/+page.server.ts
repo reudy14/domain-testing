@@ -5,6 +5,8 @@ import type { createPocketBase } from '$lib/pb';
 import { attempt } from '$lib/server/actions';
 import { loadSlotDetail, loadSlotDetails, runInBatches, seatsTaken } from '$lib/server/slots';
 import {
+	DEFAULT_GRID_MINUTES,
+	GRID_STEP_OPTIONS,
 	MAX_BULK_SLOTS,
 	addDaysToKey,
 	dateKeysBetween,
@@ -35,6 +37,7 @@ type SlotFields = {
 	start: string;
 	end: string;
 	startTimes: StartTimesMode | '';
+	gridMinutes: number | null;
 	capacity: number | null;
 	notes: string;
 };
@@ -74,8 +77,11 @@ function parseCapacity(data: FormData, fallback: number): number | { error: stri
 	return capacity;
 }
 
-function parseStartTimes(data: FormData): StartTimesMode {
-	return String(data.get('startTimes')) === 'edges' ? 'edges' : 'grid';
+/** A window's start-times mode and, for `grid`, its step (one of GRID_STEP_OPTIONS). */
+function parseStartTimes(data: FormData): { startTimes: StartTimesMode; gridMinutes: number | null } {
+	if (String(data.get('startTimes')) === 'edges') return { startTimes: 'edges', gridMinutes: null };
+	const step = Number(data.get('gridMinutes'));
+	return { startTimes: 'grid', gridMinutes: GRID_STEP_OPTIONS.includes(step) ? step : DEFAULT_GRID_MINUTES };
 }
 
 /** The services ticked in a window form, all of them active services. */
@@ -98,7 +104,7 @@ function windowFields(data: FormData, services: Service[]): SlotFields | { error
 	const start = zonedInputToIso(`${date}T${from}`, siteTimezone());
 	const end = zonedInputToIso(`${date}T${to}`, siteTimezone());
 	if (!start || !end) return { error: 'Invalid date or time.' };
-	return { kind: 'window', items, start, end, startTimes: parseStartTimes(data), capacity: null, notes: String(data.get('notes') || '').trim() };
+	return { kind: 'window', items, start, end, ...parseStartTimes(data), capacity: null, notes: String(data.get('notes') || '').trim() };
 }
 
 /** A group session from the form: one service at one of its lengths, a start and places. */
@@ -113,7 +119,7 @@ function sessionFields(data: FormData, services: Service[]): SlotFields | { erro
 	const capacity = parseCapacity(data, service.capacity);
 	if (typeof capacity !== 'number') return capacity;
 	const end = new Date(instantMs(start) + minutes * 60_000).toISOString();
-	return { kind: 'session', items: [service.id], start, end, startTimes: '', capacity, notes: String(data.get('notes') || '').trim() };
+	return { kind: 'session', items: [service.id], start, end, startTimes: '', gridMinutes: null, capacity, notes: String(data.get('notes') || '').trim() };
 }
 
 /**
@@ -331,12 +337,12 @@ export const actions: Actions = {
 			const bufferMinutes = rawBuffer === '' ? service.bufferMinutes : parseInt(rawBuffer, 10);
 			if (Number.isNaN(bufferMinutes) || bufferMinutes < 0) return fail(400, { message: 'Get-ready time must be 0 or more minutes.' });
 			const planned = planGeneratedSlots({ ...range, ...days, durationMinutes: minutes, bufferMinutes, timeZone: siteTimezone() });
-			candidates = planned.map((slot) => ({ ...slot, kind: 'session', items: [service.id], startTimes: '', capacity, notes }));
+			candidates = planned.map((slot) => ({ ...slot, kind: 'session', items: [service.id], startTimes: '', gridMinutes: null, capacity, notes }));
 		} else {
 			const items = chosenServices(data, services);
 			if ('error' in items) return fail(400, { message: items.error });
 			const startTimes = parseStartTimes(data);
-			candidates = planWindows({ ...range, ...days, timeZone: siteTimezone() }).map((slot) => ({ ...slot, kind: 'window', items, startTimes, capacity: null, notes }));
+			candidates = planWindows({ ...range, ...days, timeZone: siteTimezone() }).map((slot) => ({ ...slot, kind: 'window', items, ...startTimes, capacity: null, notes }));
 		}
 		if (!candidates.length) return fail(400, { message: 'Nothing fits those days and times.' });
 
@@ -367,7 +373,7 @@ export const actions: Actions = {
 				const start = shiftByDays(slot.start, 7 * week, siteTimezone());
 				const end = shiftByDays(slot.end, 7 * week, siteTimezone());
 				if (!start || !end) continue;
-				candidates.push({ kind: slot.kind, items: slot.items, start, end, startTimes: slot.startTimes ?? '', capacity: slot.capacity ?? null, notes: slot.notes });
+				candidates.push({ kind: slot.kind, items: slot.items, start, end, startTimes: slot.startTimes ?? '', gridMinutes: slot.gridMinutes ?? null, capacity: slot.capacity ?? null, notes: slot.notes });
 			}
 		}
 
