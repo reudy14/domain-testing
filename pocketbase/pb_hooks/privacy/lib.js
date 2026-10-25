@@ -9,6 +9,11 @@
 // - baskets.email + baskets.customerDetails — set when checkout starts. A
 //   paid basket's copy is cleared once the order exists; a basket that was
 //   never paid for is deleted after `abandonedBasketDays`.
+// - passes.email (the buyer), recipientName and message (who a bundle or
+//   voucher is for). Erasure anonymises a pass but keeps its code working —
+//   it was paid for. Retention anonymises it with the orders, once it has
+//   expired or has nothing left to book.
+// - basket_lines.giftTo / giftMessage — deleted with the basket.
 // Outside this database: Stripe (receipt email, payment) and the email
 // provider's send logs. Those are handled in their own dashboards.
 
@@ -62,17 +67,38 @@ function settings(app) {
 	};
 }
 
-/** Orders and unpaid baskets whose email is `email` (case-insensitive, exact). */
+/** Orders, unpaid baskets and bought codes whose email is `email` (case-insensitive, exact). */
 function customerRecords(app, email) {
 	const wanted = normaliseEmail(email);
-	if (!wanted) return { orders: [], baskets: [] };
+	if (!wanted) return { orders: [], baskets: [], passes: [] };
 	// `~` is a case-insensitive LIKE, but also a substring match (and `_` is a
 	// wildcard), so narrow it to the exact address here.
 	const same = (record) => normaliseEmail(record.getString('email')) === wanted;
 	return {
 		orders: app.findRecordsByFilter('orders', 'email ~ {:email}', '-created', 0, 0, { email: wanted }).filter(same),
-		baskets: app.findRecordsByFilter('baskets', "email ~ {:email} && status != 'completed'", '-updated', 0, 0, { email: wanted }).filter(same)
+		baskets: app.findRecordsByFilter('baskets', "email ~ {:email} && status != 'completed'", '-updated', 0, 0, { email: wanted }).filter(same),
+		passes: app.findRecordsByFilter('passes', 'email ~ {:email}', '-created', 0, 0, { email: wanted }).filter(same)
 	};
+}
+
+/** Keep the code (it was paid for); drop who bought it and who it's for. */
+function anonymisePass(app, pass) {
+	pass.set('email', '');
+	pass.set('recipientName', '');
+	pass.set('message', '');
+	pass.set('anonymisedAt', new Date().toISOString());
+	app.save(pass);
+}
+
+/** Whether a pass can't be used any more: expired, void, or every booking used. */
+function passFinished(app, pass) {
+	const expires = Date.parse(pass.getString('expiresAt').replace(' ', 'T'));
+	if (pass.getString('status') !== 'active' || expires <= Date.now()) return true;
+	const parts = JSON.parse(toString(pass.get('parts')) || '[]') || [];
+	let booked = 0;
+	for (const line of app.findRecordsByFilter('order_lines', "pass = {:pass} && order.status != 'refunded'", '', 0, 0, { pass: pass.id })) booked += line.getInt('quantity');
+	const bookable = parts.filter((p) => p.minutes).reduce((n, p) => n + p.count, 0);
+	return booked >= bookable;
 }
 
 function hasUpcomingBooking(app, orderId) {
@@ -97,7 +123,7 @@ function clearBasketDetails(app, basket) {
 
 function applyRetention(app) {
 	const { abandonedBasketDays, anonymiseOrdersAfterMonths } = settings(app);
-	const counts = { basketsDeleted: 0, basketsCleared: 0, ordersAnonymised: 0 };
+	const counts = { basketsDeleted: 0, basketsCleared: 0, ordersAnonymised: 0, passesAnonymised: 0 };
 
 	// Unpaid baskets (their lines cascade). Active ones expire after a day
 	// and are swept to `abandoned`, so `updated` is when they were last used.
@@ -134,9 +160,20 @@ function applyRetention(app) {
 				console.error('[privacy] could not anonymise order', order.id, e);
 			}
 		}
+		// Codes: same age, and only once they can't be used any more (whoever
+		// holds one may still need it looked up).
+		for (const pass of app.findRecordsByFilter('passes', "anonymisedAt = '' && created < {:cutoff}", '', 0, 0, { cutoff: pbDate(cutoff.getTime()) })) {
+			if (!passFinished(app, pass)) continue;
+			try {
+				anonymisePass(app, pass);
+				counts.passesAnonymised++;
+			} catch (e) {
+				console.error('[privacy] could not anonymise pass', pass.id, e);
+			}
+		}
 	}
 
-	if (counts.basketsDeleted || counts.basketsCleared || counts.ordersAnonymised) {
+	if (counts.basketsDeleted || counts.basketsCleared || counts.ordersAnonymised || counts.passesAnonymised) {
 		console.log('[privacy] retention:', JSON.stringify(counts));
 	}
 	return counts;
@@ -176,7 +213,7 @@ function searchCustomers(app, query) {
 
 /** Everything stored about one customer — the admin's detail view and the GDPR export. */
 function customerData(app, email) {
-	const { orders, baskets } = customerRecords(app, email);
+	const { orders, baskets, passes } = customerRecords(app, email);
 	return {
 		email: normaliseEmail(email),
 		exportedAt: new Date().toISOString(),
@@ -199,6 +236,16 @@ function customerData(app, email) {
 				}))
 			};
 		}),
+		// Bundle/voucher codes bought with this email, and who they are for.
+		codes: passes.map((pass) => ({
+			code: pass.getString('code'),
+			name: pass.getString('name'),
+			created: pass.getString('created'),
+			expiresAt: pass.getString('expiresAt'),
+			status: pass.getString('status'),
+			recipientName: pass.getString('recipientName'),
+			message: pass.getString('message')
+		})),
 		// Checkouts that were started but never paid for.
 		unpaidBaskets: baskets.map((basket) => ({
 			id: basket.id,
@@ -229,24 +276,36 @@ function updateCustomer(app, body) {
 
 	let updated = 0;
 	app.runInTransaction((tx) => {
-		const { orders, baskets } = customerRecords(tx, email);
-		if (!orders.length && !baskets.length) throw new NotFoundError('No customer with that email');
+		const { orders, baskets, passes } = customerRecords(tx, email);
+		if (!orders.length && !baskets.length && !passes.length) throw new NotFoundError('No customer with that email');
 		for (const record of [...orders, ...baskets]) {
 			record.set('customerDetails', Object.assign(details(record), patch));
 			if (patch.email) record.set('email', patch.email);
 			tx.save(record);
 			updated++;
 		}
+		// Codes only hold the email.
+		if (patch.email) {
+			for (const pass of passes) {
+				pass.set('email', patch.email);
+				tx.save(pass);
+				updated++;
+			}
+		}
 	});
 	return { updated, email: patch.email ? normaliseEmail(patch.email) : email };
 }
 
-/** Right to erasure: anonymise the customer's orders and delete their unpaid baskets. */
+/** Right to erasure: anonymise the customer's orders and codes, and delete their unpaid baskets. */
 function eraseCustomer(app, body) {
-	const counts = { ordersAnonymised: 0, basketsDeleted: 0 };
+	const counts = { ordersAnonymised: 0, basketsDeleted: 0, passesAnonymised: 0 };
 	app.runInTransaction((tx) => {
-		const { orders, baskets } = customerRecords(tx, body.email);
-		if (!orders.length && !baskets.length) throw new NotFoundError('No customer with that email');
+		const { orders, baskets, passes } = customerRecords(tx, body.email);
+		if (!orders.length && !baskets.length && !passes.length) throw new NotFoundError('No customer with that email');
+		for (const pass of passes) {
+			anonymisePass(tx, pass);
+			counts.passesAnonymised++;
+		}
 		for (const order of orders) {
 			anonymiseOrder(tx, order);
 			counts.ordersAnonymised++;

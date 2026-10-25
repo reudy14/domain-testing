@@ -423,6 +423,272 @@ function guardedTransaction(app, fallback, fn) {
 	if (refusal) throw refusal;
 }
 
+// ── Bundles and codes ───────────────────────────────────────────────────
+//
+// A bundle is an item (type `bundle`) with its own price, made of parts: a
+// service at one length × count, or a product × count. Buying one creates a
+// pass with a code. Its service parts are booked later — by whoever has the
+// code, until it expires — at no charge; product parts are handed over with
+// the purchase (stock is taken then).
+//
+// A pass keeps a snapshot of its parts with each part's share of the price
+// (`value`, for refunds). What's used is never stored: it is counted from
+// order lines (not refunded) and live basket holds pointing at the pass,
+// like slot availability. A basket line gets `pass` when a code covers it;
+// that line then costs nothing.
+
+/** Codes are 8 characters from this alphabet (no 0/O or 1/I to misread). */
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const CODE_LENGTH = 8;
+
+function isBundle(item) {
+	return !!item && item.getString('type') === 'bundle';
+}
+
+/** A bundle's parts, `[{ item, minutes (null: a product), count }]`; invalid entries are left out. */
+function bundleParts(item) {
+	const list = jsonValue(item.get('bundleParts'), []);
+	return (Array.isArray(list) ? list : [])
+		.map((p) => ({ item: String((p && p.item) || ''), minutes: p && p.minutes ? Math.floor(Number(p.minutes)) : null, count: Math.floor(Number(p && p.count)) || 0 }))
+		.filter((p) => p.item && p.count > 0);
+}
+
+/**
+ * A bundle's parts with names and each part's share of the bundle price
+ * (`value`, all its units together): the price split in proportion to what
+ * the parts cost on their own (evenly when those are all 0), in cents, with
+ * the rounding on the last part. Throws an ApiError when a part can't be
+ * sold — unless `lenient` (an order being created after payment), which
+ * keeps the part with what it can find.
+ */
+function bundleSnapshot(app, bundle, lenient) {
+	const name = bundle.getString('name');
+	const parts = bundleParts(bundle).map((part) => {
+		const item = findOrNull(app, 'items', part.item);
+		const own = !item ? null : isService(item) ? unitPrice(item, part.minutes) : item.getFloat('price');
+		if (own === null && !lenient) throw conflict(`"${name}" can't be bought right now — one of its parts is no longer offered`);
+		return { item: part.item, name: item ? item.getString('name') : 'Unknown item', minutes: isService(item) ? part.minutes : null, count: part.count, ownCents: Math.round((own || 0) * 100) };
+	});
+	if (!parts.length && !lenient) throw conflict(`"${name}" has nothing in it yet`);
+	const totalCents = Math.round(bundle.getFloat('price') * 100);
+	const units = parts.reduce((n, p) => n + p.count, 0);
+	const listCents = parts.reduce((sum, p) => sum + p.ownCents * p.count, 0);
+	let assigned = 0;
+	parts.forEach((p, i) => {
+		const share = listCents > 0 ? (p.ownCents * p.count) / listCents : p.count / units;
+		const cents = i === parts.length - 1 ? totalCents - assigned : Math.round(totalCents * share);
+		assigned += cents;
+		p.value = cents / 100;
+		delete p.ownCents;
+	});
+	return parts;
+}
+
+function normaliseCode(value) {
+	return String(value || '')
+		.toUpperCase()
+		.replace(/[^A-Z0-9]/g, '');
+}
+
+/** `ABCD2345` → `ABCD-2345`, as shown to people. */
+function formatCode(code) {
+	return code.length === CODE_LENGTH ? code.slice(0, 4) + '-' + code.slice(4) : code;
+}
+
+function findPassByCode(app, code) {
+	const normalised = normaliseCode(code);
+	if (!normalised) return null;
+	return findAll(app, 'passes', 'code = {:code}', { code: normalised })[0] || null;
+}
+
+function newCode(app) {
+	for (let attempt = 0; attempt < 10; attempt++) {
+		const code = $security.randomStringWithAlphabet(CODE_LENGTH, CODE_ALPHABET);
+		if (!findPassByCode(app, code)) return code;
+	}
+	throw new InternalServerError('Could not create a unique code');
+}
+
+/** Epoch ms `months` from now, or '' for no expiry. */
+function expiryIn(months) {
+	if (!(months > 0)) return '';
+	const date = new Date();
+	date.setUTCMonth(date.getUTCMonth() + months);
+	return date.toISOString();
+}
+
+/** Why a pass can't be used now (an ApiError), or null. */
+function passProblem(pass) {
+	if (!pass) return new NotFoundError('That code was not found — check it and try again');
+	if (pass.getString('status') !== 'active') return conflict('That code is no longer valid');
+	const expires = toMs(pass.getString('expiresAt'));
+	if (expires <= Date.now()) return conflict(`That code expired on ${new Date(expires).toISOString().slice(0, 10)}`);
+	return null;
+}
+
+/**
+ * A pass's parts with what's used (paid bookings), held (live basket holds)
+ * and left. Product parts were handed over with the purchase: nothing left
+ * to redeem. `options.excludeLineId` leaves one basket line out.
+ */
+function passCredits(app, pass, options) {
+	const opts = options || {};
+	const parts = jsonValue(pass.get('parts'), []);
+	const key = (item, minutes) => item + '|' + (minutes || 0);
+	const used = {};
+	const held = {};
+	for (const line of findAll(app, 'order_lines', "pass = {:pass} && order.status != 'refunded'", { pass: pass.id })) {
+		const k = key(line.getString('item'), line.getInt('minutes'));
+		used[k] = (used[k] || 0) + line.getInt('quantity');
+	}
+	for (const line of findAll(app, 'basket_lines', 'pass = {:pass} && heldUntil > {:now}', { pass: pass.id, now: pbDate(Date.now()) })) {
+		if (line.id === opts.excludeLineId) continue;
+		const k = key(line.getString('item'), line.getInt('minutes'));
+		held[k] = (held[k] || 0) + line.getInt('quantity');
+	}
+	return (Array.isArray(parts) ? parts : []).map((part) => {
+		const k = key(part.item, part.minutes);
+		const redeemable = !!part.minutes;
+		return Object.assign({}, part, {
+			redeemable,
+			used: redeemable ? used[k] || 0 : part.count,
+			held: held[k] || 0,
+			left: redeemable ? Math.max(0, part.count - (used[k] || 0) - (held[k] || 0)) : 0
+		});
+	});
+}
+
+/** How a pass is shown to the customer and the admin. */
+function passSummary(app, pass) {
+	return {
+		id: pass.id,
+		code: formatCode(pass.getString('code')),
+		name: pass.getString('name'),
+		expiresAt: pass.getString('expiresAt') ? new Date(toMs(pass.getString('expiresAt'))).toISOString() : '',
+		status: pass.getString('status'),
+		recipientName: pass.getString('recipientName'),
+		message: pass.getString('message'),
+		parts: passCredits(app, pass).map((p) => ({ item: p.item, name: p.name, minutes: p.minutes, count: p.count, value: p.value, redeemable: p.redeemable, used: p.used, held: p.held, left: p.left }))
+	};
+}
+
+/**
+ * Let the basket's code cover its bookings that match a part with places
+ * left (same service and length), oldest line first. Lines already covered
+ * stay covered. Call inside the transaction that added the lines.
+ */
+function coverWithPass(app, basket) {
+	const pass = findOrNull(app, 'passes', basket.getString('pass'));
+	if (!pass || passProblem(pass)) return;
+	const credits = passCredits(app, pass);
+	const lines = findAll(app, 'basket_lines', "basket = {:basket} && lineType = 'slot' && pass = ''", { basket: basket.id }, 'created');
+	for (const line of lines) {
+		const part = credits.find((p) => p.redeemable && p.item === line.getString('item') && p.minutes === line.getInt('minutes') && p.left >= line.getInt('quantity'));
+		if (!part) continue;
+		part.left -= line.getInt('quantity');
+		line.set('pass', pass.id);
+		app.save(line);
+	}
+}
+
+function uncoverLines(app, basketId) {
+	for (const line of findAll(app, 'basket_lines', "basket = {:basket} && pass != ''", { basket: basketId })) {
+		line.set('pass', '');
+		app.save(line);
+	}
+}
+
+/** The passes an order bought, as shown on the confirmation page and in emails. */
+function orderPasses(app, orderId) {
+	return findAll(app, 'passes', 'order = {:order}', { order: orderId }, 'created').map((pass) => passSummary(app, pass));
+}
+
+/** Units of each product the basket needs: product lines plus products inside bundles. */
+function productNeeds(app, lines, extra) {
+	const needs = {};
+	const add = (id, n) => (needs[id] = (needs[id] || 0) + n);
+	for (const line of lines.concat(extra || [])) {
+		if (line.getString('lineType') !== 'item') continue;
+		const item = findOrNull(app, 'items', line.getString('item'));
+		if (!item) continue;
+		if (isBundle(item)) {
+			for (const part of bundleParts(item)) {
+				const partItem = findOrNull(app, 'items', part.item);
+				if (partItem && !isService(partItem)) add(part.item, part.count * line.getInt('quantity'));
+			}
+		} else {
+			add(item.id, line.getInt('quantity'));
+		}
+	}
+	return needs;
+}
+
+/** An ApiError when stock can't cover `needs`, or null. */
+function stockProblem(app, needs) {
+	for (const id of Object.keys(needs)) {
+		const item = findOrNull(app, 'items', id);
+		if (!item) continue;
+		const stock = item.get('stock');
+		if (stock != null && stock !== '' && needs[id] > item.getInt('stock')) {
+			return conflict(item.getInt('stock') > 0 ? `Only ${item.getInt('stock')} of "${item.getString('name')}" left in stock` : `"${item.getString('name')}" is sold out`);
+		}
+	}
+	return null;
+}
+
+// ── Admin: codes ────────────────────────────────────────────────────────
+
+/** Codes for the admin, newest first; `query` matches the code, email, recipient or bundle name. */
+function listPasses(app, query) {
+	const q = String(query || '').trim();
+	const code = normaliseCode(q);
+	const filter = q ? '(code ~ {:code} || email ~ {:q} || recipientName ~ {:q} || name ~ {:q})' : "id != ''";
+	return findAll(app, 'passes', filter, { q, code: code || q }, '-created')
+		.slice(0, 200)
+		.map((pass) => Object.assign(passSummary(app, pass), { email: pass.getString('email'), order: pass.getString('order'), created: pass.getString('created'), anonymisedAt: pass.getString('anonymisedAt') }));
+}
+
+/** Void/reactivate a code or change when it expires. `body`: { id, status?, expiresAt? (ISO or '' for never) }. */
+function updatePass(app, body) {
+	const pass = findOrNull(app, 'passes', String(body.id || ''));
+	if (!pass) throw new NotFoundError('Code not found');
+	if (body.status !== undefined) {
+		if (body.status !== 'active' && body.status !== 'void') throw new BadRequestError('Unknown status');
+		pass.set('status', body.status);
+	}
+	if (body.expiresAt !== undefined) {
+		const ms = toMs(body.expiresAt);
+		if (body.expiresAt !== '' && Number.isNaN(ms)) throw new BadRequestError('Invalid expiry date');
+		pass.set('expiresAt', body.expiresAt === '' ? '' : new Date(ms).toISOString());
+	}
+	app.save(pass);
+	return passSummary(app, pass);
+}
+
+/**
+ * Issue a code without a purchase (a gift from the studio, a replacement).
+ * `body`: { itemId (a bundle), email?, recipientName?, message?, months? }.
+ */
+function issuePass(app, body) {
+	const bundle = findOrNull(app, 'items', String(body.itemId || ''));
+	if (!isBundle(bundle)) throw new BadRequestError('Choose a bundle');
+	const months = body.months === undefined || body.months === '' ? bundle.getInt('validMonths') : Math.floor(Number(body.months));
+	if (!(months >= 0 && months <= 120)) throw new BadRequestError('Valid for 0 (no expiry) to 120 months');
+	const pass = newRecord(app, 'passes', {
+		code: newCode(app),
+		item: bundle.id,
+		name: bundle.getString('name'),
+		parts: bundleSnapshot(app, bundle),
+		email: String(body.email || '').trim().slice(0, 320),
+		recipientName: String(body.recipientName || '').trim().slice(0, 180),
+		message: String(body.message || '').trim().slice(0, 1000),
+		expiresAt: expiryIn(months),
+		status: 'active'
+	});
+	app.save(pass);
+	return passSummary(app, pass);
+}
+
 // ── Holds and baskets ───────────────────────────────────────────────────
 
 /**
@@ -461,21 +727,26 @@ function basketLines(app, basketId) {
 
 /**
  * The basket as returned to the public app, which maps it to the `Basket`
- * type. Each line also gets `unitPrice` (null: the service is no longer
- * offered at that length) and, for a booking, `end`.
+ * type. Each line also gets `unitPrice` (0 when a code covers it; null: the
+ * service is no longer offered at that length), for a booking `end`, and
+ * for a bundle `bundle` (its parts and validity). `pass` is the applied
+ * code with what it has left.
  */
 function basketPayload(app, basket) {
 	if (!basket) return null;
 	const lines = basketLines(app, basket.id);
 	for (const line of lines) app.expandRecord(line, ['item', 'slot', 'item.image'], null);
+	const pass = findOrNull(app, 'passes', basket.getString('pass'));
 	return {
 		record: plain(basket),
+		pass: pass ? passSummary(app, pass) : null,
 		lines: lines.map((line) => {
 			const json = plain(line);
 			const item = line.expandedOne('item');
-			json.unitPrice = item ? unitPrice(item, line.getInt('minutes')) : null;
+			json.unitPrice = line.getString('pass') ? 0 : item ? unitPrice(item, line.getInt('minutes')) : null;
 			const start = toMs(line.getString('start'));
 			if (!Number.isNaN(start)) json.end = new Date(start + line.getInt('minutes') * MINUTE_MS).toISOString();
+			if (isBundle(item)) json.bundle = { validMonths: item.getInt('validMonths'), parts: bundleSnapshot(app, item, true) };
 			return json;
 		})
 	};
@@ -512,6 +783,12 @@ function extendBasketHolds(app, basketId, durationMs) {
 			app.runInTransaction((tx) => {
 				const fresh = tx.findRecordById('basket_lines', line.id);
 				if (checkBooking(tx, lineRequest(fresh), { excludeLineId: fresh.id }).error) return;
+				// A code's places may have been used up meanwhile: then the time is let go too.
+				const pass = findOrNull(tx, 'passes', fresh.getString('pass'));
+				if (pass) {
+					const part = passCredits(tx, pass, { excludeLineId: fresh.id }).find((p) => p.redeemable && p.item === fresh.getString('item') && p.minutes === fresh.getInt('minutes'));
+					if (passProblem(pass) || !part || part.left < fresh.getInt('quantity')) return;
+				}
 				fresh.set('heldUntil', until);
 				tx.save(fresh);
 			});
@@ -530,7 +807,7 @@ function basketAction(app, body) {
 
 	const action = String(body.action || '');
 	let basket = loadActiveBasket(app, body.basketId);
-	if (!basket && (action === 'add_item' || action === 'add_slot')) basket = createBasket(app);
+	if (!basket && (action === 'add_item' || action === 'add_slot' || action === 'apply_code')) basket = createBasket(app);
 	if (!basket) throw new BadRequestError('No active basket — add an item first');
 	const lines = basketLines(app, basket.id);
 
@@ -540,14 +817,17 @@ function basketAction(app, body) {
 			const quantity = Math.max(1, Math.floor(Number(body.quantity)) || 1);
 			const item = findOrNull(app, 'items', itemId);
 			if (!item || !item.getBool('active')) throw new NotFoundError('Item not found');
-			if (item.getString('type') !== 'item') throw new BadRequestError('Use add_slot for bookable services');
+			if (isService(item)) throw new BadRequestError('Use add_slot for bookable services');
+			if (isBundle(item)) bundleSnapshot(app, item); // throws if it can't be sold
 
+			// Stock for products, including those inside bundles, across the whole basket.
 			const existing = lines.find((l) => l.getString('lineType') === 'item' && l.getString('item') === itemId);
-			const newQty = (existing ? existing.getInt('quantity') : 0) + quantity;
-			const stock = item.get('stock');
-			if (stock != null && stock !== '' && newQty > item.getInt('stock')) throw conflict(`Only ${item.getInt('stock')} in stock`);
+			const adding = newRecord(app, 'basket_lines', { basket: basket.id, item: itemId, quantity, lineType: 'item' });
+			const problem = stockProblem(app, productNeeds(app, lines, [adding]));
+			if (problem) throw problem;
 
 			if (existing) {
+				const newQty = existing.getInt('quantity') + quantity;
 				existing.set('quantity', newQty);
 				app.save(existing);
 			} else {
@@ -587,7 +867,10 @@ function basketAction(app, body) {
 					});
 				line.set('quantity', line.getInt('quantity') + (booking.kind === 'session' ? request.seats : 1));
 				line.set('heldUntil', isoIn(SLOT_HOLD_MS));
+				// More places than the code covers: this line is paid for instead.
+				if (existing && existing.getString('pass')) existing.set('pass', '');
 				tx.save(line);
+				coverWithPass(tx, tx.findRecordById('baskets', basket.id));
 			});
 			break;
 		}
@@ -607,14 +890,55 @@ function basketAction(app, body) {
 					if (check.error) return check.error;
 					fresh.set('quantity', quantity);
 					fresh.set('heldUntil', isoIn(SLOT_HOLD_MS));
+					fresh.set('pass', ''); // re-covered below if the code has enough places
 					tx.save(fresh);
+					coverWithPass(tx, tx.findRecordById('baskets', basket.id));
 				});
 				break;
 			}
-			const item = findOrNull(app, 'items', line.getString('item'));
-			const stock = item ? item.get('stock') : null;
-			if (stock != null && stock !== '' && quantity > item.getInt('stock')) throw conflict(`Only ${item.getInt('stock')} in stock`);
+			const others = lines.filter((l) => l.id !== line.id);
+			const changed = newRecord(app, 'basket_lines', { basket: basket.id, item: line.getString('item'), quantity, lineType: 'item' });
+			const problem = stockProblem(app, productNeeds(app, others, [changed]));
+			if (problem) throw problem;
 			line.set('quantity', quantity);
+			app.save(line);
+			break;
+		}
+
+		case 'apply_code': {
+			// A bundle/voucher code: bookings it covers cost nothing.
+			guardedTransaction(app, 'Could not apply the code — please try again', (tx) => {
+				const pass = findPassByCode(tx, body.code);
+				const problem = passProblem(pass);
+				if (problem) return problem;
+				const fresh = tx.findRecordById('baskets', basket.id);
+				if (fresh.getString('pass') !== pass.id) uncoverLines(tx, basket.id);
+				fresh.set('pass', pass.id);
+				tx.save(fresh);
+				coverWithPass(tx, fresh);
+			});
+			basket = app.findRecordById('baskets', basket.id);
+			break;
+		}
+
+		case 'remove_code': {
+			guardedTransaction(app, 'Could not remove the code — please try again', (tx) => {
+				uncoverLines(tx, basket.id);
+				const fresh = tx.findRecordById('baskets', basket.id);
+				fresh.set('pass', '');
+				tx.save(fresh);
+			});
+			basket = app.findRecordById('baskets', basket.id);
+			break;
+		}
+
+		case 'set_gift': {
+			// Who a bundle is for: shown with its code in the confirmation email.
+			const line = lines.find((l) => l.id === String(body.lineId || ''));
+			if (!line) throw new NotFoundError('Line not found in your basket');
+			if (!isBundle(findOrNull(app, 'items', line.getString('item')))) throw new BadRequestError('Only bundles and vouchers can be gifts');
+			line.set('giftTo', String(body.giftTo || '').trim().slice(0, 180));
+			line.set('giftMessage', String(body.giftMessage || '').trim().slice(0, 1000));
 			app.save(line);
 			break;
 		}
@@ -684,7 +1008,9 @@ function currency() {
 /**
  * Start (or resume) payment for a basket: validate every line against the
  * database (the source of truth for the total), then create or update the
- * Stripe PaymentIntent. Returns the client secret for Stripe Elements.
+ * Stripe PaymentIntent. Returns `{ clientSecret }` for Stripe Elements — or,
+ * when codes cover everything (total 0), creates the order at once and
+ * returns `{ free: true, orderId, orderEmail }` (no payment step).
  */
 function startCheckout(app, body) {
 	const basketId = String(body.basketId || '');
@@ -708,6 +1034,15 @@ function startCheckout(app, body) {
 	if (!customer.name) throw new BadRequestError('Name is required');
 	if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(customer.email)) throw new BadRequestError('A valid email is required');
 
+	// A code voided or expired since it was applied stops covering anything.
+	const applied = findOrNull(app, 'passes', basket.getString('pass'));
+	if (basket.getString('pass') && passProblem(applied)) {
+		uncoverLines(app, basket.id);
+		basket.set('pass', '');
+		app.save(basket);
+		throw conflict(`Your code ${applied ? formatCode(applied.getString('code')) + ' ' : ''}can no longer be used — the bookings it covered are now charged. Please check your basket.`);
+	}
+
 	let totalCents = 0;
 	const summary = [];
 	for (const line of lines) {
@@ -719,18 +1054,36 @@ function startCheckout(app, body) {
 			if (!findOrNull(app, 'slots', line.getString('slot')) || !(toMs(line.getString('heldUntil')) > Date.now())) {
 				throw conflict(`Your time slot for "${item.getString('name')}" has expired — please pick it again`);
 			}
-		} else {
-			const stock = item.get('stock');
-			if (stock != null && stock !== '' && item.getInt('stock') < quantity) {
-				throw conflict(`Only ${item.getInt('stock')} of "${item.getString('name')}" left in stock`);
-			}
+		} else if (isBundle(item)) {
+			bundleSnapshot(app, item); // throws if it can't be sold
 		}
-		const price = unitPrice(item, line.getInt('minutes'));
+		const price = line.getString('pass') ? 0 : unitPrice(item, line.getInt('minutes'));
 		if (price === null) throw conflict(`"${item.getString('name')}" is no longer offered for ${line.getInt('minutes')} minutes — please pick it again`);
 		totalCents += Math.round(price * 100) * quantity;
 		summary.push(`${quantity}× ${item.getString('name')}`);
 	}
-	if (totalCents <= 0) throw new BadRequestError('Basket total must be positive');
+	const stock = stockProblem(app, productNeeds(app, lines));
+	if (stock) throw stock;
+
+	basket.set('email', customer.email);
+	basket.set('customerDetails', customer);
+	if (totalCents === 0) {
+		// Everything is covered by a code: confirm without a payment. A payment
+		// started before the code was applied is cancelled, so it can't be paid too.
+		const staleIntent = basket.getString('stripePaymentIntentId');
+		if (staleIntent) {
+			try {
+				stripe('POST', '/v1/payment_intents/' + encodeURIComponent(staleIntent) + '/cancel', {});
+			} catch (e) {
+				console.error('[shop] could not cancel payment', staleIntent, e);
+			}
+			basket.set('stripePaymentIntentId', '');
+		}
+		app.save(basket);
+		const orderId = createOrder(app, basket.id, { intentId: '', total: 0, receiptEmail: customer.email });
+		if (!orderId) throw conflict('This basket was already checked out');
+		return { free: true, orderId, orderEmail: orderEmailData(app, orderId) };
+	}
 
 	let intent = null;
 	const existingId = basket.getString('stripePaymentIntentId');
@@ -764,8 +1117,6 @@ function startCheckout(app, body) {
 	}
 
 	basket.set('stripePaymentIntentId', intent.id);
-	basket.set('email', customer.email);
-	basket.set('customerDetails', customer);
 	app.save(basket);
 	return { clientSecret: intent.client_secret };
 }
@@ -821,46 +1172,87 @@ function handleStripeWebhook(app, rawBody, signature) {
 function createOrderFromIntent(app, intent) {
 	const basketId = intent.metadata && intent.metadata.basket_id;
 	if (!basketId || !intent.id) return null; // not one of ours
+	return createOrder(app, basketId, { intentId: intent.id, total: intent.amount / 100, receiptEmail: intent.receipt_email });
+}
 
+function takeStock(app, item, quantity) {
+	if (!item || item.get('stock') == null || item.get('stock') === '') return;
+	item.set('stock', Math.max(0, item.getInt('stock') - quantity));
+	app.save(item);
+}
+
+/**
+ * Turn a basket into an order: after a Stripe payment (`payment.intentId`,
+ * idempotent per intent) or with nothing to pay (`intentId` '', only while
+ * the basket is still active). Bundles become passes with new codes.
+ * Returns the new order id, or null if there was nothing to do.
+ */
+function createOrder(app, basketId, payment) {
 	let orderId = null;
 	app.runInTransaction((tx) => {
-		const existing = findAll(tx, 'orders', 'stripePaymentIntentId = {:id}', { id: intent.id });
-		if (existing.length) return; // Stripe retried — already handled
+		if (payment.intentId && findAll(tx, 'orders', 'stripePaymentIntentId = {:id}', { id: payment.intentId }).length) return; // Stripe retried — already handled
 		const basket = findOrNull(tx, 'baskets', basketId);
 		if (!basket) return;
+		if (!payment.intentId && basket.getString('status') !== 'active') return;
 
 		const lines = basketLines(tx, basketId);
 		const order = newRecord(tx, 'orders', {
 			basket: basketId,
-			email: basket.getString('email') || intent.receipt_email || '',
+			email: basket.getString('email') || payment.receiptEmail || '',
 			customerDetails: JSON.parse(toString(basket.get('customerDetails')) || 'null') || {},
-			total: intent.amount / 100,
+			total: payment.total,
 			status: 'paid',
-			stripePaymentIntentId: intent.id
+			stripePaymentIntentId: payment.intentId
 		});
 		tx.save(order);
 
 		// Snapshot lines and decrement stock. A booked time moves from the
 		// basket line (a hold) to the order line (a booking) in this same
-		// transaction, so availability never sees it free in between.
+		// transaction, so availability never sees it free in between; the
+		// same goes for a code's places (`pass`).
+		const orderLine = (fields) => tx.save(newRecord(tx, 'order_lines', Object.assign({ order: order.id }, fields)));
 		for (const line of lines) {
 			const item = findOrNull(tx, 'items', line.getString('item'));
-			tx.save(
-				newRecord(tx, 'order_lines', {
-					order: order.id,
-					item: line.getString('item'),
-					slot: line.getString('slot'),
-					quantity: line.getInt('quantity'),
-					lineType: line.getString('lineType'),
-					name: item ? item.getString('name') : 'Unknown item',
-					price: (item && unitPrice(item, line.getInt('minutes'))) || 0,
-					start: line.getString('start'),
-					minutes: line.getInt('minutes')
-				})
-			);
-			if (line.getString('lineType') === 'item' && item && item.get('stock') != null && item.get('stock') !== '') {
-				item.set('stock', Math.max(0, item.getInt('stock') - line.getInt('quantity')));
-				tx.save(item);
+			const name = item ? item.getString('name') : 'Unknown item';
+			const quantity = line.getInt('quantity');
+			orderLine({
+				item: line.getString('item'),
+				slot: line.getString('slot'),
+				pass: line.getString('pass'),
+				quantity,
+				lineType: line.getString('lineType'),
+				name,
+				price: line.getString('pass') ? 0 : (item && unitPrice(item, line.getInt('minutes'))) || 0,
+				start: line.getString('start'),
+				minutes: line.getInt('minutes')
+			});
+			if (line.getString('lineType') !== 'item' || !item) continue;
+			if (!isBundle(item)) {
+				takeStock(tx, item, quantity);
+				continue;
+			}
+			// A bundle: one pass (code) per unit bought; its products go with this order.
+			const parts = bundleSnapshot(tx, item, true);
+			for (let i = 0; i < quantity; i++) {
+				tx.save(
+					newRecord(tx, 'passes', {
+						code: newCode(tx),
+						item: item.id,
+						order: order.id,
+						name,
+						parts,
+						email: order.getString('email'),
+						recipientName: line.getString('giftTo'),
+						message: line.getString('giftMessage'),
+						expiresAt: expiryIn(item.getInt('validMonths')),
+						status: 'active'
+					})
+				);
+			}
+			for (const part of parts) {
+				if (part.minutes) continue;
+				orderLine({ item: part.item, quantity: part.count * quantity, lineType: 'item', name: `${part.name} (in ${name})`, price: 0 });
+				takeStock(tx, findOrNull(tx, 'items', part.item), part.count * quantity);
 			}
 		}
 
@@ -898,10 +1290,11 @@ function emailTemplate(app, key) {
 function orderEmailData(app, orderId) {
 	const order = app.findRecordById('orders', orderId);
 	const lines = findAll(app, 'order_lines', 'order = {:order}', { order: orderId }, 'start');
-	for (const line of lines) app.expandRecord(line, ['slot', 'item'], null);
+	for (const line of lines) app.expandRecord(line, ['slot', 'item', 'pass'], null);
 	return {
 		order: plain(order),
 		lines: lines.map(plain),
+		passes: findAll(app, 'passes', 'order = {:order}', { order: orderId }, 'created').map(plain),
 		templates: {
 			customer_confirmation: emailTemplate(app, 'customer_confirmation'),
 			client_alert: emailTemplate(app, 'client_alert')
@@ -911,11 +1304,32 @@ function orderEmailData(app, orderId) {
 	};
 }
 
+/** A paid order as the result page shows it: lines (with the code that paid each) and the codes it bought. */
+function paidOrder(app, order) {
+	const lines = findAll(app, 'order_lines', 'order = {:order}', { order: order.id }, 'id');
+	return {
+		state: 'paid',
+		order: plain(order),
+		lines: lines.map((line) => {
+			const pass = findOrNull(app, 'passes', line.getString('pass'));
+			return Object.assign(plain(line), { passCode: pass ? formatCode(pass.getString('code')) : '' });
+		}),
+		passes: orderPasses(app, order.id)
+	};
+}
+
 /**
- * Payment result page. The PaymentIntent id comes from Stripe's redirect;
- * it is checked with Stripe first, so made-up ids reveal nothing.
+ * Payment result page. After a payment, `paymentIntentId` comes from
+ * Stripe's redirect and is checked with Stripe first, so made-up ids reveal
+ * nothing. An order with nothing to pay is looked up by `orderId` plus the
+ * customer's `basketId` (their cookie — the bearer secret for that basket).
  */
-function orderStatus(app, paymentIntentId) {
+function orderStatus(app, paymentIntentId, free) {
+	if (free && free.orderId) {
+		const order = findOrNull(app, 'orders', String(free.orderId));
+		if (!order || !free.basketId || order.getString('basket') !== String(free.basketId)) return { state: 'missing' };
+		return paidOrder(app, order);
+	}
 	const id = String(paymentIntentId || '');
 	if (!/^pi_[A-Za-z0-9_]+$/.test(id)) return { state: 'missing' };
 	let intent;
@@ -931,9 +1345,7 @@ function orderStatus(app, paymentIntentId) {
 		if (intent.status === 'succeeded') return { state: 'processing' };
 		return { state: intent.status === 'canceled' ? 'canceled' : 'failed' };
 	}
-	const order = orders[0];
-	const lines = findAll(app, 'order_lines', 'order = {:order}', { order: order.id }, 'id');
-	return { state: 'paid', order: plain(order), lines: lines.map(plain) };
+	return paidOrder(app, orders[0]);
 }
 
 /**
@@ -953,6 +1365,9 @@ function recordEmailStatus(app, secretHeader, body) {
 }
 
 module.exports = {
+	listPasses,
+	updatePass,
+	issuePass,
 	bookableTimes,
 	slotDetails,
 	sweepExpiredHolds,
