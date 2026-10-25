@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { CalendarEventRecord, ContentBlock, BlockBackground, BlockForeground, ItemRecord, SlotRecord } from '$shared/types';
+	import type { CalendarEventRecord, ContentBlock, BlockBackground, BlockForeground, ItemRecord } from '$shared/types';
 	import BackgroundWrapper from './BackgroundWrapper.svelte';
 	import TextBlock from './TextBlock.svelte';
 	import ImageTextBlock from './ImageTextBlock.svelte';
@@ -12,11 +12,10 @@
 	import ShopBlock from './ShopBlock.svelte';
 	import CheckoutBlock from './CheckoutBlock.svelte';
 
-	let { blocks = [], calendarEvents = [], items = [], slots = [] } = $props<{
+	let { blocks = [], calendarEvents = [], items = [] } = $props<{
 		blocks: ContentBlock[];
 		calendarEvents?: CalendarEventRecord[];
 		items?: ItemRecord[];
-		slots?: SlotRecord[];
 	}>();
 
 	function getBg(block: ContentBlock): BlockBackground {
@@ -47,7 +46,7 @@
 		{:else if block.type === 'upcoming_calendar'}
 			<UpcomingCalendarBlock data={block.data} events={calendarEvents} />
 		{:else if block.type === 'shop'}
-			<ShopBlock data={block.data} {items} {slots} />
+			<ShopBlock data={block.data} {items} />
 		{:else if block.type === 'checkout'}
 			<CheckoutBlock data={block.data} />
 		{/if}

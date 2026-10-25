@@ -72,8 +72,12 @@ export function createBasketStore(initial: Basket | null) {
 		applyBasket(await callApi({ action: 'add_item', itemId, quantity }));
 	}
 
-	async function addSlotLine(slotId: string) {
-		await applySlotChange(await callApi({ action: 'add_slot', slotId }));
+	/**
+	 * Book a time: in a window, `slotId` plus the service, length and start
+	 * picked; for a group session, `slotId` alone (one place).
+	 */
+	async function addSlotLine(slotId: string, booking: { itemId: string; minutes: number; start: string } | null = null) {
+		await applySlotChange(await callApi({ action: 'add_slot', slotId, ...booking }));
 	}
 
 	async function updateQuantity(lineId: string, quantity: number) {

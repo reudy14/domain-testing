@@ -148,14 +148,12 @@ function orderEmailContext(data: OrderEmailData, settings: EmailSettings) {
 	const lineRecords = [...data.lines].sort((a, b) => String(a.start || '').localeCompare(String(b.start || '')));
 
 	const lines: EmailLine[] = lineRecords.map((line) => {
+		// A booking ends after its own length (order lines from before
+		// lengths were stored fall back to their slot's end).
 		const start = line.start ? new Date(line.start).toISOString() : null;
+		const minutes = Number(line.minutes) || 0;
 		const slotEnd = line.expand?.slot?.end;
-		const duration = Number(line.expand?.item?.duration) || 0;
-		const end = slotEnd
-			? new Date(slotEnd).toISOString()
-			: start && duration
-				? new Date(new Date(start).getTime() + duration * 60_000).toISOString()
-				: null;
+		const end = start && minutes ? new Date(new Date(start).getTime() + minutes * 60_000).toISOString() : slotEnd ? new Date(slotEnd).toISOString() : null;
 		return {
 			name: String(line.name || 'Item'),
 			price: Number(line.price) || 0,

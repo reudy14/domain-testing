@@ -53,7 +53,10 @@ export function postJson<T>(path: string, data: unknown): Promise<T> {
 
 type BasketPayload = { record: Record<string, any>; lines: Record<string, any>[] } | null;
 
-/** Map the API's raw basket records to the `Basket` type used by the UI. */
+/** PocketBase's "2026-01-01 10:00:00.000Z" → ISO. */
+const pbInstant = (value: string) => new Date(String(value).replace(' ', 'T')).toISOString();
+
+/** Map the API's raw basket records (plus `unitPrice`/`end` per line) to the `Basket` type used by the UI. */
 export function mapBasket(payload: BasketPayload): Basket | null {
 	if (!payload) return null;
 	const { record, lines } = payload;
@@ -68,13 +71,15 @@ export function mapBasket(payload: BasketPayload): Basket | null {
 			slot: line.slot || null,
 			quantity: line.quantity,
 			lineType: line.lineType,
+			start: line.start ? pbInstant(line.start) : undefined,
+			end: line.end || undefined,
+			minutes: line.minutes || undefined,
 			itemName: item?.name,
-			itemPrice: item?.price,
+			itemPrice: line.unitPrice ?? null,
 			itemImageUrl: media ? getFileUrl('media', media.id, media.file) : undefined,
-			slotStart: slot?.start,
-			slotEnd: slot?.end,
+			slotKind: slot?.kind,
 			slotCapacity: slot?.capacity,
-			heldUntil: line.heldUntil ? new Date(String(line.heldUntil).replace(' ', 'T')).toISOString() : undefined
+			heldUntil: line.heldUntil ? pbInstant(line.heldUntil) : undefined
 		};
 	});
 	return {
@@ -116,7 +121,8 @@ export function mapOrder(order: Record<string, any>, lines: Record<string, any>[
 			lineType: l.lineType,
 			name: l.name,
 			price: l.price,
-			start: l.start || null
+			start: l.start || null,
+			minutes: l.minutes || null
 		}))
 	};
 }
