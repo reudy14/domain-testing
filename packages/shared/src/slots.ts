@@ -6,6 +6,7 @@
 // zonedInputToIso, so a run across a DST change still starts at 09:00.
 
 import { DISPLAY_LOCALE, toZonedDatetimeInput, zonedInputToIso } from './calendar';
+import type { SlotKind, StartTimesMode } from './types';
 
 /** A stretch of the day in which appointments may start and end, e.g. 09:00–12:00. */
 export type TimeWindow = { from: string; to: string };
@@ -43,21 +44,63 @@ export type BulkResult = {
 };
 
 /**
- * A slot with its places and blocking, as the shop hook reports it to the
- * admin (GET /api/shop/slots?detail=1). Places are taken by paid orders
- * (`booked`) and by baskets whose hold hasn't lapsed (`held`); `blockedBy`
- * is the overlapping slot whose booking/hold blocks this one.
+ * A booked or held time, as the shop hook reports it to the admin: paid
+ * order lines (`booked`) and basket lines whose hold hasn't lapsed
+ * (`held`). The practitioner is busy until `readyAt` (end + get-ready time).
+ */
+export type SlotBooking = PlannedSlot & {
+	slot: string;
+	item: string;
+	itemName: string;
+	readyAt: string;
+	quantity: number;
+	status: 'booked' | 'held';
+};
+
+/**
+ * A slot with what's booked in it (GET /api/shop/slots?detail=1). A window
+ * counts its bookings in `booked`/`held` and lists its `free` stretches; a
+ * group session has places and may be blocked by an overlapping booking.
  */
 export type SlotDetail = PlannedSlot & {
 	id: string;
-	item: string;
-	itemName: string;
-	capacity: number;
+	kind: SlotKind;
+	items: string[];
+	itemNames: string[];
 	notes: string;
 	booked: number;
 	held: number;
-	blockedBy: string;
+	// window
+	startTimes?: StartTimesMode;
+	/** `grid` windows: minutes between start times. */
+	gridMinutes?: number;
+	free?: PlannedSlot[];
+	// session
+	minutes?: number;
+	capacity?: number;
+	blockedBy?: SlotBooking | null;
 };
+
+export const START_TIMES_LABELS: Record<StartTimesMode, string> = {
+	grid: 'Fixed steps',
+	edges: 'Next free time'
+};
+
+/** Step choices for `grid` windows, in minutes; 30 is the default. */
+export const GRID_STEP_OPTIONS = [10, 15, 20, 30, 45, 60];
+export const DEFAULT_GRID_MINUTES = 30;
+
+/** What a window's start-times setting means, for the admin forms and day view. */
+export function startTimesHint(mode: StartTimesMode, gridMinutes = DEFAULT_GRID_MINUTES) {
+	return mode === 'grid'
+		? `Customers can start every ${gridMinutes} minutes from the window’s start, wherever their booking fits.`
+		: 'Customers can only book right at the start or the end of the free time, so the window shrinks from either end and no gaps are left.';
+}
+
+/** "Every 15 min" / "Next free time". */
+export function startTimesLabel(mode: StartTimesMode, gridMinutes = DEFAULT_GRID_MINUTES) {
+	return mode === 'grid' ? `Every ${gridMinutes} min` : START_TIMES_LABELS.edges;
+}
 
 export type SlotState = 'free' | 'held' | 'booked' | 'full' | 'blocked';
 
@@ -70,12 +113,18 @@ export const SLOT_STATE_LABELS: Record<SlotState, string> = {
 };
 
 /**
- * `full` only when paid bookings fill a group; a slot whose last places are
- * in baskets reads `held`, since it frees up again if those holds lapse.
+ * A window is `full` once no free time is left. A session is `full` only
+ * when paid bookings fill a group; one whose last places are in baskets
+ * reads `held`, since it frees up again if those holds lapse.
  */
-export function slotState(slot: Pick<SlotDetail, 'booked' | 'held' | 'capacity' | 'blockedBy'>): SlotState {
-	if (slot.booked >= slot.capacity) return slot.capacity > 1 ? 'full' : 'booked';
-	if (slot.held && slot.booked + slot.held >= slot.capacity) return 'held';
+export function slotState(slot: Pick<SlotDetail, 'kind' | 'booked' | 'held' | 'capacity' | 'blockedBy' | 'free'>): SlotState {
+	if (slot.kind === 'window') {
+		if ((slot.booked || slot.held) && !slot.free?.length) return slot.booked ? 'full' : 'held';
+		return slot.booked ? 'booked' : slot.held ? 'held' : 'free';
+	}
+	const capacity = slot.capacity ?? 1;
+	if (slot.booked >= capacity) return capacity > 1 ? 'full' : 'booked';
+	if (slot.held && slot.booked + slot.held >= capacity) return 'held';
 	if (slot.booked) return 'booked';
 	if (slot.held) return 'held';
 	return slot.blockedBy ? 'blocked' : 'free';
@@ -191,7 +240,22 @@ export type GeneratePlanInput = {
 	timeZone: string;
 };
 
-/** Every slot the generator would create, before skipping overlaps/past ones. */
+/** Each chosen day's opening hours as windows (dates in `timeZone`), before skipping overlaps/past ones. */
+export function planWindows(input: Omit<GeneratePlanInput, 'durationMinutes' | 'bufferMinutes'>): PlannedSlot[] {
+	const days = new Set(input.weekdays);
+	const slots: PlannedSlot[] = [];
+	for (const key of dateKeysBetween(input.fromDate, input.toDate)) {
+		if (!days.has(weekdayOfKey(key))) continue;
+		for (const window of input.windows) {
+			const start = zonedInputToIso(`${key}T${window.from}`, input.timeZone);
+			const end = zonedInputToIso(`${key}T${window.to}`, input.timeZone);
+			if (start && end && end > start) slots.push({ start, end });
+		}
+	}
+	return slots;
+}
+
+/** Every group session the generator would create, before skipping overlaps/past ones. */
 export function planGeneratedSlots(input: GeneratePlanInput): PlannedSlot[] {
 	const times = startTimesInWindows(input.windows, input.durationMinutes, input.bufferMinutes);
 	const days = new Set(input.weekdays);

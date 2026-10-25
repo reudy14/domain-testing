@@ -29,14 +29,14 @@ app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 │   │   ├── pages/            # Page CRUD + block editor
 │   │   ├── calendar/         # Event CRUD (menu label: Events)
 │   │   ├── items/            # Service/product CRUD (menu label: Services & products)
-│   │   ├── slots/            # Bookable slots: month calendar (?month=YYYY-MM), CRUD, bulk generate/copy/clear
+│   │   ├── slots/            # Time windows + group sessions: month calendar (?month=YYYY-MM), CRUD, bulk generate/copy/clear
 │   │   ├── orders/           # Order list + booking-email status/resend
 │   │   ├── customers/        # Customer personal data (GDPR): search, export, correct, erase, retention settings
 │   │   ├── emails/           # Block-based booking email editor (live preview, test send)
 │   │   ├── globals/          # Header/footer/colors editor (menu label: Site design)
 │   │   ├── backup/           # Export/import UI (calls api/export, api/import)
 │   │   ├── preview/          # Draft preview via sessionStorage (same-origin)
-│   │   └── api/              # upload, export, import endpoints
+│   │   └── api/              # upload, export, import, slots (Shop block times in /preview) endpoints
 │   ├── hooks.server.ts       # Auth guard — all routes except /login
 │   └── app.css               # Tailwind + DaisyUI + custom theme
 ├── static/                   # Static assets
@@ -60,7 +60,7 @@ app-public/                   # SvelteKit public app (serves *.<domain>)
 │   │   ├── +layout.svelte    # Root layout (always renders Header/Footer)
 │   │   ├── +page.svelte      # Home page (slug=home)
 │   │   ├── [slug]/           # Dynamic CMS pages
-│   │   ├── api/              # basket, checkout, webhooks endpoints
+│   │   ├── api/              # basket, checkout, webhooks, slots (Shop block times) endpoints
 │   │   └── checkout/return/  # Stripe return URL
 │   ├── hooks.server.ts       # Creates PB client in locals (no auth guard)
 │   └── app.css               # Tailwind + DaisyUI + custom theme
@@ -119,6 +119,7 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
 ### Shared Code
 - `packages/shared/src/types.ts` — all type definitions
 - `packages/shared/src/calendar.ts` — calendar utilities (used by admin calendar editor and public upcoming calendar block)
+- `packages/shared/src/items.ts` — service durations (`parseDurations`, `formatDuration`, `lowestPrice`); which length costs what is charged by the shop hooks
 - `packages/shared/src/slots.ts` — pure slot planning (generate/copy-week maths on date keys + wall-clock times in `SITE_TIMEZONE`, DST-safe); the `/slots` actions use it via `$lib/slots`, PocketBase I/O is in `app-admin/src/lib/server/slots.ts`
 - Each app's `svelte.config.js` declares `kit.alias.$shared → '../packages/shared/src'`
 - Each app's `src/lib/types.ts` and `src/lib/calendar.ts` re-export from `$shared` so existing `$lib/types` and `$lib/calendar` imports work
@@ -131,7 +132,7 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
 - **Always build filters with `pb.filter('slug = {:slug}', { slug })`** — never interpolate values into filter strings (quotes break them).
 - **Schema changes**: add a migration to `pocketbase/pb_migrations/` (runs once, on the next PocketBase start) **and** mirror it in `pb_schema.json` (fresh installs import that after the migrations have already run). Migrations must skip missing collections and must not throw for data problems — a failing migration stops PocketBase from starting.
 - **API rules**: CMS collections require `@request.auth.id != ''`, so `users` must never allow public sign-up (its createRule is superuser-only). Commerce writes (orders, order_lines, baskets, basket_lines) are superuser-only; they happen in the PocketBase shop hooks (`pocketbase/pb_hooks/shop/lib.js`), which bypass rules.
-- **Slot availability** (places + blocking by overlapping bookings, incl. get-ready time) is computed only by `slotStates()` in the shop hooks — the public listing, basket holds and the admin `/slots` page all go through it (`GET /api/shop/slots`, `?detail=1` for the admin). Never store booking state on a slot or re-implement the rule elsewhere; see the README's *Slot availability*.
+- **Slot availability** (window start times, group-session places, blocking by overlapping bookings incl. get-ready time) is computed only by `availability()`/`windowStartTimes()`/`checkBooking()` in the shop hooks — the public listing, basket holds and the admin `/slots` page all go through it (`GET /api/shop/slots?item=&minutes=&from=&to=`, `?detail=1` for the admin). Slots are `window`s (services bookable at any of their lengths) or group `session`s; bookings carry their own `start`/`minutes` on basket/order lines. Never store booking state on a slot or re-implement the rule elsewhere; see the README's *Slot availability*.
 - **Customer personal data (GDPR)** lives in `orders.customerDetails`/`email` and (during checkout) `baskets`. Admin access, correction, erasure (= anonymise the order, never delete it — the accounts need it) and the retention cron are in `pocketbase/pb_hooks/privacy/`; the admin `/customers` page only calls `/api/privacy/*`. A new place that stores customer details (e.g. a Google Calendar sync) must be covered by export, erase and retention too, and listed in the privacy draft (`app-admin/src/lib/admin/privacyTemplate.ts`). Don't load third-party resources on public pages (fonts are bundled; Stripe.js loads only at Pay) — each one sends visitors' IPs elsewhere and may need consent. See the README's *Personal data (GDPR)*.
 - **Shop / payments**: all basket, slot-hold, Stripe and order logic lives in the PocketBase hooks (JSVM: synchronous, each handler `require()`s the lib; see the header comment). The public app must stay unprivileged — no superuser login, no Stripe secret key; its routes only proxy to `/api/shop/*` and manage the `basket_id` cookie (`app-public/src/lib/server/shop.ts`). Booking emails are rendered and sent by the public app from data the webhook hook returns (`OrderEmailData`, `sendOrderEmailsFromData`); keep `orderEmailData()` in the hook and `loadOrderEmailData()` in `packages/shared/src/server/email` returning the same shape. Local testing uses `stripe-mock` (`STRIPE_API_BASE`, local compose only).
 
@@ -188,4 +189,4 @@ cd app-public && npm run build
 - `STRIPE_CURRENCY` — shop currency (ISO 4217, default `eur`; e.g. `nok`). One setting for what Stripe charges and how prices are shown: PocketBase, both apps' layout data (`currency`, read by blocks via `page.data.currency`) and booking emails. Format prices with `formatPrice(amount, currency)` from `$shared/calendar` — never hard-code a currency.
 - Secrets (Stripe, `INTERNAL_API_SECRET`, SMTP) are read from a root-level `.env` next to `docker-compose.yml`; see `.env.example`.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` → PocketBase only. `INTERNAL_API_SECRET` → PocketBase and app-public (booking-email status). No app gets PocketBase superuser credentials.
-- Shop listings are public data, loaded anonymously by `loadShopData()` in `packages/shared/src/server/shop.ts` (public layout and admin `/preview`; slots via `GET /api/shop/slots`); if a Shop block has nothing to show it says "Nothing is available".
+- Shop listings are public data, loaded anonymously by `loadShopData()` in `packages/shared/src/server/shop.ts` (public layout and admin `/preview`). The Shop block fetches bookable times itself, per service and length, from `GET /api/slots` in each app (a proxy to `GET /api/shop/slots`); if it has nothing to show it says "Nothing is available".

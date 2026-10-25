@@ -26,9 +26,9 @@
 			<p class="font-semibold">Nothing to {deleting ? 'delete' : 'create'}.</p>
 		{/if}
 		<ul class="mt-1 list-inside list-disc text-base-content/70 empty:hidden">
-			{#if preview.skippedOverlap}<li>{plural(preview.skippedOverlap, 'slot')} skipped — it would overlap a slot of the same service.</li>{/if}
+			{#if preview.skippedOverlap}<li>{plural(preview.skippedOverlap, 'slot')} skipped — it would overlap another window, or a session of the same service.</li>{/if}
 			{#if preview.skippedPast}<li>{plural(preview.skippedPast, 'slot')} skipped — in the past.</li>{/if}
-			{#if preview.kept}<li>{plural(preview.kept, 'slot')} kept — booked, or in a customer’s basket right now.</li>{/if}
+			{#if preview.kept}<li>{plural(preview.kept, 'slot')} kept — something in it is booked, or in a customer’s basket right now.</li>{/if}
 		</ul>
 	</div>
 {/if}

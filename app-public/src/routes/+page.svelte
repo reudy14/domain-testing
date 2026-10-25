@@ -8,4 +8,4 @@
 	<title>{data.page.title}</title>
 </svelte:head>
 
-<BlockRenderer blocks={data.page.blocks || []} calendarEvents={data.calendarEvents || []} items={data.items || []} slots={data.slots || []} />
+<BlockRenderer blocks={data.page.blocks || []} calendarEvents={data.calendarEvents || []} items={data.items || []} />

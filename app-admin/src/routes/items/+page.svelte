@@ -3,6 +3,7 @@
 	import { confirmSubmit } from '$lib/admin/confirm';
 	import Modal from '$lib/admin/Modal.svelte';
 	import type { ItemRecord, ItemType } from '$lib/types';
+	import { formatDuration } from '$shared/items';
 
 	let { data, form } = $props();
 	let items = $derived(data.items || []);
@@ -20,7 +21,8 @@
 		imageUrl: string;
 		type: ItemType;
 		stock: string;
-		duration: string;
+		/** Service lengths and prices, as typed (one form row each). */
+		durations: { minutes: string; price: string }[];
 		bufferMinutes: string;
 		capacity: string;
 		active: boolean;
@@ -32,7 +34,17 @@
 	let money = $derived(new Intl.NumberFormat('en-GB', { style: 'currency', currency: data.currency }));
 
 	function emptyDraft(): ItemDraft {
-		return { id: '', name: '', description: '', price: 0, image: '', imageUrl: '', type: 'item', stock: '', duration: '', bufferMinutes: '', capacity: '', active: true };
+		return { id: '', name: '', description: '', price: 0, image: '', imageUrl: '', type: 'item', stock: '', durations: [{ minutes: '60', price: '' }], bufferMinutes: '', capacity: '', active: true };
+	}
+
+	function addDuration() {
+		const last = Number(draft.durations.at(-1)?.minutes) || 0;
+		draft.durations.push({ minutes: last ? String(last + 30) : '60', price: '' });
+	}
+
+	/** "1 hour / 2 hours" for the table. */
+	function durationList(item: ItemRecord) {
+		return item.durations.map((d) => formatDuration(d.minutes)).join(' / ') || 'no lengths set';
 	}
 
 	function createItem() {
@@ -51,7 +63,7 @@
 			imageUrl: item.imageUrl,
 			type: item.type,
 			stock: item.stock == null ? '' : String(item.stock),
-			duration: item.duration == null ? '' : String(item.duration),
+			durations: item.durations.length ? item.durations.map((d) => ({ minutes: String(d.minutes), price: String(d.price) })) : [{ minutes: '60', price: '' }],
 			bufferMinutes: item.bufferMinutes == null ? '' : String(item.bufferMinutes),
 			capacity: item.capacity == null ? '' : String(item.capacity),
 			active: item.active
@@ -109,9 +121,9 @@
 								</div>
 							</td>
 							<td><span class="badge">{item.type === 'item_with_time' ? 'Service' : 'Product'}</span></td>
-							<td>{money.format(item.price)}</td>
+							<td>{item.durations.length > 1 ? `from ${money.format(item.price)}` : money.format(item.price)}</td>
 							<td>{item.type === 'item' ? (item.stock ?? '∞') : '—'}</td>
-							<td>{item.type === 'item_with_time' ? `${item.duration ?? 0} min${item.bufferMinutes ? ` + ${item.bufferMinutes} get-ready` : ''}${(item.capacity ?? 1) > 1 ? ` · ${item.capacity} places` : ''}` : '—'}</td>
+							<td>{item.type === 'item_with_time' ? `${durationList(item)}${item.bufferMinutes ? ` + ${item.bufferMinutes} min get-ready` : ''}${(item.capacity ?? 1) > 1 ? ` · ${item.capacity} places` : ''}` : '—'}</td>
 							<td><span class="badge" class:badge-success={item.active}>{item.active ? 'Active' : 'Inactive'}</span></td>
 							<td class="text-right"><button class="btn btn-sm" type="button" onclick={() => editItem(item)}>Edit</button></td>
 						</tr>
@@ -140,40 +152,59 @@
 			<textarea class="textarea min-h-28 w-full" name="description" bind:value={draft.description}></textarea>
 		</label>
 
-		<div class="grid gap-x-4 md:grid-cols-2">
-			<label class="fieldset">
-				<span class="fieldset-legend">Price ({data.currency})</span>
-				<input class="input w-full" type="number" step="0.01" min="0" name="price" required bind:value={draft.price} />
-			</label>
-			<label class="fieldset">
-				<span class="fieldset-legend">Type</span>
-				<select class="select w-full" name="type" bind:value={draft.type}>
-					<option value="item">Product</option>
-					<option value="item_with_time">Service (bookable)</option>
-				</select>
-			</label>
-		</div>
+		<label class="fieldset">
+			<span class="fieldset-legend">Type</span>
+			<select class="select w-full" name="type" bind:value={draft.type}>
+				<option value="item">Product</option>
+				<option value="item_with_time">Service (bookable)</option>
+			</select>
+		</label>
 
 		{#if draft.type === 'item'}
-			<label class="fieldset">
-				<span class="fieldset-legend">Stock</span>
-				<input class="input w-full" type="number" min="0" step="1" name="stock" placeholder="Unlimited when empty" bind:value={draft.stock} />
-			</label>
-		{:else}
 			<div class="grid gap-x-4 md:grid-cols-2">
 				<label class="fieldset">
-					<span class="fieldset-legend">Duration (minutes)</span>
-					<input class="input w-full" type="number" min="1" step="1" name="duration" placeholder="60" required bind:value={draft.duration} />
+					<span class="fieldset-legend">Price ({data.currency})</span>
+					<input class="input w-full" type="number" step="0.01" min="0" name="price" required bind:value={draft.price} />
 				</label>
+				<label class="fieldset">
+					<span class="fieldset-legend">Stock</span>
+					<input class="input w-full" type="number" min="0" step="1" name="stock" placeholder="Unlimited when empty" bind:value={draft.stock} />
+				</label>
+			</div>
+		{:else}
+			<div class="fieldset">
+				<span class="fieldset-legend">Lengths and prices</span>
+				<div class="space-y-2">
+					{#each draft.durations as row, i}
+						<div class="flex flex-wrap items-center gap-2">
+							<label class="input w-36">
+								<input type="number" min="5" max="720" step="5" name="durationMinutes" required aria-label="Length in minutes" bind:value={row.minutes} />
+								<span class="label">min</span>
+							</label>
+							<label class="input w-40">
+								<input type="number" min="0" step="0.01" name="durationPrice" required aria-label="Price for this length" bind:value={row.price} />
+								<span class="label">{data.currency}</span>
+							</label>
+							{#if Number(row.minutes) >= 5}<span class="text-sm text-base-content/60">{formatDuration(Number(row.minutes))}</span>{/if}
+							{#if draft.durations.length > 1}
+								<button class="btn btn-ghost btn-sm" type="button" aria-label="Remove this length" onclick={() => draft.durations.splice(i, 1)}>✕</button>
+							{/if}
+						</div>
+					{/each}
+				</div>
+				<button class="btn btn-ghost btn-sm mt-1 w-fit" type="button" onclick={addDuration}>+ Add a length</button>
+				<span class="label">Customers pick a length with a slider in the shop; the price follows it.</span>
+			</div>
+			<div class="grid gap-x-4 md:grid-cols-2">
 				<label class="fieldset">
 					<span class="fieldset-legend">Get-ready time (minutes)</span>
 					<input class="input w-full" type="number" min="0" step="1" name="bufferMinutes" placeholder="0" bind:value={draft.bufferMinutes} />
-					<span class="label">Gap after each appointment — between generated slots, and before another service can start</span>
+					<span class="label">Gap after each appointment, before the next one can start</span>
 				</label>
 				<label class="fieldset">
-					<span class="fieldset-legend">Places per slot</span>
+					<span class="fieldset-legend">Places in a group session</span>
 					<input class="input w-full" type="number" min="1" max="500" step="1" name="capacity" placeholder="1" bind:value={draft.capacity} />
-					<span class="label">1 for one-to-one; more for a group session. New slots start with this.</span>
+					<span class="label">Only for group sessions (Slots → group session). New sessions start with this.</span>
 				</label>
 			</div>
 		{/if}

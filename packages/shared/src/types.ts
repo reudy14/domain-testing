@@ -119,31 +119,42 @@ export const defaultPrivacy: PrivacyGlobal = {
 
 export type ItemType = 'item' | 'item_with_time';
 
+/** One length a service can be booked for, and its price. */
+export type ItemDuration = { minutes: number; price: number };
+
 export type ItemRecord = {
 	id: string;
 	name: string;
 	description: string;
+	/** A product's price; for a service, its lowest duration price (kept in sync by the admin). */
 	price: number;
 	image: string; // media record id
 	imageUrl: string; // resolved URL (populated by server load)
 	type: ItemType;
 	stock: number | null;
-	duration: number | null; // minutes, for item_with_time
-	bufferMinutes: number | null; // get-ready time after each appointment; default gap when generating slots
-	capacity: number | null; // places per slot (default for new slots; >1 = group session)
+	durations: ItemDuration[]; // item_with_time: the lengths it can be booked for, shortest first
+	bufferMinutes: number | null; // get-ready time after each appointment
+	capacity: number | null; // places in a new group session (>1 = group)
 	active: boolean;
 };
 
+/** `window`: a stretch of time in which its services can be booked; `session`: one service at a fixed time with places. */
+export type SlotKind = 'window' | 'session';
+
+/** Where bookings may start in a window: every 30 minutes, or only at the start/end of the free time. */
+export type StartTimesMode = 'grid' | 'edges';
+
 /**
- * A bookable slot as the shop lists it (GET /api/shop/slots): only slots
- * with places left that no overlapping booking blocks.
+ * A time a customer can book, as the shop lists it (GET /api/shop/slots for
+ * one service and duration): a start time in a window, or a group session
+ * with places left.
  */
-export type SlotRecord = {
-	id: string;
-	item: string; // item id
+export type BookableTime = {
+	slot: string; // slot id (window or session)
+	kind: SlotKind;
 	start: string;
 	end: string;
-	capacity: number; // places in total
+	capacity: number; // places in total (1 in a window)
 	free: number; // places still bookable
 };
 
@@ -156,12 +167,16 @@ export type BasketLine = {
 	slot: string | null;
 	quantity: number;
 	lineType: 'item' | 'slot';
+	/** Slot lines: the booked time and length. */
+	start?: string;
+	end?: string;
+	minutes?: number;
 	// Expanded fields (populated server-side)
 	itemName?: string;
-	itemPrice?: number;
+	/** Price of one unit (a product, or the service at this length); null if no longer offered. */
+	itemPrice?: number | null;
 	itemImageUrl?: string;
-	slotStart?: string;
-	slotEnd?: string;
+	slotKind?: SlotKind;
 	slotCapacity?: number;
 	/** Slot lines: when the reservation lapses and the line is dropped (ISO). */
 	heldUntil?: string;
@@ -211,6 +226,8 @@ export type OrderLine = {
 	name: string;
 	price: number;
 	start: string | null;
+	/** Slot lines: the booked length. */
+	minutes: number | null;
 };
 
 // ── Block data types ──────────────────────────────────────────────────

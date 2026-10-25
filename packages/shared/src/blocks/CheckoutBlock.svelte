@@ -6,6 +6,7 @@
 	import { DEFAULT_NOTES_HINT, DEFAULT_PRIVACY_NOTICE, type BasketLine, type CheckoutBlockData } from '$shared/types';
 	import { getBasketContext } from '$shared/basket.svelte';
 	import { DEFAULT_CURRENCY, DEFAULT_TIMEZONE, formatInstant, formatPrice } from '$shared/calendar';
+	import { formatDuration } from '$shared/items';
 	import { loadStripe } from '$shared/stripe-client';
 	import type { Stripe, StripeElements, StripePaymentElement } from '@stripe/stripe-js';
 
@@ -90,7 +91,7 @@
 	}
 
 	function describeLine(line: BasketLine) {
-		return [line.itemName ?? 'A time slot', line.slotStart ? formatSlotTime(line.slotStart) : ''].filter(Boolean).join(', ');
+		return [line.itemName ?? 'A time slot', line.start ? formatSlotTime(line.start) : ''].filter(Boolean).join(', ');
 	}
 
 	// At zero, reload the basket: the server drops the lapsed line. Retry every
@@ -345,10 +346,14 @@
 
 					<div class="min-w-0 flex-1">
 						<p class="truncate font-medium">{line.itemName ?? 'Item'}</p>
-						{#if line.lineType === 'slot' && line.slotStart}
-							<p class="text-sm text-fg-body/70">{formatSlotTime(line.slotStart)}</p>
+						{#if line.lineType === 'slot' && line.start}
+							<p class="text-sm text-fg-body/70">{formatSlotTime(line.start)}{line.minutes ? ` · ${formatDuration(line.minutes)}` : ''}</p>
 						{/if}
-						<p class="text-sm text-fg-body/70">{formatPrice(line.itemPrice ?? 0, currency)}</p>
+						{#if line.itemPrice == null}
+							<p class="text-sm text-terracotta">No longer offered at this length — please remove it and pick again.</p>
+						{:else}
+							<p class="text-sm text-fg-body/70">{formatPrice(line.itemPrice, currency)}</p>
+						{/if}
 					</div>
 
 					<!-- Products, and places in a group session (capacity > 1); the server checks what's left. -->

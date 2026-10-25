@@ -58,7 +58,7 @@
 		<label class="fieldset">
 			<span class="fieldset-legend">Services</span>
 			<select class="select w-full" name="item" bind:value={draft.item}>
-				<option value="">All services</option>
+				<option value="">All slots</option>
 				{#each items as item (item.id)}<option value={item.id}>{item.name}</option>{/each}
 			</select>
 		</label>
