@@ -308,6 +308,8 @@ function bookableTimes(app, query) {
 /**
  * Every slot in a range (or one slot by id) with its bookings — for the
  * signed-in admin. `query`: from/to (ISO), optional item, or id.
+ * `bookings`: every booked/held time starting in the range, or for one
+ * slot, that slot's own.
  */
 function slotDetails(app, query) {
 	let slots;
@@ -343,7 +345,7 @@ function slotDetails(app, query) {
 			}
 			return detail;
 		}),
-		bookings: busy.filter((b) => b.start >= from && b.start < to).map(booking)
+		bookings: busy.filter((b) => (query.id ? b.slot === String(query.id) : b.start >= from && b.start < to)).map(booking)
 	};
 }
 
