@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import type { BasketLine, ShopBlockData, ItemRecord, SlotRecord } from '$shared/types';
 	import { getBasketContext } from '$shared/basket.svelte';
-	import { DEFAULT_TIMEZONE, addMonths, createCalendarMonth, formatInstant, formatPrice, startOfMonth, zonedDateKey } from '$shared/calendar';
+	import { DEFAULT_CURRENCY, DEFAULT_TIMEZONE, addMonths, createCalendarMonth, formatInstant, formatPrice, startOfMonth, zonedDateKey } from '$shared/calendar';
 	import { formatDateKey } from '$shared/slots';
 
 	let { data = {}, items = [], slots = [] } = $props<{
@@ -32,6 +32,7 @@
 	const MONTHS_SHOWN = 2;
 	const weekdayLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 	const timezone = $derived<string>(page.data.timezone ?? DEFAULT_TIMEZONE);
+	const currency = $derived<string>(page.data.currency ?? DEFAULT_CURRENCY);
 
 	let visibleItems: ItemRecord[] = $derived.by(() => {
 		let result: ItemRecord[] = items;
@@ -234,7 +235,7 @@
 					{/if}
 
 					<div class="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-3">
-						<span class="text-lg font-semibold text-sage-dark">{formatPrice(item.price)}</span>
+						<span class="text-lg font-semibold text-sage-dark">{formatPrice(item.price, currency)}</span>
 						{#if isService && item.duration != null}
 							<span class="text-xs text-charcoal/60">{item.duration} min</span>
 						{:else if !isService && item.stock != null && item.stock > 0 && item.stock <= 5}

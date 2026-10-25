@@ -58,8 +58,25 @@ export const DISPLAY_LOCALE = 'en-GB';
 /** Fallback when no SITE_TIMEZONE reaches the page. */
 export const DEFAULT_TIMEZONE = 'Europe/Oslo';
 
-export function formatPrice(amount: number) {
-	return new Intl.NumberFormat(DISPLAY_LOCALE, { style: 'currency', currency: 'EUR' }).format(amount);
+/** Fallback when no shop currency reaches the page. */
+export const DEFAULT_CURRENCY = 'EUR';
+
+/**
+ * The shop currency as an ISO 4217 code, from STRIPE_CURRENCY ('nok' → 'NOK').
+ * One setting for what Stripe charges and what every price shows.
+ */
+export function shopCurrency(value: string | undefined) {
+	return (value || DEFAULT_CURRENCY).toUpperCase();
+}
+
+/** A price in the shop currency (layout data `currency`). */
+export function formatPrice(amount: number, currency = DEFAULT_CURRENCY) {
+	try {
+		return new Intl.NumberFormat(DISPLAY_LOCALE, { style: 'currency', currency }).format(amount);
+	} catch {
+		// Not a currency code Intl knows (a typo in STRIPE_CURRENCY).
+		return `${amount.toFixed(2)} ${currency}`;
+	}
 }
 
 /** Format an instant in `timeZone` with the display locale. */

@@ -5,7 +5,7 @@
 	import { page } from '$app/state';
 	import { DEFAULT_NOTES_HINT, DEFAULT_PRIVACY_NOTICE, type BasketLine, type CheckoutBlockData } from '$shared/types';
 	import { getBasketContext } from '$shared/basket.svelte';
-	import { DEFAULT_TIMEZONE, formatInstant, formatPrice } from '$shared/calendar';
+	import { DEFAULT_CURRENCY, DEFAULT_TIMEZONE, formatInstant, formatPrice } from '$shared/calendar';
 	import { loadStripe } from '$shared/stripe-client';
 	import type { Stripe, StripeElements, StripePaymentElement } from '@stripe/stripe-js';
 
@@ -43,12 +43,15 @@
 		lastSig = sig;
 	});
 
+	// Prices in the shop currency (STRIPE_CURRENCY, via layout data).
+	const currency = $derived<string>(page.data.currency ?? DEFAULT_CURRENCY);
+
 	const payLabel = $derived(
 		payState === 'confirming'
 			? 'Confirming…'
 			: payState === 'creating'
 				? 'Preparing payment…'
-				: `Pay ${formatPrice(basket.total)}`
+				: `Pay ${formatPrice(basket.total, currency)}`
 	);
 
 	const timezone = $derived<string>(page.data.timezone ?? DEFAULT_TIMEZONE);
@@ -345,7 +348,7 @@
 						{#if line.lineType === 'slot' && line.slotStart}
 							<p class="text-sm text-fg-body/70">{formatSlotTime(line.slotStart)}</p>
 						{/if}
-						<p class="text-sm text-fg-body/70">{formatPrice(line.itemPrice ?? 0)}</p>
+						<p class="text-sm text-fg-body/70">{formatPrice(line.itemPrice ?? 0, currency)}</p>
 					</div>
 
 					<!-- Products, and places in a group session (capacity > 1); the server checks what's left. -->
@@ -374,7 +377,7 @@
 					{/if}
 
 					<p class="w-20 shrink-0 text-right font-medium">
-						{formatPrice((line.itemPrice ?? 0) * line.quantity)}
+						{formatPrice((line.itemPrice ?? 0) * line.quantity, currency)}
 					</p>
 
 					<button
@@ -394,7 +397,7 @@
 		<div class="mt-6 rounded-2xl border border-charcoal/10 bg-white p-5">
 			<div class="flex items-center justify-between">
 				<span class="text-fg-body/70">Subtotal</span>
-				<span class="font-serif text-xl font-bold">{formatPrice(basket.total)}</span>
+				<span class="font-serif text-xl font-bold">{formatPrice(basket.total, currency)}</span>
 			</div>
 		</div>
 
@@ -505,7 +508,7 @@
 						disabled={payState === 'confirming'}
 						onclick={confirmPayment}
 					>
-						{payState === 'confirming' ? 'Confirming…' : `Confirm payment — ${formatPrice(basket.total)}`}
+						{payState === 'confirming' ? 'Confirming…' : `Confirm payment — ${formatPrice(basket.total, currency)}`}
 					</button>
 				{/if}
 

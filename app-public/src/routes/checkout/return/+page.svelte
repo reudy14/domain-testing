@@ -33,12 +33,12 @@
 								<div class="text-sm text-charcoal/60">{formatSlotDate(line.start)}</div>
 							{/if}
 						</div>
-						<span>{formatPrice(line.price * line.quantity)}</span>
+						<span>{formatPrice(line.price * line.quantity, data.currency)}</span>
 					</li>
 				{/each}
 			</ul>
 			<div class="mt-4 flex justify-between border-t border-charcoal/10 pt-4 font-bold">
-				<span>Total</span><span>{formatPrice(data.order.total)}</span>
+				<span>Total</span><span>{formatPrice(data.order.total, data.currency)}</span>
 			</div>
 		</div>
 
