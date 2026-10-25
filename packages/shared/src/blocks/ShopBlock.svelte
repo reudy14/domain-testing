@@ -321,31 +321,11 @@
 					{/if}
 
 					<div class="mt-auto pt-3">
-						{#if isService && item.durations.length > 1 && ui}
-							<!-- Several lengths: a slider steps through them and the price follows. -->
-							<label class="block">
-								<span class="flex items-baseline justify-between gap-3">
-									<span class="text-sm font-medium text-charcoal">{formatDuration(duration!.minutes)}</span>
-									<span class="text-lg font-semibold text-sage-dark">{formatPrice(duration!.price, currency)}</span>
-								</span>
-								<input
-									type="range"
-									class="mt-2 w-full cursor-pointer accent-sage"
-									min="0"
-									max={item.durations.length - 1}
-									step="1"
-									value={ui.durationIndex}
-									aria-label="Length of {item.name}"
-									aria-valuetext="{formatDuration(duration!.minutes)}, {formatPrice(duration!.price, currency)}"
-									oninput={(e) => selectDuration(item.id, Number(e.currentTarget.value))}
-								/>
-							</label>
-							<div class="mt-1 flex justify-between text-xs text-charcoal/50" aria-hidden="true">
-								{#each item.durations as option, i (option.minutes)}
-									<button type="button" tabindex="-1" class="hover:text-charcoal {i === ui.durationIndex ? 'font-semibold text-charcoal' : ''}" onclick={() => selectDuration(item.id, i)}>
-										{formatDuration(option.minutes)}
-									</button>
-								{/each}
+						{#if isService && item.durations.length > 1}
+							<!-- Several lengths: the length is picked (slider) after pressing Book. -->
+							<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+								<span class="text-lg font-semibold text-sage-dark">from {formatPrice(lowestPrice(item.durations) ?? item.price, currency)}</span>
+								<span class="text-xs text-charcoal/60">{formatDuration(item.durations[0].minutes)} – {formatDuration(item.durations[item.durations.length - 1].minutes)}</span>
 							</div>
 						{:else}
 							<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -425,6 +405,35 @@
 					{@const shown = shownRange(ui.monthOffset)}
 					{@const anyShown = availableKeys.some((key) => key >= shown.from && key <= shown.to)}
 					<div class={isList ? 'mt-5 border-t border-charcoal/10 pt-5 sm:basis-full' : 'border-t border-charcoal/10 bg-warm p-4'}>
+						{#if item.durations.length > 1}
+							<!-- Several lengths: a slider steps through them and the price follows. -->
+							<div class="mb-5">
+								<label class="block">
+									<span class="flex items-baseline justify-between gap-3">
+										<span class="text-sm font-medium text-charcoal">Length · {formatDuration(duration.minutes)}</span>
+										<span class="text-lg font-semibold text-sage-dark">{formatPrice(duration.price, currency)}</span>
+									</span>
+									<input
+										type="range"
+										class="mt-2 w-full cursor-pointer accent-sage"
+										min="0"
+										max={item.durations.length - 1}
+										step="1"
+										value={ui.durationIndex}
+										aria-label="Length of {item.name}"
+										aria-valuetext="{formatDuration(duration.minutes)}, {formatPrice(duration.price, currency)}"
+										oninput={(e) => selectDuration(item.id, Number(e.currentTarget.value))}
+									/>
+								</label>
+								<div class="mt-1 flex justify-between text-xs text-charcoal/50" aria-hidden="true">
+									{#each item.durations as option, i (option.minutes)}
+										<button type="button" tabindex="-1" class="hover:text-charcoal {i === ui.durationIndex ? 'font-semibold text-charcoal' : ''}" onclick={() => selectDuration(item.id, i)}>
+											{formatDuration(option.minutes)}
+										</button>
+									{/each}
+								</div>
+							</div>
+						{/if}
 						<div class="mb-3 flex items-center justify-between gap-2">
 							<button
 								type="button"
