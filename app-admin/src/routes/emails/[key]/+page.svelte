@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import BlockList from '$lib/admin/BlockList.svelte';
+	import SaveStatus from '$lib/admin/SaveStatus.svelte';
 	import EmailBlockEditor from '$lib/admin/editors/EmailBlockEditor.svelte';
 	import { createEmailBlock, emailBlockLabels, emailBlockTypes } from '$lib/admin/emailBlockDefaults';
 	import { warnOnUnsavedChanges } from '$lib/admin/unsaved.svelte';
@@ -95,9 +96,7 @@
 			</div>
 		</div>
 
-		{#if form?.action === 'save' && form.message}
-			<div class="alert" class:alert-success={form.ok} class:alert-error={!form.ok}>{form.message}</div>
-		{/if}
+		<SaveStatus result={form?.action === 'save' ? form : null} />
 
 		<div class="space-y-2 rounded-box bg-base-100 p-5 shadow">
 			<label class="label cursor-pointer gap-3 text-base-content">

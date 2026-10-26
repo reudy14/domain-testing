@@ -43,6 +43,34 @@
 		dropIndex = null;
 	}
 
+	// Touch: phones don't fire HTML drag events, so the handle follows the finger with
+	// pointer events instead (the mouse keeps native drag-and-drop on the whole row).
+	let list = $state<HTMLUListElement>();
+
+	function touchDragStart(e: PointerEvent, index: number) {
+		if (e.pointerType === 'mouse') return;
+		e.preventDefault();
+		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+		dragIndex = index;
+		dropIndex = index;
+	}
+
+	function touchDragMove(e: PointerEvent) {
+		if (dragIndex === null || !list) return;
+		const rows = [...list.children] as HTMLElement[];
+		const over = rows.findIndex((row) => e.clientY < row.getBoundingClientRect().bottom);
+		dropIndex = over === -1 ? rows.length - 1 : over;
+		// The handle blocks scrolling, so scroll for the finger near the screen's edges.
+		if (e.clientY < 64) window.scrollBy(0, -12);
+		else if (e.clientY > window.innerHeight - 64) window.scrollBy(0, 12);
+	}
+
+	function touchDragEnd() {
+		if (dragIndex !== null && dropIndex !== null) drop(dropIndex);
+		dragIndex = null;
+		dropIndex = null;
+	}
+
 	function moveBy(index: number, delta: number) {
 		const to = index + delta;
 		if (to >= 0 && to < blocks.length) onMove(index, to);
@@ -51,7 +79,7 @@
 
 <!-- `isolate` on each row: the delete button's z-indexed layers must stay
      inside their row, or they paint over dropdowns like "Add block". -->
-<ul class="space-y-2">
+<ul class="space-y-2" bind:this={list}>
 	{#each blocks as block, i (block.id)}
 		<li
 			class="isolate flex items-center gap-2 rounded-box border bg-base-100 p-2 pl-3 shadow-sm transition-colors {selectedId === block.id ? 'border-primary ring-1 ring-primary' : 'border-base-300 hover:border-base-content/30'}"
@@ -78,7 +106,18 @@
 				dropIndex = null;
 			}}
 		>
-			<span class="cursor-grab select-none text-lg text-base-content/40" aria-hidden="true" title="Drag to reorder">⠿</span>
+			<span
+				class="-my-2 -ml-2 cursor-grab touch-none select-none px-2 py-2 text-lg text-base-content/40"
+				aria-hidden="true"
+				title="Drag to reorder"
+				onpointerdown={(e) => touchDragStart(e, i)}
+				onpointermove={touchDragMove}
+				onpointerup={touchDragEnd}
+				onpointercancel={() => {
+					dragIndex = null;
+					dropIndex = null;
+				}}
+			>⠿</span>
 			<button
 				type="button"
 				class="flex-1 truncate py-1 text-left font-semibold"
