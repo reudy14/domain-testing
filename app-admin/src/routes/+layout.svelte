@@ -13,8 +13,10 @@
 	import { page } from '$app/state';
 	import { createBasketStore, setBasketContext } from '$lib/basket.svelte';
 	import { brandThemeVars, rootStyleTag } from '$shared/theme';
+	import { thumbUrl } from '$shared/pb';
 
 	let { children, data } = $props();
+	let icon = $derived(data.logoUrl ? thumbUrl(data.logoUrl) : favicon);
 
 	// Routes rendered without the admin shell: the login screen, and the
 	// preview iframe (which must look like the public site, not the admin).
@@ -67,7 +69,7 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+	<link rel="icon" href={icon} />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<!-- Admin buttons/highlights use the site's Primary and Accent colours (sanitised; readable text picked automatically). -->
 	{@html rootStyleTag(brandThemeVars(data.colors))}
