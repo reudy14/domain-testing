@@ -394,7 +394,8 @@
 		<ul class="{holdLeftMs !== null && slotLineCount ? 'mt-4' : 'mt-8'} space-y-4">
 			{#each basket.lines as line (line.id)}
 				{@const pending = pendingLines.has(line.id)}
-				<li class="flex items-center gap-4 rounded-2xl border border-charcoal/10 bg-white p-4 shadow-sm">
+				<!-- On a phone the quantity, price and remove button go on a row of their own under the description. -->
+				<li class="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-charcoal/10 bg-white p-4 shadow-sm">
 					{#if line.itemImageUrl}
 						<img
 							src={line.itemImageUrl}
@@ -408,7 +409,7 @@
 					{/if}
 
 					<div class="min-w-0 flex-1">
-						<p class="truncate font-medium">{line.itemName ?? 'Item'}</p>
+						<p class="break-words font-medium">{line.itemName ?? 'Item'}</p>
 						{#if line.lineType === 'slot' && line.start}
 							<p class="text-sm text-fg-body/70">{formatSlotTime(line.start)}{line.minutes ? ` · ${formatDuration(line.minutes)}` : ''}</p>
 						{/if}
@@ -453,44 +454,46 @@
 						{/if}
 					</div>
 
-					<!-- Products, and places in a group session (capacity > 1); the server checks what's left. -->
-					{#if line.lineType === 'item' || (line.slotCapacity ?? 1) > 1}
-						<div class="flex items-center gap-2">
-							<button
-								type="button"
-								class="flex h-8 w-8 items-center justify-center rounded-full border border-charcoal/15 text-lg leading-none disabled:opacity-40"
-								disabled={pending || line.quantity <= 1}
-								aria-label="Decrease quantity"
-								onclick={() => changeQuantity(line.id, line.quantity, -1)}
-							>
-								−
-							</button>
-							<span class="w-6 text-center">{line.quantity}</span>
-							<button
-								type="button"
-								class="flex h-8 w-8 items-center justify-center rounded-full border border-charcoal/15 text-lg leading-none disabled:opacity-40"
-								disabled={pending}
-								aria-label="Increase quantity"
-								onclick={() => changeQuantity(line.id, line.quantity, 1)}
-							>
-								+
-							</button>
-						</div>
-					{/if}
+					<div class="flex w-full items-center gap-3 sm:w-auto">
+						<!-- Products, and places in a group session (capacity > 1); the server checks what's left. -->
+						{#if line.lineType === 'item' || (line.slotCapacity ?? 1) > 1}
+							<div class="flex items-center gap-2">
+								<button
+									type="button"
+									class="flex h-8 w-8 items-center justify-center rounded-full border border-charcoal/15 text-lg leading-none disabled:opacity-40"
+									disabled={pending || line.quantity <= 1}
+									aria-label="Decrease quantity"
+									onclick={() => changeQuantity(line.id, line.quantity, -1)}
+								>
+									−
+								</button>
+								<span class="w-6 text-center">{line.quantity}</span>
+								<button
+									type="button"
+									class="flex h-8 w-8 items-center justify-center rounded-full border border-charcoal/15 text-lg leading-none disabled:opacity-40"
+									disabled={pending}
+									aria-label="Increase quantity"
+									onclick={() => changeQuantity(line.id, line.quantity, 1)}
+								>
+									+
+								</button>
+							</div>
+						{/if}
 
-					<p class="w-20 shrink-0 text-right font-medium">
-						{formatPrice((line.itemPrice ?? 0) * line.quantity, currency)}
-					</p>
+						<p class="ml-auto shrink-0 whitespace-nowrap text-right font-medium sm:min-w-20">
+							{formatPrice((line.itemPrice ?? 0) * line.quantity, currency)}
+						</p>
 
-					<button
-						type="button"
-						class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-charcoal/50 transition-colors hover:bg-terracotta/10 hover:text-terracotta disabled:opacity-40"
-						disabled={pending}
-						aria-label="Remove {line.itemName ?? 'item'}"
-						onclick={() => removeLine(line.id)}
-					>
-						✕
-					</button>
+						<button
+							type="button"
+							class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-charcoal/50 transition-colors hover:bg-terracotta/10 hover:text-terracotta disabled:opacity-40"
+							disabled={pending}
+							aria-label="Remove {line.itemName ?? 'item'}"
+							onclick={() => removeLine(line.id)}
+						>
+							✕
+						</button>
+					</div>
 				</li>
 			{/each}
 		</ul>
