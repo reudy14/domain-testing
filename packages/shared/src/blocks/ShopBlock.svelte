@@ -3,7 +3,7 @@
 	import type { BasketLine, BookableTime, ShopBlockData, ItemRecord } from '$shared/types';
 	import { getBasketContext } from '$shared/basket.svelte';
 	import { DEFAULT_CURRENCY, DEFAULT_TIMEZONE, addMonths, createCalendarMonth, formatInstant, formatPrice, startOfMonth, zonedDateKey, zonedInputToIso } from '$shared/calendar';
-	import { formatDuration, lowestPrice } from '$shared/items';
+	import { bundleListPrice, formatDuration, lowestPrice } from '$shared/items';
 	import { addDaysToKey, formatDateKey } from '$shared/slots';
 
 	let { data = {}, items = [] } = $props<{
@@ -342,8 +342,13 @@
 								<span class="text-xs text-charcoal/60">{formatDuration(item.durations[0].minutes)} – {formatDuration(item.durations[item.durations.length - 1].minutes)}</span>
 							</div>
 						{:else}
+							{@const listPrice = item.type === 'bundle' ? bundleListPrice(item.bundleParts, items) : null}
 							<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
 								<span class="text-lg font-semibold text-sage-dark">{formatPrice(duration?.price ?? lowestPrice(item.durations) ?? item.price, currency)}</span>
+								{#if listPrice != null && listPrice > item.price}
+									<!-- What the parts cost one by one: the bundle is a saving. -->
+									<s class="text-sm text-charcoal/50"><span class="sr-only">Bought separately: </span>{formatPrice(listPrice, currency)}</s>
+								{/if}
 								{#if duration}
 									<span class="text-xs text-charcoal/60">{formatDuration(duration.minutes)}</span>
 								{:else if !isService && item.stock != null && item.stock > 0 && item.stock <= 5}

@@ -67,7 +67,18 @@
 	/** "3× Massage (1 hour), 1× Oil" for the table. */
 	function bundleList(item: ItemRecord) {
 		const names = new Map(items.map((i) => [i.id, i.name]));
-		return item.bundleParts.map((p) => `${p.count}× ${names.get(p.item) ?? '?'}${p.minutes ? ` (${formatDuration(p.minutes)})` : ''}`).join(', ');
+		return item.bundleParts.map((p) => `${p.count}× ${names.get(p.item) ?? 'deleted item'}${p.minutes ? ` (${formatDuration(p.minutes)})` : ''}`).join(', ');
+	}
+
+	/** Why an active bundle isn't on sale (the shop hides it and won't sell it), or ''. */
+	function bundleProblem(item: ItemRecord) {
+		for (const part of item.bundleParts) {
+			const partItem = items.find((i) => i.id === part.item);
+			if (!partItem) return 'One of its parts was deleted — edit the bundle.';
+			if (!partItem.active) return `“${partItem.name}” is inactive.`;
+			if (part.minutes && !partItem.durations.some((d) => d.minutes === part.minutes)) return `“${partItem.name}” is no longer offered for ${formatDuration(part.minutes)}.`;
+		}
+		return '';
 	}
 
 	/** What the parts cost on their own, to compare with the bundle price. */
@@ -153,6 +164,8 @@
 				<thead><tr><th>Name</th><th>Type</th><th>Price</th><th>Stock</th><th>Duration</th><th>Status</th><th></th></tr></thead>
 				<tbody>
 					{#each items as item (item.id)}
+						{@const problem = item.type === 'bundle' && item.active ? bundleProblem(item) : ''}
+						{@const waiting = !item.active && item.type === 'item_with_time' ? (data.waiting[item.id] ?? 0) : 0}
 						<tr>
 							<td>
 								<div class="flex items-center gap-3">
@@ -174,7 +187,17 @@
 									{bundleList(item)} · {item.validMonths ? `valid ${item.validMonths} months` : 'no expiry'}
 								{:else}—{/if}
 							</td>
-							<td><span class="badge" class:badge-success={item.active}>{item.active ? 'Active' : 'Inactive'}</span></td>
+							<td>
+								{#if problem}
+									<span class="badge badge-warning whitespace-nowrap">Not on sale</span>
+									<span class="mt-1 block text-xs text-base-content/60">{problem}</span>
+								{:else}
+									<span class="badge" class:badge-success={item.active}>{item.active ? 'Active' : 'Inactive'}</span>
+								{/if}
+								{#if waiting}
+									<span class="mt-1 block text-xs text-base-content/70">{waiting === 1 ? '1 code has' : `${waiting} codes have`} sessions of this left to book — they can’t while it’s inactive.</span>
+								{/if}
+							</td>
 							<td class="text-right"><button class="btn btn-sm" type="button" onclick={() => editItem(item)}>Edit</button></td>
 						</tr>
 					{:else}

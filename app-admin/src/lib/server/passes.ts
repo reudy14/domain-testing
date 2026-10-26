@@ -24,6 +24,12 @@ export function issuePass(pb: Pb, body: { itemId: string; email: string; recipie
 	return pb.send<{ pass: PassSummary }>('/api/shop/passes/issue', { method: 'POST', body, requestKey: null });
 }
 
+/** Item id → how many usable codes still have sessions of it to book. */
+export async function codesWaiting(pb: Pb) {
+	const { waiting } = await pb.send<{ waiting: Record<string, number> }>('/api/shop/passes/waiting', { requestKey: null });
+	return waiting;
+}
+
 /** The hook's own message (e.g. "Choose a bundle"), or `fallback`. */
 export function hookError(e: unknown, fallback: string) {
 	if (e instanceof ClientResponseError && e.status >= 400 && e.status < 500 && e.response?.message) return String(e.response.message);
