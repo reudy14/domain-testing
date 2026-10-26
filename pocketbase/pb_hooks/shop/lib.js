@@ -458,15 +458,15 @@ function bundleParts(item) {
  * (`value`, all its units together): the price split in proportion to what
  * the parts cost on their own (evenly when those are all 0), in cents, with
  * the rounding on the last part. Throws an ApiError when a part can't be
- * sold — unless `lenient` (an order being created after payment), which
+ * sold (missing, inactive, or a length no longer offered) — unless `lenient` (an order being created after payment), which
  * keeps the part with what it can find.
  */
 function bundleSnapshot(app, bundle, lenient) {
 	const name = bundle.getString('name');
 	const parts = bundleParts(bundle).map((part) => {
 		const item = findOrNull(app, 'items', part.item);
-		const own = !item ? null : isService(item) ? unitPrice(item, part.minutes) : item.getFloat('price');
-		if (own === null && !lenient) throw conflict(`"${name}" can't be bought right now — one of its parts is no longer offered`);
+		const own = !item || isBundle(item) ? null : isService(item) ? unitPrice(item, part.minutes) : item.getFloat('price');
+		if ((own === null || !item.getBool('active')) && !lenient) throw conflict(`"${name}" can't be bought right now — one of its parts is no longer offered`);
 		return { item: part.item, name: item ? item.getString('name') : 'Unknown item', minutes: isService(item) ? part.minutes : null, count: part.count, ownCents: Math.round((own || 0) * 100) };
 	});
 	if (!parts.length && !lenient) throw conflict(`"${name}" has nothing in it yet`);
@@ -633,6 +633,44 @@ function stockProblem(app, needs) {
 		}
 	}
 	return null;
+}
+
+/**
+ * Why `item` can't be deleted, or '' when it can: a bundle contains it, or a
+ * code still has sessions of it to book (or held in a basket). Bundles keep
+ * their parts as JSON, so the database itself wouldn't stop the delete and
+ * the bundle would be left pointing at nothing. Making an item inactive is
+ * always allowed: bundles with it stop selling (bundleSnapshot), passes keep
+ * their own snapshot of names and prices, but their holders can't book an
+ * inactive service — the admin items list warns about that.
+ */
+function deleteBlocker(app, item) {
+	if (isBundle(item)) return '';
+	const name = item.getString('name');
+	const bundles = findAll(app, 'items', "type = 'bundle' && bundleParts ~ {:id}", { id: item.id }).filter((b) => bundleParts(b).some((p) => p.item === item.id));
+	if (bundles.length) {
+		const names = bundles.map((b) => `"${b.getString('name')}"`).join(', ');
+		return `"${name}" is part of ${bundles.length === 1 ? 'the bundle' : 'the bundles'} ${names}. Take it out of ${bundles.length === 1 ? 'that bundle' : 'those bundles'} first, or make "${name}" inactive instead.`;
+	}
+	const waiting = findAll(app, 'passes', "status = 'active' && parts ~ {:id}", { id: item.id }).filter(
+		(pass) => !passProblem(pass) && passCredits(app, pass).some((p) => p.item === item.id && p.redeemable && p.left + p.held > 0)
+	);
+	if (waiting.length) {
+		return `${waiting.length === 1 ? '1 code still has' : `${waiting.length} codes still have`} "${name}" sessions to book (for example ${formatCode(waiting[0].getString('code'))}), and codes can only book active services. Keep it until they're used or have expired, or void them under Vouchers & codes first.`;
+	}
+	return '';
+}
+
+/** Item id → how many usable codes still have sessions of it to book or held; for the admin items list. */
+function codesWaiting(app) {
+	const counts = {};
+	for (const pass of findAll(app, 'passes', "status = 'active'")) {
+		if (passProblem(pass)) continue;
+		const items = {};
+		for (const part of passCredits(app, pass)) if (part.redeemable && part.left + part.held > 0) items[part.item] = true;
+		for (const id of Object.keys(items)) counts[id] = (counts[id] || 0) + 1;
+	}
+	return counts;
 }
 
 // ── Admin: codes ────────────────────────────────────────────────────────
@@ -1364,6 +1402,8 @@ function recordEmailStatus(app, secretHeader, body) {
 }
 
 module.exports = {
+	deleteBlocker,
+	codesWaiting,
 	listPasses,
 	updatePass,
 	issuePass,

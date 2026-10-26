@@ -1,5 +1,7 @@
 import { fail } from '@sveltejs/kit';
-import { attempt } from '$lib/server/actions';
+import { ClientResponseError } from 'pocketbase';
+import { attempt, pbErrorMessage } from '$lib/server/actions';
+import { codesWaiting } from '$lib/server/passes';
 import { parseDurations } from '$shared/items';
 import { mapItemRecord } from '$shared/server/shop';
 import type { BundlePart, ItemDuration, ItemType } from '$lib/types';
@@ -119,11 +121,14 @@ function allItems(pb: App.Locals['pb']) {
 }
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const records = await locals.pb
-		.collection('items')
-		.getFullList({ sort: 'name', expand: 'image' })
-		.catch(() => []);
-	return { items: records.map(mapItemRecord) };
+	const [records, waiting] = await Promise.all([
+		locals.pb
+			.collection('items')
+			.getFullList({ sort: 'name', expand: 'image' })
+			.catch(() => []),
+		codesWaiting(locals.pb).catch(() => ({}) as Record<string, number>)
+	]);
+	return { items: records.map(mapItemRecord), waiting };
 };
 
 export const actions: Actions = {
@@ -148,8 +153,14 @@ export const actions: Actions = {
 		const data = await request.formData();
 		const id = String(data.get('id') || '');
 		if (!id) return fail(400, { message: 'Item id is required.' });
-		const result = await attempt('Could not delete the item — if it has past orders, switch it to inactive instead.', () => locals.pb.collection('items').delete(id));
-		if (!result.ok) return result.failure;
+		try {
+			await locals.pb.collection('items').delete(id);
+		} catch (e) {
+			// In a bundle, or still to be booked with a code: the shop hook says which.
+			if (e instanceof ClientResponseError && e.response?.data?.item?.code === 'in_use') return fail(400, { message: String(e.response.message) });
+			console.error('[action] Could not delete the item', e);
+			return fail(400, { message: pbErrorMessage(e, 'Could not delete the item — if it has past orders, switch it to inactive instead.') });
+		}
 		return { ok: true };
 	}
 };

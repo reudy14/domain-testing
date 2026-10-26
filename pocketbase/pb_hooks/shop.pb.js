@@ -59,11 +59,27 @@ routerAdd('POST', '/api/shop/passes/update', (e) => {
 	return e.json(200, { pass: shop.updatePass($app, e.requestInfo().body) });
 });
 
+routerAdd('GET', '/api/shop/passes/waiting', (e) => {
+	if (!e.auth) throw new UnauthorizedError('Sign in to see codes');
+	const shop = require(`${__hooks}/shop/lib.js`);
+	return e.json(200, { waiting: shop.codesWaiting($app) });
+});
+
 routerAdd('POST', '/api/shop/passes/issue', (e) => {
 	if (!e.auth) throw new UnauthorizedError('Sign in to issue codes');
 	const shop = require(`${__hooks}/shop/lib.js`);
 	return e.json(200, { pass: shop.issuePass($app, e.requestInfo().body) });
 });
+
+// Bundles hold their parts as JSON, so nothing else stops a service or
+// product from being deleted out from under a bundle or an unused code.
+// Runs for every delete (admin app, dashboard, API).
+onRecordDelete((e) => {
+	const shop = require(`${__hooks}/shop/lib.js`);
+	const blocker = shop.deleteBlocker(e.app, e.record);
+	if (blocker) throw new BadRequestError(blocker, { item: new ValidationError('in_use', blocker) });
+	e.next();
+}, 'items');
 
 routerAdd('POST', '/api/shop/order-email-status', (e) => {
 	const shop = require(`${__hooks}/shop/lib.js`);
