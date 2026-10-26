@@ -1,78 +1,127 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
+	import { Editor } from '@tiptap/core';
+	import StarterKit from '@tiptap/starter-kit';
 
-	let { value = '', onChange = (html: string) => {} } = $props<{ value?: string; onChange?: (html: string) => void }>();
-	let editorEl: HTMLDivElement | undefined = $state();
-	let mounted = $state(false);
+	// The visual editor for text in blocks and emails. It can only produce what
+	// the toolbar offers (see EDITOR_TAGS in $shared/richText): no inline styles
+	// or layout HTML, so pages stay consistent. Layouts are blocks (Cards, FAQ);
+	// anything else goes in an HTML block.
+	let {
+		value = '',
+		onChange = (html: string) => {},
+		compact = false
+	} = $props<{ value?: string; onChange?: (html: string) => void; compact?: boolean }>();
+
+	let element: HTMLDivElement | undefined = $state();
+	let editor: Editor | undefined = $state();
+	// Bumped on every editor transaction so the toolbar's active states re-render.
+	let tick = $state(0);
 
 	onMount(() => {
-		mounted = true;
-		if (editorEl) {
-			editorEl.innerHTML = value || '';
-		}
+		editor = new Editor({
+			element,
+			extensions: [
+				StarterKit.configure({
+					heading: { levels: [2, 3] },
+					code: false,
+					codeBlock: false,
+					underline: false,
+					// It appends an empty paragraph after a closing heading or list, which changed content just by
+					// opening a block (and looped with the value sync below).
+					trailingNode: false,
+					// No target/rel: most links are to the site's own pages, which shouldn't open a new tab.
+					link: { openOnClick: false, autolink: true, defaultProtocol: 'https', HTMLAttributes: { target: null, rel: null } }
+				})
+			],
+			content: value || '',
+			editorProps: { attributes: { class: 'rich-text min-h-32 p-4 outline-none', role: 'textbox', 'aria-multiline': 'true' } },
+			onTransaction: () => tick++,
+			onUpdate: ({ editor }) => onChange(editor.isEmpty ? '' : editor.getHTML())
+		});
+		return () => editor?.destroy();
 	});
 
-	// Sync content from props when a different block is selected,
-	// without overwriting content while the user is actively editing.
+	// Another block selected: show its content (not echoed back, so nothing is marked unsaved).
+	// Untracked: setContent runs onTransaction (tick++), which must not become a dependency here.
 	$effect(() => {
-		if (mounted && editorEl && value !== undefined) {
-			if (editorEl.innerHTML !== value) {
-				editorEl.innerHTML = value || '';
-			}
-		}
+		const html = value || '';
+		const current = editor;
+		if (!current) return;
+		untrack(() => {
+			if (html !== (current.isEmpty ? '' : current.getHTML())) current.commands.setContent(html, { emitUpdate: false });
+		});
 	});
 
-	function exec(cmd: string, val?: string) {
-		if (!browser) return;
-		editorEl?.focus();
-		document.execCommand(cmd, false, val);
-		emit();
-	}
-
-	function emit() {
-		if (editorEl) onChange(editorEl.innerHTML);
+	function active(name: string, attrs?: Record<string, unknown>) {
+		tick;
+		return editor?.isActive(name, attrs) ?? false;
 	}
 
 	function setLink() {
-		const url = prompt('Link URL', 'https://');
-		if (url) exec('createLink', url);
+		if (!editor) return;
+		const current = editor.getAttributes('link').href || '';
+		const href = prompt('Link address (/page, #anchor or https://…). Empty removes the link.', current);
+		if (href === null) return;
+		const chain = editor.chain().focus().extendMarkRange('link');
+		if (href.trim()) chain.setLink({ href: href.trim() }).run();
+		else chain.unsetLink().run();
 	}
 
-	function clearFormatting() {
-		if (!browser) return;
-		editorEl?.focus();
-		document.execCommand('formatBlock', false, '<p>');
-		document.execCommand('removeFormat');
-		emit();
-	}
-
-	function handleInput() {
-		emit();
-	}
+	type Tool = { label: string; title: string; run: () => void; on?: () => boolean; class?: string };
+	let tools = $derived.by((): Tool[][] => {
+		const c = () => editor!.chain().focus();
+		// Compact (cards, FAQ answers): no headings, quotes or lines inside small text.
+		return [
+			compact ? [] : [
+				{ label: 'Text', title: 'Paragraph', run: () => c().setParagraph().run(), on: () => active('paragraph') },
+				{ label: 'H2', title: 'Heading', run: () => c().toggleHeading({ level: 2 }).run(), on: () => active('heading', { level: 2 }) },
+				{ label: 'H3', title: 'Subheading', run: () => c().toggleHeading({ level: 3 }).run(), on: () => active('heading', { level: 3 }) }
+			],
+			[
+				{ label: 'B', title: 'Bold', run: () => c().toggleBold().run(), on: () => active('bold'), class: 'font-bold' },
+				{ label: 'I', title: 'Italic', run: () => c().toggleItalic().run(), on: () => active('italic'), class: 'italic' },
+				{ label: 'S', title: 'Strikethrough', run: () => c().toggleStrike().run(), on: () => active('strike'), class: 'line-through' },
+				{ label: 'Link', title: 'Link', run: setLink, on: () => active('link') }
+			],
+			[
+				{ label: '• List', title: 'Bulleted list', run: () => c().toggleBulletList().run(), on: () => active('bulletList') },
+				{ label: '1. List', title: 'Numbered list', run: () => c().toggleOrderedList().run(), on: () => active('orderedList') },
+				...(compact
+					? []
+					: [
+							{ label: 'Quote', title: 'Pull quote', run: () => c().toggleBlockquote().run(), on: () => active('blockquote') },
+							{ label: '— Line', title: 'Divider line', run: () => c().setHorizontalRule().run() }
+						])
+			],
+			[
+				{ label: 'Clear', title: 'Remove formatting', run: () => c().unsetAllMarks().clearNodes().run() },
+				{ label: '↶', title: 'Undo', run: () => c().undo().run() },
+				{ label: '↷', title: 'Redo', run: () => c().redo().run() }
+			]
+		].filter((group) => group.length);
+	});
 </script>
 
-{#if mounted}
-	<div class="rounded-box border border-base-300 bg-base-100">
-		<div class="flex flex-wrap gap-2 border-b border-base-300 p-2">
-			<button class="btn btn-xs" onclick={() => exec('bold')} type="button"><b>B</b></button>
-			<button class="btn btn-xs" onclick={() => exec('italic')} type="button"><i>I</i></button>
-			<button class="btn btn-xs" onclick={() => exec('formatBlock', '<h2>')} type="button">H2</button>
-			<button class="btn btn-xs" onclick={() => exec('formatBlock', '<h3>')} type="button">H3</button>
-			<button class="btn btn-xs" onclick={() => exec('insertUnorderedList')} type="button">List</button>
-			<button class="btn btn-xs" onclick={setLink} type="button">Link</button>
-			<button class="btn btn-xs" onclick={clearFormatting} type="button">Clear</button>
-		</div>
-		<div
-			bind:this={editorEl}
-			contenteditable
-			role="textbox"
-			aria-multiline="true"
-			class="min-h-40 p-4 outline-none"
-			oninput={handleInput}
-			onkeydown={(e) => { if (e.key === 'Tab') { e.preventDefault(); exec('insertHTML', '&emsp;'); } }}
-		></div>
+<div class="rounded-box border border-base-300 bg-base-100">
+	<div class="flex flex-wrap gap-1 border-b border-base-300 p-2" role="toolbar" aria-label="Text formatting">
+		{#each tools as group, g (g)}
+			{#if g > 0}<span class="mx-1 w-px self-stretch bg-base-300" aria-hidden="true"></span>{/if}
+			{#each group as tool (tool.title)}
+				<button
+					type="button"
+					class="btn btn-xs {tool.class || ''}"
+					class:btn-primary={tool.on?.()}
+					aria-pressed={tool.on ? tool.on() : undefined}
+					title={tool.title}
+					disabled={!editor}
+					onmousedown={(e) => e.preventDefault()}
+					onclick={tool.run}>{tool.label}</button
+				>
+			{/each}
+		{/each}
 	</div>
-{:else}
-	<div class="rounded-box border border-base-300 bg-base-100 p-4 text-base-content/50">Loading editor…</div>
-{/if}
+	<div bind:this={element}>
+		{#if !editor}<div class="p-4 text-base-content/50">Loading editor…</div>{/if}
+	</div>
+</div>

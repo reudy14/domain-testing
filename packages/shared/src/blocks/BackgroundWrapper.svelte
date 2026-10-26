@@ -4,10 +4,13 @@
 	let {
 		background = { type: 'none', color: '', imageUrl: '', attachment: 'scroll', overlay: false, overlayOpacity: 40 } satisfies BlockBackground,
 		foreground = {} as BlockForeground,
+		anchor = '',
 		children
 	} = $props<{
 		background?: BlockBackground;
 		foreground?: BlockForeground;
+		/** Block setting: lets links like "#prices" jump here. */
+		anchor?: string;
 		children?: import('svelte').Snippet;
 	}>();
 
@@ -41,7 +44,8 @@
 	}
 </script>
 
-<div style={bgStyle() + ' ' + fgStyle()} class="relative">
+<!-- scroll-mt keeps an #anchor target clear of the sticky header. -->
+<div id={anchor || undefined} style={bgStyle() + ' ' + fgStyle()} class="relative scroll-mt-20">
 	{#if background.type === 'image' && background.overlay && background.imageUrl}
 		<div
 			class="pointer-events-none absolute inset-0"

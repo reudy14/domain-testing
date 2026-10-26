@@ -99,6 +99,36 @@ h4 {
 	padding-left: 1.5rem;
 }
 
+/* The visual editor wraps list items in <p>. */
+.prose-wellness li > p {
+	margin: 0;
+}
+
+.prose-wellness ol {
+	list-style: decimal;
+	padding-left: 1.5rem;
+}
+
+/* Pull quote: a "Quote" in the visual editor. */
+.prose-wellness blockquote {
+	margin: 0.75rem 0;
+	padding-left: 1.25rem;
+	border-left: 3px solid var(--color-primary, #8a9a7b);
+	font-family: 'Playfair Display', Georgia, serif;
+	font-size: 1.35rem;
+	font-style: italic;
+}
+
+.prose-wellness.text-center blockquote {
+	border-left: 0;
+	padding-left: 0;
+}
+
+.prose-wellness hr {
+	margin: 2rem 0;
+	border-color: color-mix(in srgb, currentColor 20%, transparent);
+}
+
 .prose-wellness a {
 	color: color-mix(in srgb, var(--color-primary, #8a9a7b) 90%, #000);
 	text-decoration: underline;

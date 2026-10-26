@@ -11,7 +11,10 @@ export const blockLabels: Record<BlockType, string> = {
 	testimonials: 'Testimonials',
 	upcoming_calendar: 'Upcoming Calendar',
 	shop: 'Shop',
-	checkout: 'Checkout'
+	checkout: 'Checkout',
+	cards: 'Cards',
+	faq: 'FAQ',
+	html: 'HTML'
 };
 
 export const blockTypes = Object.keys(blockLabels) as BlockType[];
@@ -79,6 +82,24 @@ export function createBlock(type: BlockType): ContentBlock {
 				heading: 'Complete your booking',
 				notesLabel: 'Notes or special requests'
 			};
+			break;
+		case 'cards':
+			base.data = {
+				heading: 'Section heading',
+				intro: '',
+				align: 'center',
+				style: 'image',
+				items: [1, 2, 3].map((n) => ({ imageUrl: '', imageAlt: '', title: `Card ${n}`, subtitle: '', text: '<p>A sentence or two.</p>', href: '', linkLabel: '' }))
+			};
+			break;
+		case 'faq':
+			base.data = {
+				heading: 'Questions people ask',
+				items: [{ question: 'What happens in the first session?', answer: '<p>Answer it here.</p>' }]
+			};
+			break;
+		case 'html':
+			base.data = { html: '' };
 			break;
 	}
 	base.data._background = { type: 'none', color: '', attachment: 'scroll', overlay: false, overlayOpacity: 40 };

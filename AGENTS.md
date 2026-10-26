@@ -99,12 +99,14 @@ All components use Svelte 5 runes syntax — **never** `export let`, `$:`, or `o
 
 ### Block System
 Pages are composed of `ContentBlock[]`. Each block has `{ id, type, data }`. Block types are defined in `packages/shared/src/types.ts` (re-exported via `$lib/types` in each app):
-`text | image_text | timeline | hero | button | spacer | testimonials | upcoming_calendar | shop | checkout`
+`text | image_text | timeline | hero | button | spacer | testimonials | upcoming_calendar | shop | checkout | cards | faq | html`
 
 - **Renderers (shared)**: `packages/shared/src/blocks/<Type>Block.svelte` — one renderer per type, imported by both apps via `$shared/blocks/...`. The admin preview iframe uses the same shared renderers.
 - **Admin editors**: `app-admin/src/lib/admin/editors/BlockEditor.svelte` — switches editor UI by type
 - **Defaults**: `app-admin/src/lib/admin/blockDefaults.ts` — `createBlock(type)` generates a new block with sensible defaults
 - **Block list**: `app-admin/src/lib/admin/BlockList.svelte` — draggable reorder, select, delete
+- **Settings on every block** (keys starting with `_`, edited below each block's own fields): `_background`, `_foreground` (colours) and `_anchor` (id for `#anchor` links), applied by `BackgroundWrapper.svelte`.
+- **Text is edited visually**: `RichTextEditor.svelte` (Tiptap) only produces `p, h2, h3, strong, em, s, a, ul, ol, li, blockquote, br, hr` — no inline styles or layout HTML. That list is `EDITOR_TAGS` in `packages/shared/src/richText.ts`; keep it and the editor's extensions in step. A layout people keep needing becomes a block (as Cards and FAQ did), never HTML in a text block; one-offs and embeds go in an `html` block. Old text blocks holding other HTML are turned into `html` blocks (or centred text) by `upgradeLegacyBlocks()` on backup import and by migration `1793300000_text_blocks_visual_editor.js`.
 
 To add a new block type: add to `BlockType` union in `packages/shared/src/types.ts`, create renderer in `packages/shared/src/blocks/`, add editor case in `app-admin/src/lib/admin/editors/BlockEditor.svelte`, add default in `app-admin/src/lib/admin/blockDefaults.ts`, add import in `packages/shared/src/blocks/BlockRenderer.svelte`.
 
@@ -149,7 +151,7 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
   - Editors with unsaved state use `use:enhance` + `warnOnUnsavedChanges()`.
 - **Dates, times and prices shown to people** use `DISPLAY_LOCALE` (`en-GB`: day-month-year, 24-hour clock) and the helpers in `$shared/calendar` (`formatInstant`, `formatPrice` with the shop `currency`, `formatDateTime`) — never `toLocale*(undefined)`, which renders US formats on the server. Booking times on the public site are shown in `SITE_TIMEZONE` too (layout data `timezone`, read by blocks via `page.data.timezone`). Native `<input type="date">` fields follow the visitor's browser language and can't be changed from the page.
 - **Dates/times in admin**: entered and displayed in `SITE_TIMEZONE` (layout data `timezone`), via `toZonedDatetimeInput`, `zonedInputToIso`, `formatDateTime` in `$shared/calendar`. Never `new Date(localInput)` on the server — the container runs in UTC.
-- **Prose**: `.prose-wellness` class for rich text content styling
+- **Prose**: `.prose-wellness` class for rich text content styling (in both apps' `app.css`, which must stay alike: the admin preview uses it). A *Quote* in the editor is the pull quote (`blockquote`).
 
 ### Routing
 - **Admin app** (`app-admin`): All routes except `/login` are auth-guarded in `hooks.server.ts` (which also refreshes the token per request and sets the cookie's `Secure` flag from the real scheme). The root layout renders the admin shell (grouped sidebar) except on `/login` and `/preview`. The `/preview` route reads `sessionStorage` set by the page editor (same-origin, so it works).

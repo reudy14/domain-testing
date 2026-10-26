@@ -7,6 +7,8 @@ import {
 	validateSiteExport,
 	type SiteExport
 } from '$lib/exportImport';
+import { upgradeLegacyBlocks } from '$shared/richText';
+import type { ContentBlock } from '$lib/types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	let body: SiteExport;
@@ -54,7 +56,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	// 2. Import pages
 	for (const page of body.pages) {
 		try {
-			const blocks = restorePlaceholders(page.blocks, keyToUrl);
+			// Files exported before the visual editor may hold raw HTML in text blocks.
+			const blocks = upgradeLegacyBlocks(restorePlaceholders(page.blocks, keyToUrl) as ContentBlock[]);
 
 			// Try to find existing page by slug
 			let existing;
