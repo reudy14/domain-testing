@@ -8,7 +8,10 @@ export type BlockType =
 	| 'testimonials'
 	| 'upcoming_calendar'
 	| 'shop'
-	| 'checkout';
+	| 'checkout'
+	| 'cards'
+	| 'faq'
+	| 'html';
 
 export type BlockBackground = {
 	type: 'none' | 'color' | 'image';

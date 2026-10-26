@@ -11,6 +11,9 @@
 	import UpcomingCalendarBlock from './UpcomingCalendarBlock.svelte';
 	import ShopBlock from './ShopBlock.svelte';
 	import CheckoutBlock from './CheckoutBlock.svelte';
+	import CardsBlock from './CardsBlock.svelte';
+	import FaqBlock from './FaqBlock.svelte';
+	import HtmlBlock from './HtmlBlock.svelte';
 
 	let { blocks = [], calendarEvents = [], items = [] } = $props<{
 		blocks: ContentBlock[];
@@ -28,7 +31,7 @@
 </script>
 
 {#each blocks as block (block.id)}
-	<BackgroundWrapper background={getBg(block)} foreground={getFg(block)}>
+	<BackgroundWrapper background={getBg(block)} foreground={getFg(block)} anchor={block.data._anchor}>
 		{#if block.type === 'text'}
 			<TextBlock data={block.data} />
 		{:else if block.type === 'image_text'}
@@ -49,6 +52,12 @@
 			<ShopBlock data={block.data} {items} />
 		{:else if block.type === 'checkout'}
 			<CheckoutBlock data={block.data} />
+		{:else if block.type === 'cards'}
+			<CardsBlock data={block.data} />
+		{:else if block.type === 'faq'}
+			<FaqBlock data={block.data} />
+		{:else if block.type === 'html'}
+			<HtmlBlock data={block.data} />
 		{/if}
 	</BackgroundWrapper>
 {/each}
