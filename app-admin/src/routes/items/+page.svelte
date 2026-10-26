@@ -137,7 +137,74 @@
 
 	{#if form?.message}<div class="alert alert-error" role="alert">{form.message}</div>{/if}
 
-	<div class="rounded-box bg-base-100 p-5 shadow">
+	{#snippet thumbnail(item: ItemRecord)}
+		{#if item.imageUrl}
+			<img class="size-10 shrink-0 rounded-box object-cover" src={item.imageUrl} alt="" />
+		{:else}
+			<div class="size-10 shrink-0 rounded-box bg-base-200"></div>
+		{/if}
+	{/snippet}
+
+	{#snippet typeBadge(item: ItemRecord)}
+		<span class="badge">{item.type === 'item_with_time' ? 'Service' : item.type === 'bundle' ? 'Bundle' : 'Product'}</span>
+	{/snippet}
+
+	{#snippet price(item: ItemRecord)}{item.durations.length > 1 ? `from ${money.format(item.price)}` : money.format(item.price)}{/snippet}
+
+	{#snippet details(item: ItemRecord)}
+		{#if item.type === 'item_with_time'}
+			{durationList(item)}{item.bufferMinutes ? ` + ${item.bufferMinutes} min get-ready` : ''}{(item.capacity ?? 1) > 1 ? ` · ${item.capacity} places` : ''}
+		{:else if item.type === 'bundle'}
+			{bundleList(item)} · {item.validMonths ? `valid ${item.validMonths} months` : 'no expiry'}
+		{:else}—{/if}
+	{/snippet}
+
+	{#snippet status(item: ItemRecord, problem: string)}
+		{#if problem}
+			<span class="badge badge-warning whitespace-nowrap">Not on sale</span>
+		{:else}
+			<span class="badge whitespace-nowrap" class:badge-success={item.active}>{item.active ? 'Active' : 'Inactive'}</span>
+		{/if}
+	{/snippet}
+
+	{#snippet notes(problem: string, waiting: number)}
+		{#if problem}
+			<span class="mt-1 block text-xs text-base-content/60">{problem}</span>
+		{/if}
+		{#if waiting}
+			<span class="mt-1 block text-xs text-base-content/70">{waiting === 1 ? '1 code has' : `${waiting} codes have`} sessions of this left to book — they can’t while it’s inactive.</span>
+		{/if}
+	{/snippet}
+
+	<!-- Phones and tablets: one card per item (seven columns didn't fit; long bundle lists made rows very tall). -->
+	<ul class="divide-y divide-base-200 rounded-box bg-base-100 shadow lg:hidden">
+		{#each items as item (item.id)}
+			{@const problem = item.type === 'bundle' && item.active ? bundleProblem(item) : ''}
+			{@const waiting = !item.active && item.type === 'item_with_time' ? (data.waiting[item.id] ?? 0) : 0}
+			<li class="p-4">
+				<div class="flex items-start gap-3">
+					{@render thumbnail(item)}
+					<div class="min-w-0 flex-1">
+						<span class="block font-semibold break-words">{item.name}</span>
+						<div class="mt-1 flex flex-wrap items-center gap-2 text-sm">
+							{@render typeBadge(item)}
+							{@render status(item, problem)}
+							<span class="text-base-content/70">{@render price(item)}{item.type === 'item' ? ` · stock ${item.stock ?? '∞'}` : ''}</span>
+						</div>
+						{#if item.type !== 'item'}
+							<p class="mt-2 text-sm text-base-content/70">{@render details(item)}</p>
+						{/if}
+						{@render notes(problem, waiting)}
+					</div>
+					<button class="btn btn-sm shrink-0" type="button" onclick={() => editItem(item)}>Edit</button>
+				</div>
+			</li>
+		{:else}
+			<li class="py-10 text-center text-base-content/60">No items yet — create a service or product.</li>
+		{/each}
+	</ul>
+
+	<div class="hidden rounded-box bg-base-100 p-5 shadow lg:block">
 		<div class="overflow-x-auto">
 			<table class="table">
 				<thead><tr><th>Name</th><th>Type</th><th>Price</th><th>Stock</th><th>Duration</th><th>Status</th><th></th></tr></thead>
@@ -148,34 +215,17 @@
 						<tr>
 							<td>
 								<div class="flex items-center gap-3">
-									{#if item.imageUrl}
-										<img class="size-10 rounded-box object-cover" src={item.imageUrl} alt="" />
-									{:else}
-										<div class="size-10 rounded-box bg-base-200"></div>
-									{/if}
+									{@render thumbnail(item)}
 									<span class="font-semibold">{item.name}</span>
 								</div>
 							</td>
-							<td><span class="badge">{item.type === 'item_with_time' ? 'Service' : item.type === 'bundle' ? 'Bundle' : 'Product'}</span></td>
-							<td>{item.durations.length > 1 ? `from ${money.format(item.price)}` : money.format(item.price)}</td>
+							<td>{@render typeBadge(item)}</td>
+							<td>{@render price(item)}</td>
 							<td>{item.type === 'item' ? (item.stock ?? '∞') : '—'}</td>
+							<td>{@render details(item)}</td>
 							<td>
-								{#if item.type === 'item_with_time'}
-									{durationList(item)}{item.bufferMinutes ? ` + ${item.bufferMinutes} min get-ready` : ''}{(item.capacity ?? 1) > 1 ? ` · ${item.capacity} places` : ''}
-								{:else if item.type === 'bundle'}
-									{bundleList(item)} · {item.validMonths ? `valid ${item.validMonths} months` : 'no expiry'}
-								{:else}—{/if}
-							</td>
-							<td>
-								{#if problem}
-									<span class="badge badge-warning whitespace-nowrap">Not on sale</span>
-									<span class="mt-1 block text-xs text-base-content/60">{problem}</span>
-								{:else}
-									<span class="badge" class:badge-success={item.active}>{item.active ? 'Active' : 'Inactive'}</span>
-								{/if}
-								{#if waiting}
-									<span class="mt-1 block text-xs text-base-content/70">{waiting === 1 ? '1 code has' : `${waiting} codes have`} sessions of this left to book — they can’t while it’s inactive.</span>
-								{/if}
+								{@render status(item, problem)}
+								{@render notes(problem, waiting)}
 							</td>
 							<td class="text-right"><button class="btn btn-sm" type="button" onclick={() => editItem(item)}>Edit</button></td>
 						</tr>
