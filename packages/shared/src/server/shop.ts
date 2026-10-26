@@ -1,6 +1,6 @@
 import type PocketBase from 'pocketbase';
 import { getFileUrl } from '../pb';
-import { parseDurations } from '../items';
+import { bundleListPrice, parseDurations } from '../items';
 import type { BookableTime, BundlePart, ItemRecord, ItemType } from '../types';
 
 /** A bundle's `bundleParts` field (JSON) → valid parts. */
@@ -42,7 +42,10 @@ export function mapItemRecord(record: Record<string, any>): ItemRecord {
  */
 export async function loadShopData(pb: PocketBase): Promise<{ items: ItemRecord[] }> {
 	const records = await pb.collection('items').getFullList({ filter: 'active = true', sort: 'name', expand: 'image' });
-	return { items: records.map(mapItemRecord) };
+	const items = records.map(mapItemRecord);
+	// A bundle with a part that isn't on sale (inactive, deleted, or a length
+	// the service dropped) can't be bought — the shop hook refuses it too.
+	return { items: items.filter((item) => item.type !== 'bundle' || bundleListPrice(item.bundleParts, items) !== null) };
 }
 
 export type BookableTimesQuery = { item: string; minutes: string; from: string; to: string };
