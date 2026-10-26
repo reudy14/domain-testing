@@ -2,7 +2,7 @@
 	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
 	import { fly, slide } from 'svelte/transition';
-	import ImageUploader from '$lib/admin/editors/ImageUploader.svelte';
+	import ImagePicker from '$lib/admin/editors/ImagePicker.svelte';
 	import { PRIVACY_PAGE_SLUG } from '$lib/admin/privacyTemplate';
 	import { shopLinks } from '$lib/types';
 	import type { SubmitFunction } from '@sveltejs/kit';
@@ -126,7 +126,7 @@
 		<input type="hidden" name="data" value={JSON.stringify(header)} />
 		<h2 class="mb-4 text-2xl font-bold">Header</h2>
 		<h3 class="mb-2 font-bold">Logo</h3>
-		<ImageUploader url={header.logo?.url} alt={header.logo?.alt} onChange={(image) => (header.logo = image)} />
+		<ImagePicker url={header.logo?.url} alt={header.logo?.alt} altHint="Usually the business name" onChange={(image) => (header.logo = { url: image.url, alt: image.alt })} />
 		<h3 class="mt-6 mb-2 font-bold">Home page</h3>
 		<select class="select w-full" aria-label="Home page" bind:value={header.homePage}>
 			<option value="">— Select a page —</option>

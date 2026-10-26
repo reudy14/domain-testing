@@ -2,7 +2,7 @@
 	import type { BlockType, ContentBlock } from '$lib/types';
 	import { blockLabels } from '$lib/admin/blockDefaults';
 	import RichTextEditor from './RichTextEditor.svelte';
-	import ImageUploader from './ImageUploader.svelte';
+	import ImagePicker from './ImagePicker.svelte';
 	import SegmentedControl from './SegmentedControl.svelte';
 	import ColorField from './ColorField.svelte';
 	import ShopBlockEditor from './ShopBlockEditor.svelte';
@@ -94,7 +94,7 @@
 			</div>
 		{:else if block.type === 'image_text'}
 			<div class="space-y-4">
-				<ImageUploader url={block.data.url} alt={block.data.alt} onChange={(image) => updateData(image)} />
+				<ImagePicker url={block.data.url} alt={block.data.alt} onChange={(image) => updateData({ url: image.url, alt: image.alt })} />
 				<SegmentedControl label="Image position" options={['left', 'right']} value={block.data.imagePosition === 'right' ? 'right' : 'left'} onChange={(v) => updateData({ imagePosition: v })} />
 				<RichTextEditor value={block.data.content} onChange={(content) => updateData({ content })} />
 			</div>
@@ -199,7 +199,7 @@
 							<button class="btn btn-ghost btn-xs text-error" type="button" onclick={() => removeArrayItem('items', i)}>Remove</button>
 						</div>
 						{#if block.data.style !== 'numbered'}
-							<ImageUploader url={card.imageUrl} alt={card.imageAlt} onChange={(image) => updateArray('items', i, { imageUrl: image.url, imageAlt: image.alt })} />
+							<ImagePicker url={card.imageUrl} alt={card.imageAlt} onChange={(image) => updateArray('items', i, { imageUrl: image.url, imageAlt: image.alt })} />
 						{/if}
 						<div class="grid gap-x-3 md:grid-cols-2">
 							{@render field('Title', card.title || '', (title) => updateArray('items', i, { title }))}
@@ -255,7 +255,7 @@
 			{#if block.data._background?.type === 'color'}
 				<ColorField label="Color" value={block.data._background?.color || ''} fallback="#66755d" placeholder="#66755d" onChange={(color) => updateBackground({ color })} />
 			{:else if block.data._background?.type === 'image'}
-				<ImageUploader url={block.data._background?.imageUrl || ''} alt={block.data._background?.imageAlt || ''} onChange={(image) => updateBackground({ imageUrl: image.url, imageAlt: image.alt })} />
+				<ImagePicker url={block.data._background?.imageUrl || ''} alt={block.data._background?.imageAlt || ''} onChange={(image) => updateBackground({ imageUrl: image.url, imageAlt: image.alt })} />
 				<SegmentedControl label="Attachment" options={['scroll', 'fixed']} value={block.data._background?.attachment || 'scroll'} onChange={(attachment) => updateBackground({ attachment })} />
 				<SegmentedControl
 					label="Overlay"

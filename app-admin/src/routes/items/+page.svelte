@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { uploadMedia } from '$lib/pb';
+	import ImagePicker from '$lib/admin/editors/ImagePicker.svelte';
 	import { confirmSubmit } from '$lib/admin/confirm';
 	import Modal from '$lib/admin/Modal.svelte';
 	import type { ItemRecord, ItemType } from '$lib/types';
@@ -9,8 +9,6 @@
 	let items = $derived(data.items || []);
 	let showEditor = $state(false);
 	let uploading = $state(false);
-	let uploadError = $state('');
-	let fileInput: HTMLInputElement | undefined = $state();
 
 	type ItemDraft = {
 		id: string;
@@ -102,7 +100,6 @@
 
 	function createItem() {
 		draft = emptyDraft();
-		uploadError = '';
 		showEditor = true;
 	}
 
@@ -123,25 +120,7 @@
 			capacity: item.capacity == null ? '' : String(item.capacity),
 			active: item.active
 		};
-		uploadError = '';
 		showEditor = true;
-	}
-
-	async function onImageSelected(event: Event) {
-		const input = event.currentTarget as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
-		uploading = true;
-		uploadError = '';
-		try {
-			const result = await uploadMedia(file);
-			draft = { ...draft, image: result.record.id, imageUrl: result.url };
-		} catch (err) {
-			uploadError = err instanceof Error ? err.message : 'Upload failed.';
-		} finally {
-			uploading = false;
-			input.value = '';
-		}
 	}
 </script>
 
@@ -326,23 +305,9 @@
 
 		<div class="fieldset">
 			<span class="fieldset-legend">Image</span>
-			<div class="flex items-center gap-4">
-				{#if draft.imageUrl}
-					<img class="size-20 rounded-box object-cover shadow" src={draft.imageUrl} alt="" />
-				{:else}
-					<div class="grid size-20 place-items-center rounded-box border-2 border-dashed border-base-300 text-xs text-base-content/40">No image</div>
-				{/if}
-				<div class="flex flex-wrap gap-2">
-					<button class="btn btn-sm" type="button" disabled={uploading} onclick={() => fileInput?.click()}>
-						{#if uploading}<span class="loading loading-spinner loading-xs"></span> Uploading…{:else}{draft.imageUrl ? 'Replace image' : 'Upload image'}{/if}
-					</button>
-					{#if draft.image}
-						<button class="btn btn-ghost btn-sm text-error" type="button" onclick={() => (draft = { ...draft, image: '', imageUrl: '' })}>Remove</button>
-					{/if}
-				</div>
-				<input class="hidden" type="file" accept="image/*" bind:this={fileInput} onchange={onImageSelected} />
-			</div>
-			{#if uploadError}<span class="label text-error">{uploadError}</span>{/if}
+			<ImagePicker url={draft.imageUrl} withUrl={false} altHint="" bind:uploading onChange={(image) => (draft = { ...draft, image: image.id ?? draft.image, imageUrl: image.url })}>
+				<p>The shop uses the name as the image’s alt text.</p>
+			</ImagePicker>
 		</div>
 
 		<label class="label mt-2 cursor-pointer gap-3 text-base-content">
