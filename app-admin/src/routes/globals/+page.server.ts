@@ -27,12 +27,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 		getGlobal(locals.pb, 'colors', defaultColors)
 	]);
 
-	// All pages for the page selectors, with what the booking and basket
-	// settings need to warn about (unpublished, no Shop / Checkout block).
+	// All pages for the page selectors, with what the basket setting warns
+	// about (unpublished, no Checkout block).
 	const records = await locals.pb.collection('pages').getFullList({ sort: 'slug', fields: 'id,slug,title,published,blocks' });
 	const pages = records.map((page) => {
 		const types = new Set(((page.blocks as { type?: string }[]) || []).map((block) => block.type));
-		return { id: page.id, slug: page.slug, title: page.title, published: !!page.published, hasShop: types.has('shop'), hasCheckout: types.has('checkout') };
+		return { id: page.id, slug: page.slug, title: page.title, published: !!page.published, hasCheckout: types.has('checkout') };
 	});
 
 	return { header, footer, colors, pages };

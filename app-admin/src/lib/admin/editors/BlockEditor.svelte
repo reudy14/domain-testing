@@ -101,7 +101,7 @@
 			{@render field('Subheading', block.data.subheading || '', (subheading) => updateData({ subheading }))}
 			<div class="grid gap-x-4 md:grid-cols-2">
 				{@render field('Button label', block.data.buttonLabel || '', (buttonLabel) => updateData({ buttonLabel }))}
-				{@render field('Button URL', block.data.buttonUrl || '', (buttonUrl) => updateData({ buttonUrl }), 'Empty = the booking page')}
+				{@render field('Button URL', block.data.buttonUrl || '', (buttonUrl) => updateData({ buttonUrl }), 'Empty = the CTA button’s address')}
 			</div>
 		{:else if block.type === 'button'}
 			<div class="grid gap-x-4 md:grid-cols-2">

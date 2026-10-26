@@ -10,10 +10,8 @@
 	let footer = $state(structuredClone(data.footer.data));
 	let colors = $state(structuredClone(data.colors.data));
 	let saving = $state('');
-	// Older records may predate the CTA button and the booking/basket pages;
-	// they start from wherever the site's links led until now.
-	header.ctaButton ??= { label: '' };
-	header.bookingPage ||= shopLinks(header).booking.slice(1);
+	// Older records may predate the CTA button and the basket page; the inputs below need values.
+	header.ctaButton ??= { label: '', href: '' };
 	header.basketPage ??= '';
 	footer.privacyPage ??= '';
 
@@ -40,19 +38,12 @@
 
 	const pageBySlug = (slug: string) => data.pages.find((page) => page.slug === slug);
 
-	function bookingProblem(slug: string) {
-		const page = pageBySlug(slug);
-		if (!page) return `There is no page “${slug}” — pick one.`;
-		if (!page.published) return 'This page isn’t published yet.';
-		if (!page.hasShop) return 'This page has no Shop block.';
-		return '';
-	}
-
-	function basketProblem(slug: string) {
-		const page = pageBySlug(slug || header.bookingPage);
+	// The page the basket links lead to: the basket page, else the CTA's address when that is a page here.
+	function basketProblem() {
+		const page = pageBySlug(shopLinks(header).basket.replace(/^\/|\/$/g, ''));
 		if (!page) return '';
-		if (!page.published) return 'This page isn’t published yet.';
-		if (!page.hasCheckout) return 'This page has no Checkout block, so people can’t pay from it.';
+		if (!page.published) return `“${page.title}” isn’t published yet.`;
+		if (!page.hasCheckout) return `“${page.title}” has no Checkout block, so people can’t pay from it.`;
 		return '';
 	}
 
@@ -108,26 +99,20 @@
 		{/each}
 		<button class="btn btn-sm mt-1" type="button" onclick={addHeaderLink}>Add link</button>
 		<h3 class="mt-6 mb-2 font-bold">CTA button</h3>
-		<input class="input w-full" aria-label="Button label" bind:value={header.ctaButton.label} placeholder="Book Now" />
-		<p class="mt-1 text-sm text-base-content/60">Leads to the booking page. Empty = no button.</p>
-		<h3 class="mt-6 mb-2 font-bold">Booking page</h3>
-		<select class="select w-full" aria-label="Booking page" bind:value={header.bookingPage}>
-			{#if !pageBySlug(header.bookingPage)}<option value={header.bookingPage}>— Select a page —</option>{/if}
-			{#each data.pages as page (page.id)}
-				<option value={page.slug}>{page.title} [{page.slug}]</option>
-			{/each}
-		</select>
-		<p class="mt-1 text-sm text-base-content/60">Where people choose what to book: the header button, hero buttons without an address and “Book another” after paying lead here.</p>
-		{#if bookingProblem(header.bookingPage)}<p class="mt-1 text-sm font-semibold">⚠ {bookingProblem(header.bookingPage)}</p>{/if}
-		<h3 class="mt-6 mb-2 font-bold">Basket page</h3>
+		<div class="grid grid-cols-2 gap-2">
+			<input class="input w-full" aria-label="Button label" bind:value={header.ctaButton.label} placeholder="Label" />
+			<input class="input w-full" aria-label="Button address" bind:value={header.ctaButton.href} placeholder="/book" />
+		</div>
+		<p class="mt-1 text-sm text-base-content/60">Hero buttons without an address and “Book another” after paying lead here too.</p>
+		<h3 class="mt-6 mb-2 font-bold">Basket page <span class="font-normal text-base-content/50">(optional)</span></h3>
 		<select class="select w-full" aria-label="Basket page" bind:value={header.basketPage}>
-			<option value="">— Same as the booking page —</option>
+			<option value="">— Same as the CTA button —</option>
 			{#each data.pages as page (page.id)}
 				<option value={page.slug}>{page.title} [{page.slug}]</option>
 			{/each}
 		</select>
-		<p class="mt-1 text-sm text-base-content/60">Where people pay: the basket in the header and “view basket” in the shop lead here.</p>
-		{#if basketProblem(header.basketPage)}<p class="mt-1 text-sm font-semibold">⚠ {basketProblem(header.basketPage)}</p>{/if}
+		<p class="mt-1 text-sm text-base-content/60">Where people pay: the basket in the header and “view basket” in the shop lead here. Leave it empty if the CTA button’s page has the Checkout block.</p>
+		{#if basketProblem()}<p class="mt-1 text-sm font-semibold">⚠ {basketProblem()}</p>{/if}
 		<h3 class="mt-6 mb-2 font-bold">Home page</h3>
 		<select class="select w-full" aria-label="Home page" bind:value={header.homePage}>
 			<option value="">— Select a page —</option>
