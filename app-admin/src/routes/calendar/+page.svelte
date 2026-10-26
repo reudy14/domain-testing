@@ -100,24 +100,25 @@
 	{#if form?.message}<div class="alert alert-error" role="alert">{form.message}</div>{/if}
 
 	<div class="rounded-box bg-base-100 p-5 shadow">
-		<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-			<button class="btn btn-outline btn-sm" type="button" onclick={previousMonth}>← Previous</button>
-			<h2 class="text-2xl font-bold">{month.label}</h2>
-			<button class="btn btn-outline btn-sm" type="button" onclick={nextMonth}>Next →</button>
+		<div class="mb-4 flex items-center justify-between gap-2">
+			<button class="btn btn-outline btn-sm" type="button" aria-label="Previous month" onclick={previousMonth}>←<span class="hidden sm:inline"> Previous</span></button>
+			<h2 class="text-center text-xl font-bold sm:text-2xl">{month.label}</h2>
+			<button class="btn btn-outline btn-sm" type="button" aria-label="Next month" onclick={nextMonth}><span class="hidden sm:inline">Next </span>→</button>
 		</div>
 
-		<div class="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase text-base-content/50">
+		<div class="grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase text-base-content/50 sm:gap-2">
 			{#each weekdays as weekday}<div>{weekday}</div>{/each}
 		</div>
-		<div class="mt-2 grid grid-cols-7 gap-2">
+		<!-- On a phone the days only show coloured bars (tap one to edit); the list below names them. -->
+		<div class="mt-2 grid grid-cols-7 gap-1 sm:gap-2">
 			{#each month.days as day}
-				<div class="min-h-32 rounded-box border border-base-300 bg-base-200/60 p-2" class:opacity-40={!day.inMonth}>
+				<div class="min-h-16 rounded-box border border-base-300 bg-base-200/60 p-1 sm:min-h-32 sm:p-2" class:opacity-40={!day.inMonth}>
 					<button class="btn btn-circle btn-xs mb-1 {day.isToday ? 'btn-primary' : 'btn-ghost'}" type="button" title="Create an event on this day" aria-current={day.isToday ? 'date' : undefined} onclick={() => createEvent(day.dateKey)}>{day.dayNumber}</button>
 					<div class="space-y-1">
 						{#each eventsForDay(day.date) as event}
-							<button class="w-full rounded-lg px-2 py-1 text-left text-xs font-semibold text-white shadow" style={`background:${event.color || '#8a9a7b'}`} type="button" onclick={() => editEvent(event)}>
-								<span class="block truncate">{event.name}</span>
-								<span class="block truncate text-[0.65rem] opacity-80">{formatEventDateRange(event)}</span>
+							<button class="block h-3 w-full rounded-lg text-left text-xs font-semibold text-white shadow sm:h-auto sm:px-2 sm:py-1" style={`background:${event.color || '#8a9a7b'}`} type="button" title={event.name} aria-label="Edit {event.name}" onclick={() => editEvent(event)}>
+								<span class="hidden truncate sm:block">{event.name}</span>
+								<span class="hidden truncate text-[0.65rem] opacity-80 sm:block">{formatEventDateRange(event)}</span>
 							</button>
 						{/each}
 					</div>
@@ -130,13 +131,16 @@
 		<h2 class="mb-4 text-xl font-bold">All events</h2>
 		<div class="overflow-x-auto">
 			<table class="table">
-				<thead><tr><th>Name</th><th>Date</th><th>Categories</th><th>Status</th><th></th></tr></thead>
+				<thead><tr><th>Name</th><th class="hidden sm:table-cell">Date</th><th class="hidden md:table-cell">Categories</th><th>Status</th><th></th></tr></thead>
 				<tbody>
 					{#each events as event (event.id)}
 						<tr>
-							<td><span class="mr-2 inline-block h-3 w-3 rounded-full" style={`background:${event.color}`}></span>{event.name}</td>
-							<td>{formatEventDateRange(event)}</td>
-							<td>{event.categories.join(', ')}</td>
+							<td>
+								<span class="mr-2 inline-block h-3 w-3 rounded-full" style={`background:${event.color}`}></span>{event.name}
+								<span class="block text-xs text-base-content/60 sm:hidden">{formatEventDateRange(event)}</span>
+							</td>
+							<td class="hidden whitespace-nowrap sm:table-cell">{formatEventDateRange(event)}</td>
+							<td class="hidden md:table-cell">{event.categories.join(', ')}</td>
 							<td><span class="badge" class:badge-success={event.published}>{event.published ? 'Published' : 'Draft'}</span></td>
 							<td class="text-right"><button class="btn btn-sm" type="button" onclick={() => editEvent(event)}>Edit</button></td>
 						</tr>

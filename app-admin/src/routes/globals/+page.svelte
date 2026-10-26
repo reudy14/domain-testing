@@ -96,7 +96,7 @@
 {/snippet}
 
 {#snippet info(text: string)}
-	<span class="tooltip tooltip-right font-sans font-normal before:max-w-48" data-tip={text}>
+	<span class="tooltip tooltip-bottom sm:tooltip-right font-sans font-normal before:max-w-48" data-tip={text}>
 		<button class="btn btn-circle btn-ghost btn-xs text-base-content/60" type="button" aria-label={text}>
 			<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
 				<circle cx="12" cy="12" r="9" /><path stroke-linecap="round" d="M12 11v5M12 8h.01" />
