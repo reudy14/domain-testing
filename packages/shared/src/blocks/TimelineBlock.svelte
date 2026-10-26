@@ -6,8 +6,9 @@
 	let items = $derived(data.items?.length ? data.items : [
 		{ title: 'Your story here', description: 'Add milestones, training, or the journey behind the practice.' }
 	]);
+	// Desktop only: cards alternate sides and overlap a little; on a phone they stack in one column.
 	let widths = $derived(items.map((_: TimelineItem, i: number) => {
-		const opts = ['w-[78%]', 'w-[85%]', 'w-[90%]', 'w-[95%]', 'w-[98%]'];
+		const opts = ['md:w-[78%]', 'md:w-[85%]', 'md:w-[90%]', 'md:w-[95%]', 'md:w-[98%]'];
 		return opts[(i * 7 + 3) % opts.length];
 	}));
 </script>
@@ -19,9 +20,9 @@
 	</div>
 	<div class="relative md:before:absolute md:before:left-1/2 md:before:top-0 md:before:h-full md:before:w-px md:before:bg-sage/30">
 		{#each items as item, index}
-			<div use:scrollReveal class="reveal relative mb-[-1rem] grid gap-4 md:grid-cols-2 md:gap-8">
+			<div use:scrollReveal class="reveal relative mb-4 grid gap-4 md:mb-[-1rem] md:grid-cols-2 md:gap-8">
 				<div class="hidden md:block" class:md:order-2={index % 2 === 0}></div>
-				<article class="rounded-2xl bg-white/75 p-5 shadow-sm ring-1 ring-charcoal/5 -mt-4 {widths[index]} {index % 2 === 0 ? 'md:ml-auto md:text-right' : ''}">
+				<article class="rounded-2xl bg-white/75 p-5 shadow-sm ring-1 ring-charcoal/5 md:-mt-4 {widths[index]} {index % 2 === 0 ? 'md:ml-auto md:text-right' : ''}">
 					<h3 class="text-xl">{item.title}</h3>
 					<p class="mt-2 text-sm leading-6 text-fg-body/70">{item.description}</p>
 				</article>
