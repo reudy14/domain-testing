@@ -123,26 +123,19 @@ function sessionFields(data: FormData, services: Service[]): SlotFields | { erro
 }
 
 /**
- * Slots that may not overlap: windows with any other window (one
- * practitioner, one opening time), a group session with another session of
- * the same service. A session may overlap a window — whichever is booked
- * first blocks the other (see the README's Slot availability).
+ * A slot that `fields` would overlap (ignoring `exceptId`), or null — or undefined if PocketBase can't be read.
+ * No two slots may overlap, whatever their kind or service: one practitioner works them all.
  */
-function clashKey(slot: Pick<SlotFields, 'kind' | 'items'>) {
-	return slot.kind === 'window' ? 'window' : `session:${slot.items[0] ?? ''}`;
-}
-
-/** A slot that `fields` would overlap (ignoring `exceptId`), or null — or undefined if PocketBase can't be read. */
 async function clashingSlot(pb: Pb, fields: SlotFields, exceptId = '') {
 	const key = toZonedDatetimeInput(fields.start, siteTimezone()).slice(0, 10);
 	const existing = await slotsForDays(pb, addDaysToKey(key, -1), addDaysToKey(key, 1));
 	if (!existing) return undefined;
-	return existing.slots.find((slot) => slot.id !== exceptId && clashKey(slot) === clashKey(fields) && overlapsAny(fields, [slot])) ?? null;
+	return existing.slots.find((slot) => slot.id !== exceptId && overlapsAny(fields, [slot])) ?? null;
 }
 
 function clashMessage(slot: SlotDetail) {
 	const time = `${toZonedDatetimeInput(slot.start, siteTimezone()).replace('T', ' ')}–${toZonedDatetimeInput(slot.end, siteTimezone()).slice(11)}`;
-	return slot.kind === 'window' ? `This overlaps the window ${time}. Change that one instead.` : `This overlaps another ${slot.itemNames[0] ?? ''} session (${time}).`;
+	return slot.kind === 'window' ? `This overlaps the window ${time}. Change or delete that one first.` : `This overlaps the ${slot.itemNames[0] ?? ''} group session ${time}. Change or delete that one first.`;
 }
 
 /** Validated `from`/`to` date keys from a bulk form, or an error message. */
@@ -164,13 +157,12 @@ function slotsForDays(pb: Pb, fromKey: string, toKey: string, item = '') {
 }
 
 /**
- * Drop candidates that start in the past or overlap a slot they may not
- * overlap (existing, or accepted earlier in this run — see clashKey).
+ * Drop candidates that start in the past or overlap another slot (existing,
+ * or accepted earlier in this run — see clashingSlot).
  */
 function filterCandidates(candidates: SlotFields[], existing: SlotDetail[]) {
 	const now = Date.now();
-	const taken = new Map<string, PlannedSlot[]>();
-	for (const slot of existing) taken.set(clashKey(slot), [...(taken.get(clashKey(slot)) ?? []), slot]);
+	const taken: PlannedSlot[] = [...existing];
 
 	const accepted: SlotFields[] = [];
 	let skippedPast = 0;
@@ -180,13 +172,11 @@ function filterCandidates(candidates: SlotFields[], existing: SlotDetail[]) {
 			skippedPast++;
 			continue;
 		}
-		const ranges = taken.get(clashKey(candidate)) ?? [];
-		if (overlapsAny(candidate, ranges)) {
+		if (overlapsAny(candidate, taken)) {
 			skippedOverlap++;
 			continue;
 		}
-		ranges.push(candidate);
-		taken.set(clashKey(candidate), ranges);
+		taken.push(candidate);
 		accepted.push(candidate);
 	}
 	accepted.sort((a, b) => instantMs(a.start) - instantMs(b.start));
