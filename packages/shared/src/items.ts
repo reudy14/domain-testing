@@ -27,3 +27,8 @@ export function formatDuration(minutes: number) {
 export function lowestPrice(durations: ItemDuration[]) {
 	return durations.length ? Math.min(...durations.map((d) => d.price)) : null;
 }
+
+/** A stored code `ABCD2345` → `ABCD-2345`, as shown to people (the shop hooks format it the same way). */
+export function formatCode(code: string) {
+	return code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
+}

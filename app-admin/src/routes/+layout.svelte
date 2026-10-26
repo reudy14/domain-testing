@@ -41,6 +41,7 @@
 				{ href: '/customers', label: 'Customers' },
 				{ href: '/slots', label: 'Slots' },
 				{ href: '/items', label: 'Services & products' },
+				{ href: '/passes', label: 'Vouchers & codes' },
 				{ href: '/calendar', label: 'Events' }
 			]
 		},

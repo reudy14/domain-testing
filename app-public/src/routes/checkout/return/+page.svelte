@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { formatInstant, formatPrice } from '$shared/calendar';
+	import { formatDuration } from '$shared/items';
 
 	let { data } = $props();
 
@@ -32,6 +33,9 @@
 							{#if line.start}
 								<div class="text-sm text-charcoal/60">{formatSlotDate(line.start)}</div>
 							{/if}
+							{#if line.passCode}
+								<div class="text-sm text-charcoal/60">Paid with code {line.passCode}</div>
+							{/if}
 						</div>
 						<span>{formatPrice(line.price * line.quantity, data.currency)}</span>
 					</li>
@@ -41,6 +45,28 @@
 				<span>Total</span><span>{formatPrice(data.order.total, data.currency)}</span>
 			</div>
 		</div>
+
+		{#if data.order.passes?.length}
+			<!-- Bundles bought: their codes (also in the confirmation email). -->
+			<div class="mt-6 rounded-box border border-sage/40 bg-sage/10 p-6 text-left">
+				<h2 class="font-serif text-xl">Your {data.order.passes.length === 1 ? 'code' : 'codes'}</h2>
+				<p class="mt-1 text-sm text-charcoal/70">Enter a code in the basket when you book — the sessions it includes are then already paid for.</p>
+				{#each data.order.passes as pass (pass.id)}
+					<div class="mt-4 rounded-xl bg-white p-4">
+						<div class="flex flex-wrap items-baseline justify-between gap-2">
+							<span class="font-mono text-2xl font-semibold tracking-widest">{pass.code}</span>
+							<span class="text-sm text-charcoal/60">{pass.expiresAt ? `Valid until ${formatInstant(pass.expiresAt, data.timezone, { day: 'numeric', month: 'long', year: 'numeric' })}` : 'No expiry'}</span>
+						</div>
+						<p class="mt-1 font-semibold">{pass.name}{pass.recipientName ? ` · for ${pass.recipientName}` : ''}</p>
+						<ul class="mt-1 text-sm text-charcoal/70">
+							{#each pass.parts as part (`${part.item}|${part.minutes}`)}
+								<li>{part.count}× {part.name}{part.minutes ? ` (${formatDuration(part.minutes)})` : ' — handed over with your order'}</li>
+							{/each}
+						</ul>
+					</div>
+				{/each}
+			</div>
+		{/if}
 
 		<a class="btn mt-8 rounded-full border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href="/">Book another</a>
 	{:else if data.state === 'processing'}

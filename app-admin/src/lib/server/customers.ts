@@ -20,5 +20,5 @@ export function updateCustomer(pb: Pb, body: { email: string; name?: string; new
 }
 
 export function eraseCustomer(pb: Pb, email: string) {
-	return pb.send<{ ordersAnonymised: number; basketsDeleted: number }>('/api/privacy/customer/erase', { method: 'POST', body: { email }, requestKey: null });
+	return pb.send<{ ordersAnonymised: number; basketsDeleted: number; passesAnonymised: number }>('/api/privacy/customer/erase', { method: 'POST', body: { email }, requestKey: null });
 }

@@ -117,10 +117,13 @@ export const defaultPrivacy: PrivacyGlobal = {
 
 // ── Commerce types ─────────────────────────────────────────────────────
 
-export type ItemType = 'item' | 'item_with_time';
+export type ItemType = 'item' | 'item_with_time' | 'bundle';
 
 /** One length a service can be booked for, and its price. */
 export type ItemDuration = { minutes: number; price: number };
+
+/** Part of a bundle: a service at one length (`minutes`), or a product (`minutes` null), `count` times. */
+export type BundlePart = { item: string; minutes: number | null; count: number };
 
 export type ItemRecord = {
 	id: string;
@@ -133,6 +136,8 @@ export type ItemRecord = {
 	type: ItemType;
 	stock: number | null;
 	durations: ItemDuration[]; // item_with_time: the lengths it can be booked for, shortest first
+	bundleParts: BundlePart[]; // bundle: what it contains
+	validMonths: number | null; // bundle: how long its code can be used after purchase (null: no expiry)
 	bufferMinutes: number | null; // get-ready time after each appointment
 	capacity: number | null; // places in a new group session (>1 = group)
 	active: boolean;
@@ -158,6 +163,32 @@ export type BookableTime = {
 	free: number; // places still bookable
 };
 
+/** A part of a code (pass) with its share of the price and what's left to book. */
+export type PassPart = {
+	item: string;
+	name: string;
+	minutes: number | null;
+	count: number;
+	value: number;
+	/** Services are booked with the code; products were handed over with the purchase. */
+	redeemable: boolean;
+	used: number;
+	held: number;
+	left: number;
+};
+
+/** A bundle/voucher code as the customer and the admin see it. */
+export type PassSummary = {
+	id: string;
+	code: string; // ABCD-2345
+	name: string;
+	expiresAt: string; // ISO, '' = no expiry
+	status: 'active' | 'void';
+	recipientName: string;
+	message: string;
+	parts: PassPart[];
+};
+
 export type BasketStatus = 'active' | 'completed' | 'abandoned';
 
 export type BasketLine = {
@@ -178,6 +209,13 @@ export type BasketLine = {
 	itemImageUrl?: string;
 	slotKind?: SlotKind;
 	slotCapacity?: number;
+	/** Slot lines: the basket's code pays for this booking. */
+	passCovered?: boolean;
+	/** Bundle lines: who it's for (shown with its code in the confirmation email). */
+	giftTo?: string;
+	giftMessage?: string;
+	/** Bundle lines: what's in it. */
+	bundle?: { validMonths: number; parts: { item: string; name: string; minutes: number | null; count: number; value: number }[] };
 	/** Slot lines: when the reservation lapses and the line is dropped (ISO). */
 	heldUntil?: string;
 };
@@ -190,6 +228,8 @@ export type Basket = {
 	customerDetails: CustomerDetails | null;
 	stripePaymentIntentId: string | null;
 	lines: BasketLine[];
+	/** The code applied at checkout, with what it has left. */
+	pass?: PassSummary | null;
 	/** Server clock (epoch ms) when this was read, so browsers with a wrong clock count holds down correctly. */
 	serverNow?: number;
 };
@@ -214,6 +254,8 @@ export type OrderRecord = {
 	customerEmailSentAt?: string;
 	clientEmailSentAt?: string;
 	emailError?: string;
+	/** Codes this order bought. */
+	passes?: PassSummary[];
 };
 
 export type OrderLine = {
@@ -228,6 +270,8 @@ export type OrderLine = {
 	start: string | null;
 	/** Slot lines: the booked length. */
 	minutes: number | null;
+	/** The code that paid for this booking ('' if none). */
+	passCode?: string;
 };
 
 // ── Block data types ──────────────────────────────────────────────────

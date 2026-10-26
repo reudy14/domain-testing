@@ -30,6 +30,7 @@ export const privacyTemplateHtml = `<h2>Privacy policy</h2>
 <h3>How long we keep it</h3>
 <ul>
 <li>Details entered at checkout without completing payment: deleted after [30] days.</li>
+<li>Gift vouchers and bundles: the code is kept until it expires; your email and any recipient name and message you added are removed together with your order details.</li>
 <li>Orders: your contact details are removed [after N months / when you ask]; the order record without them is kept for [N] years as required for our accounts.</li>
 <li>Server logs (including IP addresses): [a few] days.</li>
 </ul>

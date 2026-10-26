@@ -9,6 +9,7 @@ export type BasketStore = ReturnType<typeof createBasketStore>;
 export function createBasketStore(initial: Basket | null) {
 	let lines = $state<BasketLine[]>(initial?.lines ?? []);
 	let status = $state<Basket['status']>(initial?.status ?? 'active');
+	let pass = $state<Basket['pass']>(initial?.pass ?? null);
 	// Browser clock minus server clock, so hold countdowns survive a wrong clock.
 	let clockOffset = $state(clockOffsetOf(initial));
 
@@ -40,6 +41,7 @@ export function createBasketStore(initial: Basket | null) {
 	function applyBasket(basket: Basket | null) {
 		lines = basket?.lines ?? [];
 		status = basket?.status ?? 'active';
+		pass = basket?.pass ?? null;
 		clockOffset = clockOffsetOf(basket);
 	}
 
@@ -93,6 +95,20 @@ export function createBasketStore(initial: Basket | null) {
 		await applySlotChange(await callApi({ action: 'renew_holds' }));
 	}
 
+	/** Apply a bundle/voucher code: the bookings it covers cost nothing. */
+	async function applyCode(code: string) {
+		applyBasket(await callApi({ action: 'apply_code', code }));
+	}
+
+	async function removeCode() {
+		applyBasket(await callApi({ action: 'remove_code' }));
+	}
+
+	/** Who a bundle in the basket is for (empty: not a gift). */
+	async function setGift(lineId: string, giftTo: string, giftMessage: string) {
+		applyBasket(await callApi({ action: 'set_gift', lineId, giftTo, giftMessage }));
+	}
+
 	return {
 		get lines() {
 			return lines;
@@ -109,13 +125,19 @@ export function createBasketStore(initial: Basket | null) {
 		get holdDeadline() {
 			return holdDeadline;
 		},
+		get pass() {
+			return pass;
+		},
 		refresh,
 		syncFrom,
 		addItemLine,
 		addSlotLine,
 		updateQuantity,
 		removeLine,
-		renewHolds
+		renewHolds,
+		applyCode,
+		removeCode,
+		setGift
 	};
 }
 

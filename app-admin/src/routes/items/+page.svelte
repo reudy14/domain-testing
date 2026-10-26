@@ -23,6 +23,9 @@
 		stock: string;
 		/** Service lengths and prices, as typed (one form row each). */
 		durations: { minutes: string; price: string }[];
+		/** Bundle contents, as typed (one form row each); minutes '' for a product. */
+		parts: { item: string; minutes: string; count: string }[];
+		validMonths: string;
 		bufferMinutes: string;
 		capacity: string;
 		active: boolean;
@@ -34,8 +37,47 @@
 	let money = $derived(new Intl.NumberFormat('en-GB', { style: 'currency', currency: data.currency }));
 
 	function emptyDraft(): ItemDraft {
-		return { id: '', name: '', description: '', price: 0, image: '', imageUrl: '', type: 'item', stock: '', durations: [{ minutes: '60', price: '' }], bufferMinutes: '', capacity: '', active: true };
+		return {
+			id: '',
+			name: '',
+			description: '',
+			price: 0,
+			image: '',
+			imageUrl: '',
+			type: 'item',
+			stock: '',
+			durations: [{ minutes: '60', price: '' }],
+			parts: [{ item: '', minutes: '', count: '1' }],
+			validMonths: '12',
+			bufferMinutes: '',
+			capacity: '',
+			active: true
+		};
 	}
+
+	/** What a bundle can contain: services and products (never itself or another bundle). */
+	let partChoices = $derived(items.filter((item) => item.type !== 'bundle' && item.id !== draft.id));
+
+	function choosePartItem(row: ItemDraft['parts'][number], id: string) {
+		row.item = id;
+		const item = items.find((candidate) => candidate.id === id);
+		row.minutes = item?.durations[0] ? String(item.durations[0].minutes) : '';
+	}
+
+	/** "3× Massage (1 hour), 1× Oil" for the table. */
+	function bundleList(item: ItemRecord) {
+		const names = new Map(items.map((i) => [i.id, i.name]));
+		return item.bundleParts.map((p) => `${p.count}× ${names.get(p.item) ?? '?'}${p.minutes ? ` (${formatDuration(p.minutes)})` : ''}`).join(', ');
+	}
+
+	/** What the parts cost on their own, to compare with the bundle price. */
+	let partsListPrice = $derived(
+		draft.parts.reduce((sum, row) => {
+			const item = items.find((candidate) => candidate.id === row.item);
+			const unit = item?.type === 'item_with_time' ? (item.durations.find((d) => String(d.minutes) === row.minutes)?.price ?? 0) : (item?.price ?? 0);
+			return sum + unit * (Number(row.count) || 0);
+		}, 0)
+	);
 
 	function addDuration() {
 		const last = Number(draft.durations.at(-1)?.minutes) || 0;
@@ -64,6 +106,8 @@
 			type: item.type,
 			stock: item.stock == null ? '' : String(item.stock),
 			durations: item.durations.length ? item.durations.map((d) => ({ minutes: String(d.minutes), price: String(d.price) })) : [{ minutes: '60', price: '' }],
+			parts: item.bundleParts.length ? item.bundleParts.map((p) => ({ item: p.item, minutes: p.minutes ? String(p.minutes) : '', count: String(p.count) })) : [{ item: '', minutes: '', count: '1' }],
+			validMonths: item.type === 'bundle' ? (item.validMonths == null ? '' : String(item.validMonths)) : '12',
 			bufferMinutes: item.bufferMinutes == null ? '' : String(item.bufferMinutes),
 			capacity: item.capacity == null ? '' : String(item.capacity),
 			active: item.active
@@ -96,7 +140,7 @@
 	<div class="flex flex-col justify-between gap-4 md:flex-row md:items-end">
 		<div>
 			<h1 class="text-3xl font-bold">Services & products</h1>
-			<p class="text-base-content/60">Bookable services and products, shown in Shop blocks.</p>
+			<p class="text-base-content/60">Bookable services, products and bundles (codes for sessions booked later), shown in Shop blocks.</p>
 		</div>
 		<button class="btn btn-primary" type="button" onclick={() => createItem()}>Add service or product</button>
 	</div>
@@ -120,10 +164,16 @@
 									<span class="font-semibold">{item.name}</span>
 								</div>
 							</td>
-							<td><span class="badge">{item.type === 'item_with_time' ? 'Service' : 'Product'}</span></td>
+							<td><span class="badge">{item.type === 'item_with_time' ? 'Service' : item.type === 'bundle' ? 'Bundle' : 'Product'}</span></td>
 							<td>{item.durations.length > 1 ? `from ${money.format(item.price)}` : money.format(item.price)}</td>
 							<td>{item.type === 'item' ? (item.stock ?? '∞') : '—'}</td>
-							<td>{item.type === 'item_with_time' ? `${durationList(item)}${item.bufferMinutes ? ` + ${item.bufferMinutes} min get-ready` : ''}${(item.capacity ?? 1) > 1 ? ` · ${item.capacity} places` : ''}` : '—'}</td>
+							<td>
+								{#if item.type === 'item_with_time'}
+									{durationList(item)}{item.bufferMinutes ? ` + ${item.bufferMinutes} min get-ready` : ''}{(item.capacity ?? 1) > 1 ? ` · ${item.capacity} places` : ''}
+								{:else if item.type === 'bundle'}
+									{bundleList(item)} · {item.validMonths ? `valid ${item.validMonths} months` : 'no expiry'}
+								{:else}—{/if}
+							</td>
 							<td><span class="badge" class:badge-success={item.active}>{item.active ? 'Active' : 'Inactive'}</span></td>
 							<td class="text-right"><button class="btn btn-sm" type="button" onclick={() => editItem(item)}>Edit</button></td>
 						</tr>
@@ -157,10 +207,52 @@
 			<select class="select w-full" name="type" bind:value={draft.type}>
 				<option value="item">Product</option>
 				<option value="item_with_time">Service (bookable)</option>
+				<option value="bundle">Bundle / voucher (paid now, booked later with a code)</option>
 			</select>
 		</label>
 
-		{#if draft.type === 'item'}
+		{#if draft.type === 'bundle'}
+			<div class="fieldset">
+				<span class="fieldset-legend">What’s in it</span>
+				<div class="space-y-2">
+					{#each draft.parts as row, i}
+						{@const partItem = items.find((item) => item.id === row.item)}
+						<div class="flex flex-wrap items-center gap-2">
+							<input class="input w-20" type="number" min="1" max="50" step="1" name="partCount" required aria-label="How many" bind:value={row.count} />
+							<span>×</span>
+							<select class="select w-56" name="partItem" required aria-label="Service or product" value={row.item} onchange={(e) => choosePartItem(row, e.currentTarget.value)}>
+								<option value="" disabled>Choose…</option>
+								{#each partChoices as choice (choice.id)}<option value={choice.id}>{choice.name}{choice.type === 'item' ? ' (product)' : ''}</option>{/each}
+							</select>
+							{#if partItem?.type === 'item_with_time'}
+								<select class="select w-36" name="partMinutes" aria-label="Length" bind:value={row.minutes}>
+									{#each partItem.durations as duration (duration.minutes)}<option value={String(duration.minutes)}>{formatDuration(duration.minutes)}</option>{/each}
+								</select>
+							{:else}
+								<input type="hidden" name="partMinutes" value="" />
+							{/if}
+							{#if draft.parts.length > 1}
+								<button class="btn btn-ghost btn-sm" type="button" aria-label="Remove this part" onclick={() => draft.parts.splice(i, 1)}>✕</button>
+							{/if}
+						</div>
+					{/each}
+				</div>
+				<button class="btn btn-ghost btn-sm mt-1 w-fit" type="button" onclick={() => draft.parts.push({ item: '', minutes: '', count: '1' })}>+ Add a service or product</button>
+				<span class="label whitespace-normal">The buyer gets a code; whoever has it books the services, each at the length set here, without paying again. Products are handed over with the purchase. A one-service voucher is a bundle with one part.</span>
+			</div>
+			<div class="grid gap-x-4 md:grid-cols-2">
+				<label class="fieldset">
+					<span class="fieldset-legend">Bundle price ({data.currency})</span>
+					<input class="input w-full" type="number" step="0.01" min="0.01" name="price" required bind:value={draft.price} />
+					{#if partsListPrice}<span class="label">Bought separately: {money.format(partsListPrice)}</span>{/if}
+				</label>
+				<label class="fieldset">
+					<span class="fieldset-legend">Valid for (months)</span>
+					<input class="input w-full" type="number" min="1" max="120" step="1" name="validMonths" placeholder="No expiry" bind:value={draft.validMonths} />
+					<span class="label">From the day it’s bought. Check local rules on minimum validity for gift cards.</span>
+				</label>
+			</div>
+		{:else if draft.type === 'item'}
 			<div class="grid gap-x-4 md:grid-cols-2">
 				<label class="fieldset">
 					<span class="fieldset-legend">Price ({data.currency})</span>

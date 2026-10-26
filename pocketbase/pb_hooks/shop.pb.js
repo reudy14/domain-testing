@@ -41,7 +41,28 @@ routerAdd('POST', '/api/shop/stripe-webhook', (e) => {
 
 routerAdd('GET', '/api/shop/order', (e) => {
 	const shop = require(`${__hooks}/shop/lib.js`);
-	return e.json(200, shop.orderStatus($app, e.request.url.query().get('payment_intent')));
+	const query = e.request.url.query();
+	return e.json(200, shop.orderStatus($app, query.get('payment_intent'), { orderId: query.get('order'), basketId: query.get('basket') }));
+});
+
+// Bundle/voucher codes, for the signed-in admin (Vouchers & codes page).
+// Customers only use codes through their basket (`apply_code`).
+routerAdd('GET', '/api/shop/passes', (e) => {
+	if (!e.auth) throw new UnauthorizedError('Sign in to see codes');
+	const shop = require(`${__hooks}/shop/lib.js`);
+	return e.json(200, { passes: shop.listPasses($app, e.request.url.query().get('q')) });
+});
+
+routerAdd('POST', '/api/shop/passes/update', (e) => {
+	if (!e.auth) throw new UnauthorizedError('Sign in to change codes');
+	const shop = require(`${__hooks}/shop/lib.js`);
+	return e.json(200, { pass: shop.updatePass($app, e.requestInfo().body) });
+});
+
+routerAdd('POST', '/api/shop/passes/issue', (e) => {
+	if (!e.auth) throw new UnauthorizedError('Sign in to issue codes');
+	const shop = require(`${__hooks}/shop/lib.js`);
+	return e.json(200, { pass: shop.issuePass($app, e.requestInfo().body) });
 });
 
 routerAdd('POST', '/api/shop/order-email-status', (e) => {

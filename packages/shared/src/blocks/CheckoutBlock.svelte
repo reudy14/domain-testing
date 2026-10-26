@@ -47,13 +47,63 @@
 	// Prices in the shop currency (STRIPE_CURRENCY, via layout data).
 	const currency = $derived<string>(page.data.currency ?? DEFAULT_CURRENCY);
 
+	/** Codes cover everything: the order is confirmed without a payment step. */
+	const nothingToPay = $derived(basket.lines.length > 0 && basket.total === 0);
+
 	const payLabel = $derived(
 		payState === 'confirming'
 			? 'Confirming…'
 			: payState === 'creating'
-				? 'Preparing payment…'
-				: `Pay ${formatPrice(basket.total, currency)}`
+				? nothingToPay
+					? 'Confirming…'
+					: 'Preparing payment…'
+				: nothingToPay
+					? 'Confirm booking'
+					: `Pay ${formatPrice(basket.total, currency)}`
 	);
+
+	// ── Bundle/voucher code ──
+	let codeInput = $state('');
+	let codeError = $state('');
+	let codeBusy = $state(false);
+
+	async function applyCode() {
+		if (!codeInput.trim() || codeBusy) return;
+		codeBusy = true;
+		codeError = '';
+		try {
+			await basket.applyCode(codeInput.trim());
+			codeInput = '';
+		} catch (e) {
+			codeError = e instanceof Error ? e.message : 'Could not apply the code.';
+		} finally {
+			codeBusy = false;
+		}
+	}
+
+	async function removeCode() {
+		codeBusy = true;
+		codeError = '';
+		try {
+			await basket.removeCode();
+		} catch (e) {
+			codeError = e instanceof Error ? e.message : 'Could not remove the code.';
+		} finally {
+			codeBusy = false;
+		}
+	}
+
+	// ── Gifts (bundle lines) ──
+	let giftOpen = $state<Record<string, boolean>>({});
+
+	async function saveGift(line: BasketLine, giftTo: string, giftMessage: string) {
+		if (giftTo === (line.giftTo ?? '') && giftMessage === (line.giftMessage ?? '')) return;
+		try {
+			await basket.setGift(line.id, giftTo, giftMessage);
+		} catch (e) {
+			errorMsg = e instanceof Error ? e.message : 'Could not save the gift details.';
+		}
+	}
 
 	const timezone = $derived<string>(page.data.timezone ?? DEFAULT_TIMEZONE);
 
@@ -179,7 +229,13 @@
 						`Could not start payment (${res.status}). If you booked a time slot, its hold may have expired — please pick it again from the shop section.`
 				);
 			}
-			const { clientSecret } = await res.json();
+			const result = await res.json();
+			if (result.free) {
+				// Paid in full with a code: the order exists, no payment step.
+				goto('/checkout/return?order=' + encodeURIComponent(result.orderId));
+				return;
+			}
+			const { clientSecret } = result;
 			// Starting payment holds the slots longer; show the new countdown.
 			await basket.refresh();
 
@@ -349,10 +405,44 @@
 						{#if line.lineType === 'slot' && line.start}
 							<p class="text-sm text-fg-body/70">{formatSlotTime(line.start)}{line.minutes ? ` · ${formatDuration(line.minutes)}` : ''}</p>
 						{/if}
-						{#if line.itemPrice == null}
+						{#if line.passCovered}
+							<p class="text-sm font-medium text-sage-dark">Paid with your code</p>
+						{:else if line.itemPrice == null}
 							<p class="text-sm text-terracotta">No longer offered at this length — please remove it and pick again.</p>
 						{:else}
 							<p class="text-sm text-fg-body/70">{formatPrice(line.itemPrice, currency)}</p>
+						{/if}
+						{#if line.bundle}
+							<p class="text-sm text-fg-body/70">
+								{line.bundle.parts.map((p) => `${p.count}× ${p.name}${p.minutes ? ` (${formatDuration(p.minutes)})` : ''}`).join(', ')}{line.bundle.validMonths
+									? ` · valid ${line.bundle.validMonths} months`
+									: ''}
+							</p>
+							{#if giftOpen[line.id] || line.giftTo}
+								<div class="mt-2 grid gap-2 sm:grid-cols-2">
+									<input
+										type="text"
+										maxlength="180"
+										placeholder="For (their name)"
+										aria-label="Who the gift is for"
+										class="rounded-lg border border-charcoal/15 bg-white px-3 py-1.5 text-sm"
+										value={line.giftTo ?? ''}
+										onchange={(e) => saveGift(line, e.currentTarget.value.trim(), line.giftMessage ?? '')}
+									/>
+									<input
+										type="text"
+										maxlength="1000"
+										placeholder="Message (optional)"
+										aria-label="Gift message"
+										class="rounded-lg border border-charcoal/15 bg-white px-3 py-1.5 text-sm"
+										value={line.giftMessage ?? ''}
+										onchange={(e) => saveGift(line, line.giftTo ?? '', e.currentTarget.value.trim())}
+									/>
+								</div>
+								<p class="mt-1 text-xs text-fg-body/60">Shown with the code in your confirmation email — forward it to them, or print it.</p>
+							{:else}
+								<button type="button" class="mt-1 text-sm text-sage-dark underline underline-offset-2" onclick={() => (giftOpen[line.id] = true)}>This is a gift</button>
+							{/if}
 						{/if}
 					</div>
 
@@ -404,6 +494,50 @@
 				<span class="text-fg-body/70">Subtotal</span>
 				<span class="font-serif text-xl font-bold">{formatPrice(basket.total, currency)}</span>
 			</div>
+		</div>
+
+		<!-- Bundle / voucher code: covers bookings of the same service and length. -->
+		<div class="mt-4 rounded-2xl border border-charcoal/10 bg-white p-5">
+			{#if basket.pass}
+				{@const left = basket.pass.parts.filter((p) => p.redeemable)}
+				<div class="flex flex-wrap items-start justify-between gap-3">
+					<div>
+						<p class="font-medium">Code <span class="font-mono tracking-wider">{basket.pass.code}</span> · {basket.pass.name}</p>
+						<p class="text-sm text-fg-body/70">
+							{left.map((p) => `${p.left} × ${p.name} (${formatDuration(p.minutes ?? 0)})`).join(', ')} left after this basket{basket.pass.expiresAt
+								? ` · valid until ${formatInstant(basket.pass.expiresAt, timezone, { day: 'numeric', month: 'long', year: 'numeric' })}`
+								: ''}.
+						</p>
+						{#if !basket.lines.some((l) => l.passCovered)}
+							<p class="mt-1 text-sm text-terracotta">Nothing in your basket matches this code — book one of the sessions above, at the same length.</p>
+						{/if}
+					</div>
+					<button type="button" class="text-sm text-fg-body/70 underline underline-offset-2 disabled:opacity-50" disabled={codeBusy} onclick={removeCode}>Remove code</button>
+				</div>
+			{:else}
+				<form
+					class="flex flex-wrap items-center gap-2"
+					onsubmit={(e) => {
+						e.preventDefault();
+						applyCode();
+					}}
+				>
+					<label class="text-sm font-medium" for="checkout-code">Have a bundle or voucher code?</label>
+					<input
+						id="checkout-code"
+						type="text"
+						autocomplete="off"
+						spellcheck="false"
+						placeholder="ABCD-2345"
+						class="w-36 rounded-xl border border-charcoal/15 bg-white px-3 py-2 font-mono tracking-wider uppercase focus:ring-2 focus:ring-sage/50 focus:outline-none"
+						bind:value={codeInput}
+					/>
+					<button type="submit" class="rounded-full border border-charcoal/20 px-4 py-2 text-sm font-medium transition hover:bg-charcoal/5 disabled:opacity-50" disabled={codeBusy || !codeInput.trim()}>
+						{codeBusy ? 'Checking…' : 'Apply'}
+					</button>
+				</form>
+			{/if}
+			{#if codeError}<p class="mt-2 text-sm text-terracotta" role="alert">{codeError}</p>{/if}
 		</div>
 
 		<div class="mt-10 grid gap-10 md:grid-cols-2">
@@ -519,7 +653,9 @@
 
 				{#if payState === 'idle' && !errorMsg}
 					<p class="mt-4 text-sm text-fg-body/70">
-						Fill in your details and press Pay to continue to secure payment.
+						{nothingToPay
+							? 'Nothing to pay — your code covers everything. Fill in your details and press Confirm booking.'
+							: 'Fill in your details and press Pay to continue to secure payment.'}
 					</p>
 				{/if}
 			</div>

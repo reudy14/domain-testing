@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { confirmSubmit } from '$lib/admin/confirm';
 	import { DISPLAY_LOCALE, formatDateTime } from '$lib/calendar';
+	import { formatCode } from '$shared/items';
 
 	let { data, form } = $props();
 	let customer = $derived(data.customer);
@@ -154,6 +155,16 @@
 					{/each}
 				</ul>
 
+				{#if customer.codes?.length}
+					<h3 class="mt-6 font-bold">Codes bought</h3>
+					<p class="text-sm text-base-content/60">Bundles and vouchers. Erasing keeps the codes usable but removes the email, recipient and message.</p>
+					<ul class="mt-2 space-y-1 text-sm">
+						{#each customer.codes as code (code.code)}
+							<li><span class="font-mono">{formatCode(code.code)}</span> — {code.name}{code.recipientName ? ` · for ${code.recipientName}` : ''}{code.message ? ` · “${code.message}”` : ''}</li>
+						{/each}
+					</ul>
+				{/if}
+
 				{#if customer.unpaidBaskets.length}
 					<h3 class="mt-6 font-bold">Unpaid checkouts</h3>
 					<p class="text-sm text-base-content/60">Details typed at checkout without paying. Deleted automatically after {data.settings.abandonedBasketDays} days.</p>
@@ -167,7 +178,7 @@
 				<div class="mt-6 rounded-box border border-error/40 p-4">
 					<h3 class="font-bold">Erase this customer</h3>
 					<p class="mt-1 text-sm text-base-content/70">
-						For a request to be forgotten. Removes their name, email, phone and notes from every order (the amounts, services and dates stay, for your accounts) and deletes unpaid checkouts.
+						For a request to be forgotten. Removes their name, email, phone and notes from every order (the amounts, services and dates stay, for your accounts), removes their email and any recipient name and message from codes they bought (the codes keep working), and deletes unpaid checkouts.
 						Their payment also exists in Stripe and their booking emails in your email provider's logs — handle those in those services.
 					</p>
 					{#if upcoming.length}

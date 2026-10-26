@@ -1,4 +1,5 @@
 import type { ColorsGlobal, CustomerDetails, EmailBlock, EmailTemplate, FooterGlobal } from '../types';
+import { formatDuration } from '../items';
 
 // Pure email rendering — no server or browser APIs, so the admin editor can
 // render its live preview client-side with exactly the code that sends.
@@ -12,6 +13,18 @@ export type EmailLine = {
 	quantity: number;
 	start: string | null;
 	end: string | null;
+	/** The code that paid for this booking. */
+	passCode?: string;
+};
+
+/** A bundle/voucher code bought in this order. */
+export type EmailPass = {
+	code: string; // ABCD-2345
+	name: string;
+	expiresAt: string; // ISO, '' = no expiry
+	recipientName: string;
+	message: string;
+	parts: { name: string; minutes: number | null; count: number }[];
 };
 
 export type EmailContext = {
@@ -20,6 +33,8 @@ export type EmailContext = {
 	currency: string;
 	customer: CustomerDetails;
 	lines: EmailLine[];
+	/** Codes bought in this order — shown under the booking details. */
+	passes?: EmailPass[];
 	business: FooterGlobal;
 	colors: ColorsGlobal;
 	siteUrl: string;
@@ -95,6 +110,20 @@ function formatTime(iso: string, timezone: string): string {
 		hour: '2-digit',
 		minute: '2-digit'
 	}).format(new Date(iso));
+}
+
+function formatDate(iso: string, timezone: string): string {
+	return new Intl.DateTimeFormat('en-GB', { timeZone: safeTimeZone(timezone), day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso));
+}
+
+/** "Valid until 25 October 2027" / "No expiry". */
+function passValidity(pass: EmailPass, timezone: string) {
+	return pass.expiresAt ? `Valid until ${formatDate(pass.expiresAt, timezone)}` : 'No expiry';
+}
+
+/** "3× Massage (1 hour)" / "1× Oil — handed over with this order". */
+function passPartLabel(part: EmailPass['parts'][number]) {
+	return `${part.count}× ${part.name}${part.minutes ? ` (${formatDuration(part.minutes)})` : ' — handed over with this order'}`;
 }
 
 /** "Monday 6 October 2026 at 10:00 – 11:00" (end omitted when unknown). */
@@ -236,6 +265,7 @@ function renderBookingDetails(block: EmailBlock, ctx: EmailContext): string {
 <td valign="top" style="${cell}padding:10px 12px 10px 0;border-bottom:1px solid ${BORDER};">
 <div style="font-size:16px;font-weight:600;line-height:1.4;">${escapeHtml(qty + line.name)}</div>
 ${when ? `<div style="font-size:14px;line-height:1.5;color:${ctx.colors.subheading};">${escapeHtml(when)}</div>` : ''}
+${line.passCode ? `<div style="font-size:14px;line-height:1.5;color:${ctx.colors.subheading};">Paid with code ${escapeHtml(line.passCode)}</div>` : ''}
 </td>
 <td valign="top" align="right" style="${cell}padding:10px 0;border-bottom:1px solid ${BORDER};font-size:15px;white-space:nowrap;">${escapeHtml(formatMoney(line.price * line.quantity, ctx.currency))}</td>
 </tr>`;
@@ -243,7 +273,25 @@ ${when ? `<div style="font-size:14px;line-height:1.5;color:${ctx.colors.subheadi
 		.join('');
 	const total = `<tr><td style="${cell}padding:12px 12px 0 0;font-size:16px;font-weight:700;">Total paid</td><td align="right" style="${cell}padding:12px 0 0;font-size:16px;font-weight:700;white-space:nowrap;">${escapeHtml(formatMoney(ctx.total, ctx.currency))}</td></tr>`;
 	const table = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${lines}${total}</table>`;
-	return boxed(sectionTitle(block.data.title ?? '', ctx) + table, ctx);
+	return boxed(sectionTitle(block.data.title ?? '', ctx) + table + renderPasses(ctx), ctx);
+}
+
+/** The codes an order bought, under its booking details. */
+function renderPasses(ctx: EmailContext): string {
+	if (!ctx.passes?.length) return '';
+	const small = `font-family:${FONT_BODY};font-size:14px;line-height:1.5;color:${ctx.colors.subheading};margin:4px 0 0;`;
+	const cards = ctx.passes
+		.map(
+			(pass) => `<div style="margin:12px 0 0;padding:14px 16px;border:1px dashed ${ctx.colors.accent};border-radius:8px;">
+<div style="font-family:'Courier New',Courier,monospace;font-size:24px;font-weight:700;letter-spacing:3px;color:${ctx.colors.text};">${escapeHtml(pass.code)}</div>
+<div style="font-family:${FONT_BODY};font-size:16px;font-weight:600;line-height:1.4;color:${ctx.colors.text};margin:6px 0 0;">${escapeHtml(pass.name)}${pass.recipientName ? ` · for ${escapeHtml(pass.recipientName)}` : ''}</div>
+${pass.message ? `<p style="${small}font-style:italic;">“${escapeHtml(pass.message).replace(/\n/g, '<br>')}”</p>` : ''}
+<p style="${small}">${pass.parts.map((part) => escapeHtml(passPartLabel(part))).join('<br>')}</p>
+<p style="${small}">${escapeHtml(passValidity(pass, ctx.timezone))}. Enter the code in the basket when booking.</p>
+</div>`
+		)
+		.join('');
+	return `<div style="font-family:${FONT_BODY};font-size:16px;font-weight:700;color:${ctx.colors.text};margin:20px 0 0;">Your ${ctx.passes.length === 1 ? 'code' : 'codes'}</div>${cards}`;
 }
 
 function renderCustomerDetails(block: EmailBlock, ctx: EmailContext): string {
@@ -323,9 +371,20 @@ function renderBlockText(block: EmailBlock, ctx: EmailContext, values: Record<st
 			const lines = ctx.lines.map((line) => {
 				const when = formatLineWhen(line, ctx.timezone);
 				const qty = line.quantity > 1 ? `${line.quantity}× ` : '';
-				return `- ${qty}${line.name} — ${formatMoney(line.price * line.quantity, ctx.currency)}${when ? `\n  ${when}` : ''}`;
+				return `- ${qty}${line.name} — ${formatMoney(line.price * line.quantity, ctx.currency)}${when ? `\n  ${when}` : ''}${line.passCode ? `\n  Paid with code ${line.passCode}` : ''}`;
 			});
-			return `${title}${lines.join('\n')}\nTotal paid: ${formatMoney(ctx.total, ctx.currency)}`;
+			const passes = (ctx.passes ?? []).map((pass) =>
+				[
+					`\n${pass.code} — ${pass.name}${pass.recipientName ? ` (for ${pass.recipientName})` : ''}`,
+					pass.message && `"${pass.message}"`,
+					...pass.parts.map((part) => `  ${passPartLabel(part)}`),
+					`  ${passValidity(pass, ctx.timezone)}. Enter the code in the basket when booking.`
+				]
+					.filter(Boolean)
+					.join('\n')
+			);
+			const codes = passes.length ? `\n\nYOUR ${passes.length === 1 ? 'CODE' : 'CODES'}${passes.join('\n')}` : '';
+			return `${title}${lines.join('\n')}\nTotal paid: ${formatMoney(ctx.total, ctx.currency)}${codes}`;
 		}
 		case 'customer_details': {
 			const { name, email, phone, notes } = ctx.customer;
