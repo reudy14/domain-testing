@@ -1,6 +1,6 @@
 <script lang="ts">
 	// One row of mutually exclusive options with an optional label column on
-	// the left — the standard "setting row" in the block editors (see
+	// the left (above it in a narrow row) — the standard "setting row" in the block editors (see
 	// ColorField for the colour variant; both share the label column width).
 	let {
 		label,
@@ -25,22 +25,25 @@
 	} = $props();
 </script>
 
-<div class="flex items-center gap-3 {className}" role="group" aria-label={label}>
-	{#if label}
-		<span class="w-28 shrink-0 text-sm" class:font-bold={strong} class:font-medium={!strong}>{label}</span>
-	{/if}
-	<div class="join grid flex-1" style="grid-template-columns: repeat({options.length}, minmax(0, 1fr))">
-		{#each options as option}
-			<button
-				type="button"
-				class="btn btn-sm join-item px-1"
-				class:btn-active={value === option}
-				class:btn-primary={value === option}
-				aria-pressed={value === option}
-				onclick={() => onChange(option)}
-			>
-				{formatLabel(option)}
-			</button>
-		{/each}
+<!-- In a narrow row (a phone) the label goes above the buttons, so they keep room for their text. -->
+<div class="@container {className}">
+	<div class="flex flex-col gap-1 @sm:flex-row @sm:items-center @sm:gap-3" role="group" aria-label={label}>
+		{#if label}
+			<span class="shrink-0 text-sm @sm:w-28" class:font-bold={strong} class:font-medium={!strong}>{label}</span>
+		{/if}
+		<div class="join grid flex-1" style="grid-template-columns: repeat({options.length}, minmax(0, 1fr))">
+			{#each options as option}
+				<button
+					type="button"
+					class="btn btn-sm join-item px-1"
+					class:btn-active={value === option}
+					class:btn-primary={value === option}
+					aria-pressed={value === option}
+					onclick={() => onChange(option)}
+				>
+					{formatLabel(option)}
+				</button>
+			{/each}
+		</div>
 	</div>
 </div>

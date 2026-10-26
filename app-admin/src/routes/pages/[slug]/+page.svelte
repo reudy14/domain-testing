@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import BlockList from '$lib/admin/BlockList.svelte';
+	import SaveStatus from '$lib/admin/SaveStatus.svelte';
 	import { blockLabels, blockTypes, createBlock } from '$lib/admin/blockDefaults';
 	import BlockEditor from '$lib/admin/editors/BlockEditor.svelte';
 	import { warnOnUnsavedChanges } from '$lib/admin/unsaved.svelte';
@@ -106,9 +107,7 @@
 		</div>
 	</div>
 
-	{#if form?.message}
-		<div class="alert" class:alert-success={form.ok} class:alert-error={!form.ok} role="status">{form.message}</div>
-	{/if}
+	<SaveStatus result={form} />
 
 	<div class="grid gap-4 rounded-box bg-base-100 p-5 shadow md:grid-cols-2">
 		<label class="fieldset py-0">

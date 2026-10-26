@@ -243,10 +243,12 @@
 		{/if}
 
 		<div class="mt-6 space-y-3 rounded-box border border-base-300 p-4">
-			<label class="flex items-center gap-3">
-				<span class="w-28 shrink-0 text-sm font-bold">Anchor</span>
-				<input class="input input-sm flex-1" placeholder="e.g. prices — then link to #prices" value={block.data._anchor || ''} onchange={(e) => updateData({ _anchor: toAnchor(e.currentTarget.value) })} />
-			</label>
+			<div class="@container">
+				<label class="flex flex-col gap-1 @sm:flex-row @sm:items-center @sm:gap-3">
+					<span class="shrink-0 text-sm font-bold @sm:w-28">Anchor</span>
+					<input class="input input-sm w-full @sm:flex-1" placeholder="e.g. prices — then link to #prices" value={block.data._anchor || ''} onchange={(e) => updateData({ _anchor: toAnchor(e.currentTarget.value) })} />
+				</label>
+			</div>
 
 			<hr class="border-base-300" />
 
@@ -257,13 +259,17 @@
 			{:else if block.data._background?.type === 'image'}
 				<ImagePicker url={block.data._background?.imageUrl || ''} alt={block.data._background?.imageAlt || ''} onChange={(image) => updateBackground({ imageUrl: image.url, imageAlt: image.alt })} />
 				<SegmentedControl label="Attachment" options={['scroll', 'fixed']} value={block.data._background?.attachment || 'scroll'} onChange={(attachment) => updateBackground({ attachment })} />
-				<SegmentedControl
-					label="Overlay"
-					options={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90]}
-					value={block.data._background?.overlay ? (block.data._background?.overlayOpacity ?? 40) : 0}
-					onChange={(v) => updateBackground({ overlay: Number(v) > 0, overlayOpacity: Number(v) })}
-					formatLabel={(v) => (Number(v) === 0 ? 'None' : `${v}%`)}
-				/>
+				{@const overlay = block.data._background?.overlay ? (block.data._background?.overlayOpacity ?? 40) : 0}
+				<!-- A slider: ten buttons don't fit a phone. -->
+				<div class="@container">
+					<label class="flex flex-col gap-1 @sm:flex-row @sm:items-center @sm:gap-3">
+						<span class="shrink-0 text-sm font-medium @sm:w-28">Overlay</span>
+						<span class="flex flex-1 items-center gap-3">
+							<input class="range range-sm flex-1" type="range" min="0" max="90" step="10" value={overlay} oninput={(e) => updateBackground({ overlay: Number(e.currentTarget.value) > 0, overlayOpacity: Number(e.currentTarget.value) })} />
+							<span class="w-12 text-right text-sm tabular-nums">{overlay === 0 ? 'None' : `${overlay}%`}</span>
+						</span>
+					</label>
+				</div>
 			{/if}
 
 			<hr class="border-base-300" />
