@@ -154,7 +154,7 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
 ### Routing
 - **Admin app** (`app-admin`): All routes except `/login` are auth-guarded in `hooks.server.ts` (which also refreshes the token per request and sets the cookie's `Secure` flag from the real scheme). The root layout renders the admin shell (grouped sidebar) except on `/login` and `/preview`. The `/preview` route reads `sessionStorage` set by the page editor (same-origin, so it works).
 - **Public app** (`app-public`): No auth guard. The root layout always renders Header/Footer. `+layout.server.ts` fetches header/footer/colors globals + basket/items/slots for every page.
-- **Booking and basket links**: booking = the header CTA's address, basket = the optional basket page (`header.basketPage`; '' = the CTA's address), both from `shopLinks(header)` in `packages/shared/src/types.ts` (blocks read `page.data.header`) — never hard-code `/book`.
+- **Booking and basket links**: booking = the header CTA's address, basket = the optional basket page slug typed in Site design (`header.basketPage`; '' = the CTA's address), both from `shopLinks(header)` in `packages/shared/src/types.ts` (blocks read `page.data.header`) — never hard-code `/book`.
 - **Class names in components are written out whole** (`'btn-primary'`, not `` `btn-${variant}` ``): Tailwind only generates classes it finds in the source, so a built-up name silently gets no style.
 - `+page.server.ts` for home fetches `slug = "home" && published = true`
 - `[slug]/+page.server.ts` fetches by dynamic slug

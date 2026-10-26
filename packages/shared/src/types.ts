@@ -64,7 +64,7 @@ export type HeaderGlobal = {
 	/** The header button. Its address is also where hero buttons without one and "Book another" lead. */
 	ctaButton: { label: string; href: string };
 	homePage: string;
-	/** Slug of the page with the Checkout block: the basket in the header and "view basket" lead here ('' = the CTA button's address). */
+	/** Slug of the page with the Checkout block, typed in Site design: the basket in the header and "view basket" lead here ('' = the CTA button's address). */
 	basketPage?: string;
 };
 
@@ -95,7 +95,9 @@ export const defaultHeader: HeaderGlobal = {
 /** Where booking (the CTA button's address) and the basket (the basket page, else the same address) are. */
 export function shopLinks(header?: Partial<HeaderGlobal> | null) {
 	const booking = header?.ctaButton?.href || '/book';
-	return { booking, basket: header?.basketPage ? `/${header.basketPage}` : booking };
+	// Typed by hand, so tolerate "/basket", "basket/" and spaces.
+	const basketSlug = header?.basketPage?.trim().replace(/^\/+|\/+$/g, '');
+	return { booking, basket: basketSlug ? `/${basketSlug}` : booking };
 }
 
 export const defaultFooter: FooterGlobal = {

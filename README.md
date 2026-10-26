@@ -172,7 +172,7 @@ Setup:
    ```
    Copy the printed `whsec_…` signing secret into `STRIPE_WEBHOOK_SECRET`.
 4. Import the updated `pb_schema.json` (adds `items`, `slots`, `baskets`, `basket_lines`, `orders`, `order_lines`). Two visitors can't take the same place: holds are checked and written in one PocketBase transaction (see *Slot availability*).
-5. Create a published page (e.g. slug `book`) with a `shop` block and point the header CTA at it (*Site design → Header*); hero buttons without an address and *Book another* after paying lead there too. Put a `checkout` block on the same page, or on a page of its own picked as the optional *Basket page*: the basket in the header and *view basket* in the shop lead there (empty = the CTA's address). Site design warns when the basket's page isn't published or has no `checkout` block.
+5. Create a published page (e.g. slug `book`) with a `shop` block and point the header CTA at it (*Site design → Header*); hero buttons without an address and *Book another* after paying lead there too. Put a `checkout` block on the same page, or on a page of its own whose slug you type as the optional *Basket page*: the basket in the header and *view basket* in the shop lead there (empty = the CTA's address). Site design warns when the basket's page isn't published or has no `checkout` block.
 
 ## Bundles and codes
 

@@ -40,8 +40,10 @@
 
 	// The page the basket links lead to: the basket page, else the CTA's address when that is a page here.
 	function basketProblem() {
-		const page = pageBySlug(shopLinks(header).basket.replace(/^\/|\/$/g, ''));
-		if (!page) return '';
+		const slug = shopLinks(header).basket.replace(/^\/|\/$/g, '');
+		const page = pageBySlug(slug);
+		// The CTA may point anywhere (even another site); a typed basket slug must be a page here.
+		if (!page) return header.basketPage?.trim() ? `There is no page with the slug “${slug}”.` : '';
 		if (!page.published) return `“${page.title}” isn’t published yet.`;
 		if (!page.hasCheckout) return `“${page.title}” has no Checkout block, so people can’t pay from it.`;
 		return '';
@@ -105,13 +107,8 @@
 		</div>
 		<p class="mt-1 text-sm text-base-content/60">Hero buttons without an address and “Book another” after paying lead here too.</p>
 		<h3 class="mt-6 mb-2 font-bold">Basket page <span class="font-normal text-base-content/50">(optional)</span></h3>
-		<select class="select w-full" aria-label="Basket page" bind:value={header.basketPage}>
-			<option value="">— Same as the CTA button —</option>
-			{#each data.pages as page (page.id)}
-				<option value={page.slug}>{page.title} [{page.slug}]</option>
-			{/each}
-		</select>
-		<p class="mt-1 text-sm text-base-content/60">Where people pay: the basket in the header and “view basket” in the shop lead here. Leave it empty if the CTA button’s page has the Checkout block.</p>
+		<input class="input w-full" aria-label="Basket page" bind:value={header.basketPage} placeholder="Same as the CTA button" />
+		<p class="mt-1 text-sm text-base-content/60">The slug of the page where people pay, e.g. <code>basket</code>: the basket in the header and “view basket” in the shop lead there. Leave it empty if the CTA button’s page has the Checkout block.</p>
 		{#if basketProblem()}<p class="mt-1 text-sm font-semibold">⚠ {basketProblem()}</p>{/if}
 		<h3 class="mt-6 mb-2 font-bold">Home page</h3>
 		<select class="select w-full" aria-label="Home page" bind:value={header.homePage}>
