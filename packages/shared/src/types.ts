@@ -61,8 +61,13 @@ export type UpcomingCalendarBlockData = {
 export type HeaderGlobal = {
 	logo: { url: string; alt: string };
 	navLinks: { label: string; href: string }[];
-	ctaButton: { label: string; href: string };
+	/** The header button. It leads to the booking page; `href` is only read on sites set up before there was one. */
+	ctaButton: { label: string; href?: string };
 	homePage: string;
+	/** Slug of the page with the Shop block: the header button, hero buttons without an address and "Book another" lead here. */
+	bookingPage?: string;
+	/** Slug of the page with the Checkout block: the basket in the header and "view basket" lead here ('' = the booking page). */
+	basketPage?: string;
 };
 
 export type FooterGlobal = {
@@ -84,9 +89,23 @@ export const defaultHeader: HeaderGlobal = {
 		{ label: 'About', href: '/about' },
 		{ label: 'Services', href: '/services' }
 	],
-	ctaButton: { label: 'Book Now', href: '/book' },
-	homePage: 'home'
+	ctaButton: { label: 'Book Now' },
+	homePage: 'home',
+	bookingPage: 'book',
+	basketPage: ''
 };
+
+/**
+ * Addresses of the booking and basket pages. Sites set up before these
+ * settings existed sent everything to `/book` or the button's own address,
+ * so that is still where they lead until a page is picked in Site design.
+ */
+export function shopLinks(header?: Partial<HeaderGlobal> | null) {
+	const legacy = header?.ctaButton?.href?.match(/^\/([a-z0-9-]+)\/?$/)?.[1];
+	const booking = header?.bookingPage || legacy || 'book';
+	const basket = header?.basketPage || booking;
+	return { booking: `/${booking}`, basket: `/${basket}` };
+}
 
 export const defaultFooter: FooterGlobal = {
 	businessName: 'Demo Studio',

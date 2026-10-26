@@ -172,7 +172,7 @@ Setup:
    ```
    Copy the printed `whsec_…` signing secret into `STRIPE_WEBHOOK_SECRET`.
 4. Import the updated `pb_schema.json` (adds `items`, `slots`, `baskets`, `basket_lines`, `orders`, `order_lines`). Two visitors can't take the same place: holds are checked and written in one PocketBase transaction (see *Slot availability*).
-5. Create a published page (e.g. slug `book`) with a `shop` block and a `checkout` block, and point the header CTA at it.
+5. Create a published page (e.g. slug `book`) with a `shop` block, and pick it as *Site design → Header → Booking page*: the header button, hero buttons without an address and *Book another* after paying lead there. Add a `checkout` block either to the same page, or to a page of its own picked as *Basket page*: the basket in the header and *view basket* in the shop lead there. Site design warns when the page picked lacks the block it needs or isn't published. (Sites set up before these settings keep using the header button's old address, or `/book`, until a page is picked.)
 
 ## Bundles and codes
 

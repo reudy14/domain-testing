@@ -3,7 +3,7 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { DEFAULT_NOTES_HINT, DEFAULT_PRIVACY_NOTICE, type BasketLine, type CheckoutBlockData } from '$shared/types';
+	import { DEFAULT_NOTES_HINT, DEFAULT_PRIVACY_NOTICE, shopLinks, type BasketLine, type CheckoutBlockData } from '$shared/types';
 	import { getBasketContext } from '$shared/basket.svelte';
 	import { DEFAULT_CURRENCY, DEFAULT_TIMEZONE, formatInstant, formatPrice } from '$shared/calendar';
 	import { formatDuration } from '$shared/items';
@@ -15,6 +15,9 @@
 	const basket = getBasketContext();
 	// Not set in the admin preview, which has no footer data.
 	const privacyPage = $derived(page.data.footer?.privacyPage || '');
+	// On its own basket page there is no shop above, so point to the booking page.
+	const bookingHref = $derived(shopLinks(page.data.header).booking);
+	const shopAbove = $derived(page.url.pathname === bookingHref);
 
 	const customer = $state({ name: '', email: '', phone: '', notes: '' });
 	let payState = $state<'idle' | 'creating' | 'ready' | 'confirming' | 'error'>('idle');
@@ -352,7 +355,11 @@
 	{#if basket.lines.length === 0}
 		<div class="mt-12 rounded-2xl border border-charcoal/10 bg-white/60 px-6 py-16 text-center">
 			<p class="font-serif text-xl">Your basket is empty</p>
-			<p class="mt-2 text-sm text-fg-body/70">Pick a service or product above.</p>
+			{#if shopAbove}
+				<p class="mt-2 text-sm text-fg-body/70">Pick a service or product above.</p>
+			{:else}
+				<a class="mt-6 inline-flex rounded-full bg-sage px-6 py-2.5 text-sm font-medium text-primary-content transition hover:bg-sage-dark" href={bookingHref}>Book a session</a>
+			{/if}
 		</div>
 	{:else}
 		{#if holdLeftMs !== null && slotLineCount}

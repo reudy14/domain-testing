@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { page } from '$app/state';
+	import { shopLinks } from '$shared/types';
+
 	let { data } = $props<{
 		data: {
 			heading?: string;
@@ -21,7 +24,7 @@
 		{/if}
 		{#if data.buttonLabel}
 			<div class="animate-fade-in mt-10" style="animation-delay: 0.3s;">
-				<a class="btn rounded-full border-0 bg-sage px-10 py-3 text-lg text-primary-content shadow-lg transition hover:bg-sage-dark hover:shadow-xl" href={data.buttonUrl || '/book'}>
+				<a class="btn rounded-full border-0 bg-sage px-10 py-3 text-lg text-primary-content shadow-lg transition hover:bg-sage-dark hover:shadow-xl" href={data.buttonUrl || shopLinks(page.data.header).booking}>
 					{data.buttonLabel}
 				</a>
 			</div>

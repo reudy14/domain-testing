@@ -33,7 +33,7 @@ export function createBlock(type: BlockType): ContentBlock {
 				heading: 'Welcome to our studio',
 				subheading: 'Classes, workshops and events',
 				buttonLabel: 'BOOK NOW',
-				buttonUrl: '/book'
+				buttonUrl: ''
 			};
 			break;
 		case 'button':

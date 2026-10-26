@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import type { BasketLine, BookableTime, ShopBlockData, ItemRecord } from '$shared/types';
+	import { shopLinks, type BasketLine, type BookableTime, type ShopBlockData, type ItemRecord } from '$shared/types';
 	import { getBasketContext } from '$shared/basket.svelte';
 	import { DEFAULT_CURRENCY, DEFAULT_TIMEZONE, addMonths, createCalendarMonth, formatInstant, formatPrice, startOfMonth, zonedDateKey, zonedInputToIso } from '$shared/calendar';
 	import { bundleListPrice, formatDuration, lowestPrice } from '$shared/items';
@@ -46,6 +46,7 @@
 	const weekdayLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 	const timezone = $derived<string>(page.data.timezone ?? DEFAULT_TIMEZONE);
 	const currency = $derived<string>(page.data.currency ?? DEFAULT_CURRENCY);
+	const basketHref = $derived(shopLinks(page.data.header).basket);
 
 	let visibleItems: ItemRecord[] = $derived.by(() => {
 		let result: ItemRecord[] = items;
@@ -408,7 +409,7 @@
 							</button>
 							{#if itemInBasket}
 								<a
-									href="/book"
+									href={basketHref}
 									class="inline-flex items-center gap-1 text-sm font-medium text-sage-dark underline-offset-2 hover:underline"
 									>✓ In basket</a
 								>
@@ -597,7 +598,7 @@
 
 						{#if ui.justAdded}
 							<p class="mt-3 text-sm font-medium text-sage-dark">
-								Added ✓ — <a href="/book" class="underline underline-offset-2 hover:no-underline">view basket</a>
+								Added ✓ — <a href={basketHref} class="underline underline-offset-2 hover:no-underline">view basket</a>
 							</p>
 						{/if}
 					</div>

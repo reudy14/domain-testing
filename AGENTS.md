@@ -154,6 +154,7 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
 ### Routing
 - **Admin app** (`app-admin`): All routes except `/login` are auth-guarded in `hooks.server.ts` (which also refreshes the token per request and sets the cookie's `Secure` flag from the real scheme). The root layout renders the admin shell (grouped sidebar) except on `/login` and `/preview`. The `/preview` route reads `sessionStorage` set by the page editor (same-origin, so it works).
 - **Public app** (`app-public`): No auth guard. The root layout always renders Header/Footer. `+layout.server.ts` fetches header/footer/colors globals + basket/items/slots for every page.
+- **Booking and basket pages** are picked in Site design (`header.bookingPage`, `header.basketPage`; '' = the booking page). Links to them come from `shopLinks(header)` in `packages/shared/src/types.ts` (blocks read `page.data.header`) — never hard-code `/book`.
 - `+page.server.ts` for home fetches `slug = "home" && published = true`
 - `[slug]/+page.server.ts` fetches by dynamic slug
 
