@@ -61,8 +61,11 @@ export type UpcomingCalendarBlockData = {
 export type HeaderGlobal = {
 	logo: { url: string; alt: string };
 	navLinks: { label: string; href: string }[];
+	/** The header button. Its address is also where hero buttons without one and "Book another" lead. */
 	ctaButton: { label: string; href: string };
 	homePage: string;
+	/** Slug of the page with the Checkout block, typed in Site design: the basket in the header and "view basket" lead here ('' = the CTA button's address). */
+	basketPage?: string;
 };
 
 export type FooterGlobal = {
@@ -85,8 +88,17 @@ export const defaultHeader: HeaderGlobal = {
 		{ label: 'Services', href: '/services' }
 	],
 	ctaButton: { label: 'Book Now', href: '/book' },
-	homePage: 'home'
+	homePage: 'home',
+	basketPage: ''
 };
+
+/** Where booking (the CTA button's address) and the basket (the basket page, else the same address) are. */
+export function shopLinks(header?: Partial<HeaderGlobal> | null) {
+	const booking = header?.ctaButton?.href || '/book';
+	// Typed by hand, so tolerate "/basket", "basket/" and spaces.
+	const basketSlug = header?.basketPage?.trim().replace(/^\/+|\/+$/g, '');
+	return { booking, basket: basketSlug ? `/${basketSlug}` : booking };
+}
 
 export const defaultFooter: FooterGlobal = {
 	businessName: 'Demo Studio',

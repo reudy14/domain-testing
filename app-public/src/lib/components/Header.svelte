@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
-	import type { HeaderGlobal } from '$lib/types';
+	import { shopLinks, type HeaderGlobal } from '$lib/types';
 	import { getBasketContext } from '$lib/basket.svelte';
 	import { DEFAULT_CURRENCY, formatPrice } from '$shared/calendar';
 
@@ -9,6 +9,7 @@
 
 	const basket = getBasketContext();
 	let hasItems = $derived(basket.count > 0);
+	let links = $derived(shopLinks(header));
 
 	// Phone menu: a native modal <dialog> sliding in from the right, so focus
 	// trapping, Escape and the inert page behind come from the browser.
@@ -64,7 +65,7 @@
 			{#if hasItems}
 				<a
 					class="relative flex items-center gap-2 rounded-full border border-charcoal/10 px-3 py-2 text-sm font-semibold text-charcoal/80 transition hover:border-sage hover:text-sage-dark md:px-4"
-					href="/book"
+					href={links.basket}
 					aria-label="View your basket ({basket.count})"
 				>
 					{@render basketIcon()}
@@ -73,7 +74,7 @@
 				</a>
 			{/if}
 			{#if header.ctaButton?.label}
-				<a class="cta btn hidden rounded-full border-0 px-6 hover:opacity-90 md:inline-flex" href={header.ctaButton.href}>{header.ctaButton.label}</a>
+				<a class="cta btn hidden rounded-full border-0 px-6 hover:opacity-90 md:inline-flex" href={links.booking}>{header.ctaButton.label}</a>
 			{/if}
 			<button
 				class="grid h-10 w-10 place-items-center rounded-full text-charcoal/80 transition hover:bg-charcoal/5 md:hidden"
@@ -118,7 +119,7 @@
 			</ul>
 
 			{#if hasItems}
-				<a class="mx-1 mt-6 flex items-center gap-3 rounded-xl border border-charcoal/10 px-4 py-3 font-semibold text-charcoal/80 transition hover:border-sage" href="/book">
+				<a class="mx-1 mt-6 flex items-center gap-3 rounded-xl border border-charcoal/10 px-4 py-3 font-semibold text-charcoal/80 transition hover:border-sage" href={links.basket}>
 					{@render basketIcon()}
 					<span class="flex-1">Basket ({basket.count})</span>
 					<span class="text-charcoal/60">{formatTotal(basket.total)}</span>
@@ -128,7 +129,7 @@
 
 		{#if header.ctaButton?.label}
 			<div class="border-t border-charcoal/10 p-6">
-				<a class="cta btn btn-block rounded-full border-0 hover:opacity-90" href={header.ctaButton.href}>{header.ctaButton.label}</a>
+				<a class="cta btn btn-block rounded-full border-0 hover:opacity-90" href={links.booking}>{header.ctaButton.label}</a>
 			</div>
 		{/if}
 	</div>

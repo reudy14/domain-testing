@@ -2,8 +2,10 @@
 	import { onMount } from 'svelte';
 	import { formatInstant, formatPrice } from '$shared/calendar';
 	import { formatDuration } from '$shared/items';
+	import { shopLinks } from '$lib/types';
 
 	let { data } = $props();
+	let links = $derived(shopLinks(data.header));
 
 	// "Friday 15 January, 10:00" in the studio's timezone.
 	function formatSlotDate(iso?: string | null) {
@@ -68,7 +70,7 @@
 			</div>
 		{/if}
 
-		<a class="btn mt-8 rounded-full border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href="/">Book another</a>
+		<a class="btn mt-8 rounded-full border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href={links.booking}>Book another</a>
 	{:else if data.state === 'processing'}
 		<h1 class="font-serif text-4xl">Processing your payment…</h1>
 		<p class="mt-3 text-charcoal/70">
@@ -80,10 +82,10 @@
 	{:else if data.state === 'canceled' || data.state === 'failed'}
 		<h1 class="font-serif text-4xl">Payment not completed</h1>
 		<p class="mt-3 text-charcoal/70">Your payment didn't go through — no money was captured. Please try again.</p>
-		<a class="btn mt-8 rounded-full border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href="/">Back to the shop</a>
+		<a class="btn mt-8 rounded-full border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href={links.basket}>Back to your basket</a>
 	{:else}
 		<h1 class="font-serif text-4xl">Nothing to see here</h1>
 		<p class="mt-3 text-charcoal/70">This link is missing a payment reference.</p>
-		<a class="btn mt-8 rounded-full border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href="/">Back to the shop</a>
+		<a class="btn mt-8 rounded-full border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href={links.booking}>Back to the shop</a>
 	{/if}
 </section>
