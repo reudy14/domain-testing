@@ -151,11 +151,14 @@
 					onChange={(v) => (draft.startTimes = v as StartTimesMode)}
 				/>
 				{#if draft.startTimes === 'grid'}
-					<label class="mt-2 flex items-center gap-3">
-						<span class="w-28 shrink-0 text-sm font-medium">Step</span>
-						<select class="select select-sm w-40" name="gridMinutes" bind:value={draft.gridMinutes}>
-							{#each GRID_STEP_OPTIONS as step (step)}<option value={step}>Every {step} min</option>{/each}
-						</select>
+					<!-- Laid out like the Start times row above: label on the left, or above it in a narrow row. -->
+					<label class="mt-2 @container block">
+						<span class="flex flex-col gap-1 @sm:flex-row @sm:items-center @sm:gap-3">
+							<span class="shrink-0 text-sm font-medium @sm:w-28">Step</span>
+							<select class="select select-sm w-full flex-1" name="gridMinutes" bind:value={draft.gridMinutes}>
+								{#each GRID_STEP_OPTIONS as step (step)}<option value={step}>Every {step} min</option>{/each}
+							</select>
+						</span>
 					</label>
 				{/if}
 				<span class="label whitespace-normal">{startTimesHint(draft.startTimes, draft.gridMinutes)}</span>
