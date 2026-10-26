@@ -358,7 +358,7 @@
 			{#if shopAbove}
 				<p class="mt-2 text-sm text-fg-body/70">Pick a service or product above.</p>
 			{:else}
-				<a class="mt-6 inline-flex rounded-full bg-sage px-6 py-2.5 text-sm font-medium text-primary-content transition hover:bg-sage-dark" href={bookingHref}>Book a session</a>
+				<a class="mt-6 inline-flex rounded-button bg-sage px-6 py-2.5 text-sm font-medium text-primary-content transition hover:bg-sage-dark" href={bookingHref}>Book a session</a>
 			{/if}
 		</div>
 	{:else}
@@ -380,7 +380,7 @@
 				{#if ending && payState !== 'confirming'}
 					<button
 						type="button"
-						class="rounded-full border border-charcoal/20 bg-white px-4 py-1.5 font-medium transition hover:bg-charcoal/5 disabled:opacity-60"
+						class="rounded-button border border-charcoal/20 bg-white px-4 py-1.5 font-medium transition hover:bg-charcoal/5 disabled:opacity-60"
 						disabled={renewing}
 						onclick={renewHolds}
 					>
@@ -460,7 +460,7 @@
 							<div class="flex items-center gap-2">
 								<button
 									type="button"
-									class="flex h-8 w-8 items-center justify-center rounded-full border border-charcoal/15 text-lg leading-none disabled:opacity-40"
+									class="flex h-8 w-8 items-center justify-center rounded-button border border-charcoal/15 text-lg leading-none disabled:opacity-40"
 									disabled={pending || line.quantity <= 1}
 									aria-label="Decrease quantity"
 									onclick={() => changeQuantity(line.id, line.quantity, -1)}
@@ -470,7 +470,7 @@
 								<span class="w-6 text-center">{line.quantity}</span>
 								<button
 									type="button"
-									class="flex h-8 w-8 items-center justify-center rounded-full border border-charcoal/15 text-lg leading-none disabled:opacity-40"
+									class="flex h-8 w-8 items-center justify-center rounded-button border border-charcoal/15 text-lg leading-none disabled:opacity-40"
 									disabled={pending}
 									aria-label="Increase quantity"
 									onclick={() => changeQuantity(line.id, line.quantity, 1)}
@@ -486,7 +486,7 @@
 
 						<button
 							type="button"
-							class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-charcoal/50 transition-colors hover:bg-terracotta/10 hover:text-terracotta disabled:opacity-40"
+							class="flex h-8 w-8 shrink-0 items-center justify-center rounded-button text-charcoal/50 transition-colors hover:bg-terracotta/10 hover:text-terracotta disabled:opacity-40"
 							disabled={pending}
 							aria-label="Remove {line.itemName ?? 'item'}"
 							onclick={() => removeLine(line.id)}
@@ -542,7 +542,7 @@
 						class="w-36 rounded-xl border border-charcoal/15 bg-white px-3 py-2 font-mono tracking-wider uppercase focus:ring-2 focus:ring-sage/50 focus:outline-none"
 						bind:value={codeInput}
 					/>
-					<button type="submit" class="rounded-full border border-charcoal/20 px-4 py-2 text-sm font-medium transition hover:bg-charcoal/5 disabled:opacity-50" disabled={codeBusy || !codeInput.trim()}>
+					<button type="submit" class="rounded-button border border-charcoal/20 px-4 py-2 text-sm font-medium transition hover:bg-charcoal/5 disabled:opacity-50" disabled={codeBusy || !codeInput.trim()}>
 						{codeBusy ? 'Checking…' : 'Apply'}
 					</button>
 				</form>
@@ -617,7 +617,7 @@
 				{#if payState === 'idle' || payState === 'creating'}
 					<button
 						type="submit"
-						class="btn w-full rounded-full border-0 text-primary-content"
+						class="btn w-full rounded-button border-0 text-primary-content"
 						style="background-color: var(--color-primary, #8a9a7b);"
 						disabled={payState === 'creating'}
 					>
@@ -652,7 +652,7 @@
 				{#if payState === 'ready' || payState === 'confirming'}
 					<button
 						type="button"
-						class="btn mt-4 w-full rounded-full border-0 text-primary-content"
+						class="btn mt-4 w-full rounded-button border-0 text-primary-content"
 						style="background-color: var(--color-primary, #8a9a7b);"
 						disabled={payState === 'confirming'}
 						onclick={confirmPayment}

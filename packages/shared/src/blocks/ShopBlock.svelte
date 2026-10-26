@@ -353,11 +353,11 @@
 								{#if duration}
 									<span class="text-xs text-charcoal/60">{formatDuration(duration.minutes)}</span>
 								{:else if !isService && item.stock != null && item.stock > 0 && item.stock <= 5}
-									<span class="rounded-full bg-terracotta/15 px-2.5 py-0.5 text-xs font-medium text-terracotta">
+									<span class="rounded-button bg-terracotta/15 px-2.5 py-0.5 text-xs font-medium text-terracotta">
 										Only {item.stock} left
 									</span>
 								{:else if soldOut}
-									<span class="rounded-full bg-terracotta/15 px-2.5 py-0.5 text-xs font-medium text-terracotta">
+									<span class="rounded-button bg-terracotta/15 px-2.5 py-0.5 text-xs font-medium text-terracotta">
 										Sold out
 									</span>
 								{/if}
@@ -386,7 +386,7 @@
 						{#if isService}
 							<button
 								type="button"
-								class="inline-flex items-center justify-center gap-2 rounded-full px-6 py-2.5 text-sm font-medium transition {ui?.pickerOpen
+								class="inline-flex items-center justify-center gap-2 rounded-button px-6 py-2.5 text-sm font-medium transition {ui?.pickerOpen
 									? 'border border-charcoal/15 text-charcoal hover:bg-charcoal/5'
 									: bookable
 										? 'bg-sage text-primary-content hover:bg-sage-dark'
@@ -400,7 +400,7 @@
 						{:else}
 							<button
 								type="button"
-								class="inline-flex items-center justify-center gap-2 rounded-full bg-sage px-6 py-2.5 text-sm font-medium text-primary-content transition hover:bg-sage-dark disabled:cursor-not-allowed disabled:bg-charcoal/10 disabled:text-charcoal/50"
+								class="inline-flex items-center justify-center gap-2 rounded-button bg-sage px-6 py-2.5 text-sm font-medium text-primary-content transition hover:bg-sage-dark disabled:cursor-not-allowed disabled:bg-charcoal/10 disabled:text-charcoal/50"
 								disabled={soldOut || ui?.adding}
 								onclick={() => addItem(item.id)}
 							>
@@ -457,7 +457,7 @@
 						<div class="mb-3 flex items-center justify-between gap-2">
 							<button
 								type="button"
-								class="flex h-8 w-8 items-center justify-center rounded-full border border-charcoal/15 text-lg leading-none text-charcoal transition hover:bg-charcoal/5 disabled:cursor-default disabled:opacity-30"
+								class="flex h-8 w-8 items-center justify-center rounded-button border border-charcoal/15 text-lg leading-none text-charcoal transition hover:bg-charcoal/5 disabled:cursor-default disabled:opacity-30"
 								aria-label="Previous month"
 								disabled={ui.monthOffset <= 0}
 								onclick={() => ui.monthOffset--}
@@ -470,7 +470,7 @@
 							</p>
 							<button
 								type="button"
-								class="flex h-8 w-8 items-center justify-center rounded-full border border-charcoal/15 text-lg leading-none text-charcoal transition hover:bg-charcoal/5 disabled:cursor-default disabled:opacity-30"
+								class="flex h-8 w-8 items-center justify-center rounded-button border border-charcoal/15 text-lg leading-none text-charcoal transition hover:bg-charcoal/5 disabled:cursor-default disabled:opacity-30"
 								aria-label="Next month"
 								disabled={ui.monthOffset >= MAX_MONTH_OFFSET}
 								onclick={() => ui.monthOffset++}
@@ -489,7 +489,7 @@
 									<span>The next available date for {formatDuration(duration.minutes)} is <strong>{longDate(zonedDateKey(ui.next, timezone))}</strong>.</span>
 									<button
 										type="button"
-										class="rounded-full bg-sage px-4 py-1.5 font-medium text-primary-content transition hover:bg-sage-dark"
+										class="rounded-button bg-sage px-4 py-1.5 font-medium text-primary-content transition hover:bg-sage-dark"
 										onclick={() => showDay(item.id, ui.next!)}
 									>
 										Go to next available date →
@@ -516,7 +516,7 @@
 												disabled={!selectable}
 												aria-pressed={selected}
 												onclick={() => (ui.selectedDayKey = day.dateKey)}
-												class="aspect-square rounded-full text-sm transition {selected
+												class="aspect-square rounded-button text-sm transition {selected
 													? 'bg-sage font-semibold text-primary-content'
 													: selectable
 														? 'cursor-pointer bg-sage/15 font-medium text-charcoal hover:bg-sage/35'
@@ -545,12 +545,12 @@
 									{@const label = `${formatTime(entry.start)}–${formatTime(entry.end)}`}
 									{#if isGroup && entry.line}
 										<!-- Places in a group session already in the basket: − / + -->
-										<div class="inline-flex items-center gap-2 rounded-full bg-sage/15 py-1 pr-1 pl-3.5 text-sm text-sage-dark">
+										<div class="inline-flex items-center gap-2 rounded-button bg-sage/15 py-1 pr-1 pl-3.5 text-sm text-sage-dark">
 											<span>{label} · {placesLeft(free)}</span>
-											<span class="inline-flex items-center gap-1 rounded-full bg-white px-1 py-0.5">
+											<span class="inline-flex items-center gap-1 rounded-button bg-white px-1 py-0.5">
 												<button
 													type="button"
-													class="flex h-6 w-6 items-center justify-center rounded-full leading-none text-charcoal transition hover:bg-charcoal/10 disabled:opacity-40"
+													class="flex h-6 w-6 items-center justify-center rounded-button leading-none text-charcoal transition hover:bg-charcoal/10 disabled:opacity-40"
 													aria-label="One place fewer"
 													disabled={ui.adding}
 													onclick={() => changeSeats(item.id, entry, -1)}
@@ -563,7 +563,7 @@
 												</span>
 												<button
 													type="button"
-													class="flex h-6 w-6 items-center justify-center rounded-full leading-none text-charcoal transition hover:bg-charcoal/10 disabled:opacity-40"
+													class="flex h-6 w-6 items-center justify-center rounded-button leading-none text-charcoal transition hover:bg-charcoal/10 disabled:opacity-40"
 													aria-label="One place more"
 													disabled={ui.adding || free <= 0}
 													onclick={() => changeSeats(item.id, entry, 1)}
@@ -577,7 +577,7 @@
 											type="button"
 											disabled={!!entry.line || !entry.time || ui.adding}
 											onclick={() => entry.time && addTime(item, duration.minutes, entry.time)}
-											class="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition {entry.line
+											class="inline-flex items-center gap-1.5 rounded-button border px-3.5 py-1.5 text-sm transition {entry.line
 												? 'cursor-not-allowed border-transparent bg-sage/15 text-sage-dark'
 												: 'border-charcoal/15 bg-white text-charcoal hover:border-sage hover:bg-sage/10'} disabled:opacity-60 {ui.adding &&
 											!entry.line

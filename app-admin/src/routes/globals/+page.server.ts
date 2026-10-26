@@ -2,10 +2,10 @@ import { fail, redirect } from '@sveltejs/kit';
 import { ClientResponseError } from 'pocketbase';
 import { PRIVACY_PAGE_SLUG, privacyTemplateHtml } from '$lib/admin/privacyTemplate';
 import { attempt } from '$lib/server/actions';
-import { defaultColors, defaultFooter, defaultHeader } from '$lib/types';
+import { defaultColors, defaultFooter, defaultHeader, defaultStyle } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
 
-const SECTIONS = ['header', 'footer', 'colors'] as const;
+const SECTIONS = ['header', 'footer', 'colors', 'style'] as const;
 
 async function getGlobal(pb: App.Locals['pb'], key: string, fallback: unknown) {
 	try {
@@ -21,10 +21,11 @@ async function getGlobal(pb: App.Locals['pb'], key: string, fallback: unknown) {
 }
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const [header, footer, colors] = await Promise.all([
+	const [header, footer, colors, style] = await Promise.all([
 		getGlobal(locals.pb, 'header', defaultHeader),
 		getGlobal(locals.pb, 'footer', defaultFooter),
-		getGlobal(locals.pb, 'colors', defaultColors)
+		getGlobal(locals.pb, 'colors', defaultColors),
+		getGlobal(locals.pb, 'style', defaultStyle)
 	]);
 
 	// All pages for the page selectors, with what the basket setting warns
@@ -35,7 +36,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		return { id: page.id, slug: page.slug, title: page.title, published: !!page.published, hasCheckout: types.has('checkout') };
 	});
 
-	return { header, footer, colors, pages };
+	return { header, footer, colors, style, pages };
 };
 
 export const actions: Actions = {

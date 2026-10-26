@@ -1,4 +1,4 @@
-import { defaultColors, defaultFooter, defaultHeader } from '$lib/types';
+import { defaultColors, defaultFooter, defaultHeader, defaultStyle } from '$lib/types';
 import type { ItemRecord } from '$lib/types';
 import { BASKET_COOKIE, getBasket } from '$lib/server/shop';
 import { loadShopData } from '$shared/server/shop';
@@ -21,10 +21,11 @@ export const load: LayoutServerLoad = async ({ locals, cookies, url }) => {
 	// Shop blocks fetch bookable times themselves (GET /api/slots).
 	void url.pathname;
 
-	const [header, footer, colors] = await Promise.all([
+	const [header, footer, colors, style] = await Promise.all([
 		getGlobal(locals.pb, 'header', defaultHeader),
 		getGlobal(locals.pb, 'footer', defaultFooter),
-		getGlobal(locals.pb, 'colors', defaultColors)
+		getGlobal(locals.pb, 'colors', defaultColors),
+		getGlobal(locals.pb, 'style', defaultStyle)
 	]);
 
 	if (!header.homePage) header.homePage = defaultHeader.homePage;
@@ -47,5 +48,5 @@ export const load: LayoutServerLoad = async ({ locals, cookies, url }) => {
 	// Prices are shown in the currency Stripe charges in.
 	const currency = shopCurrency(env.STRIPE_CURRENCY);
 
-	return { header, footer, colors, user: locals.user, basket, items, timezone, currency };
+	return { header, footer, colors, style, user: locals.user, basket, items, timezone, currency };
 };

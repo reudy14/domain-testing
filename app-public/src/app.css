@@ -3,9 +3,28 @@
 	themes: light --default;
 }
 
+/* Site design → Style sets the --site-* variables (siteStyleVars in
+   $shared/theme) on the public site and the admin preview; without them
+   (the admin's own pages) every token below is its usual value. Corners,
+   shadows and widths are scaled here, so blocks just use rounded-xl,
+   shadow-sm, max-w-6xl… Buttons and chips use rounded-button (a pill when
+   Round); dots and avatars stay rounded-full. */
 @theme {
-	--font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-	--font-serif: 'Playfair Display', Georgia, serif;
+	--font-sans: var(--site-font-body, 'DM Sans Variable', ui-sans-serif, system-ui, sans-serif);
+	--font-serif: var(--site-font-heading, 'Playfair Display Variable', Georgia, serif);
+	--radius-lg: calc(0.5rem * var(--site-corners, 1));
+	--radius-xl: calc(0.75rem * var(--site-corners, 1));
+	--radius-2xl: calc(1rem * var(--site-corners, 1));
+	--radius-card: calc(1.25rem * var(--site-corners, 1));
+	--radius-panel: calc(2rem * var(--site-corners, 1));
+	--radius-button: var(--site-button-radius, 9999px);
+	--shadow-sm: 0 1px 3px 0 rgb(0 0 0 / calc(0.1 * var(--site-shadow, 1))), 0 1px 2px -1px rgb(0 0 0 / calc(0.1 * var(--site-shadow, 1)));
+	--shadow-md: 0 4px 6px -1px rgb(0 0 0 / calc(0.1 * var(--site-shadow, 1))), 0 2px 4px -2px rgb(0 0 0 / calc(0.1 * var(--site-shadow, 1)));
+	--shadow-lg: 0 10px 15px -3px rgb(0 0 0 / calc(0.1 * var(--site-shadow, 1))), 0 4px 6px -4px rgb(0 0 0 / calc(0.1 * var(--site-shadow, 1)));
+	--shadow-xl: 0 20px 25px -5px rgb(0 0 0 / calc(0.1 * var(--site-shadow, 1))), 0 8px 10px -6px rgb(0 0 0 / calc(0.1 * var(--site-shadow, 1)));
+	--container-3xl: calc(48rem * var(--site-width, 1));
+	--container-6xl: calc(72rem * var(--site-width, 1));
+	--container-7xl: calc(80rem * var(--site-width, 1));
 	--color-warm: var(--color-bg, #faf8f5);
 	--color-charcoal: var(--color-heading, #2c2c2c);
 	--color-sage: var(--color-primary, #8a9a7b);
@@ -44,7 +63,9 @@
 	--fg-body: var(--color-text, #2c2c2c);
 	background: var(--color-bg, #faf8f5);
 	color: var(--fg-body);
-	font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+	font-family: var(--font-sans);
+	/* Site design → Style → Text size; rem-sized spacing grows with it. */
+	font-size: var(--site-text-size, 100%);
 }
 
 /* ── Foreground colour utilities (set per-block via BackgroundWrapper) ── */
@@ -74,7 +95,7 @@ h1,
 h2,
 h3,
 h4 {
-	font-family: 'Playfair Display', Georgia, serif;
+	font-family: var(--font-serif);
 	color: var(--fg-heading, #2c2c2c);
 }
 
@@ -114,7 +135,7 @@ h4 {
 	margin: 0.75rem 0;
 	padding-left: 1.25rem;
 	border-left: 3px solid var(--color-primary, #8a9a7b);
-	font-family: 'Playfair Display', Georgia, serif;
+	font-family: var(--font-serif);
 	font-size: 1.35rem;
 	font-style: italic;
 }

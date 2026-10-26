@@ -3,14 +3,19 @@
 	import { enhance } from '$app/forms';
 	import { fly, slide } from 'svelte/transition';
 	import ImagePicker from '$lib/admin/editors/ImagePicker.svelte';
+	import SegmentedControl from '$lib/admin/editors/SegmentedControl.svelte';
 	import { PRIVACY_PAGE_SLUG } from '$lib/admin/privacyTemplate';
-	import { shopLinks } from '$lib/types';
+	import { defaultStyle, shopLinks } from '$lib/types';
+	import { SITE_FONTS, readableTextOn, siteStyleVars } from '$shared/theme';
 	import type { SubmitFunction } from '@sveltejs/kit';
 
 	let { data, form } = $props();
 	let header = $state(structuredClone(data.header.data));
 	let footer = $state(structuredClone(data.footer.data));
 	let colors = $state(structuredClone(data.colors.data));
+	let style = $state({ ...defaultStyle, ...data.style.data });
+	// The sample below the style settings: the variables the public site gets, as an inline style.
+	let styleSample = $derived(Object.entries(siteStyleVars(style)).map(([name, value]) => `${name}:${value}`).join(';'));
 	let saving = $state('');
 	// Older records may predate the CTA button and the basket page; the inputs below need values.
 	header.ctaButton ??= { label: '', href: '' };
@@ -116,7 +121,7 @@
 
 <div class="mb-6">
 	<h1 class="text-3xl font-bold">Site design</h1>
-	<p class="text-base-content/60">The header, footer and colors shared by every page of the site.</p>
+	<p class="text-base-content/60">The header, footer, colors and style shared by every page of the site.</p>
 </div>
 
 <div class="grid gap-6 xl:grid-cols-3">
@@ -217,5 +222,54 @@
 			</div>
 		{/each}
 		{@render saveButton('colors', 'Save colors')}
+	</form>
+
+	<form class="flex flex-col rounded-box bg-base-100 p-5 shadow" method="POST" action="?/save" use:enhance={submit}>
+		<input type="hidden" name="id" value={data.style.id} />
+		<input type="hidden" name="section" value="style" />
+		<input type="hidden" name="data" value={JSON.stringify(style)} />
+		<h2 class="mb-4 text-2xl font-bold">Style</h2>
+		<p class="mb-2 text-sm text-base-content/60">Fonts and shapes for the public site. The fonts come with the site, so visitors' browsers don't contact Google for them.</p>
+		{#snippet fontSelect(label: string, key: 'headingFont' | 'bodyFont')}
+			<label class="fieldset py-1">
+				<span class="fieldset-legend pb-0">{label}</span>
+				<select class="select w-full" bind:value={style[key]}>
+					<optgroup label="Serif">
+						{#each SITE_FONTS.filter((font) => font.serif) as font (font.id)}
+							<option value={font.id} style="font-family: '{font.family}'">{font.label}</option>
+						{/each}
+					</optgroup>
+					<optgroup label="Sans-serif">
+						{#each SITE_FONTS.filter((font) => !font.serif) as font (font.id)}
+							<option value={font.id} style="font-family: '{font.family}'">{font.label}</option>
+						{/each}
+					</optgroup>
+				</select>
+			</label>
+		{/snippet}
+		{@render fontSelect('Headings', 'headingFont')}
+		{@render fontSelect('Body text', 'bodyFont')}
+		<div class="mt-3 space-y-2">
+			<SegmentedControl label="Corners" options={['sharp', 'soft', 'round']} value={style.corners} onChange={(v) => (style.corners = v as typeof style.corners)} />
+			<SegmentedControl label="Text size" options={['small', 'normal', 'large']} value={style.textSize} onChange={(v) => (style.textSize = v as typeof style.textSize)} />
+			<SegmentedControl label="Shadows" options={['none', 'soft', 'strong']} value={style.shadows} onChange={(v) => (style.shadows = v as typeof style.shadows)} />
+			<SegmentedControl label="Page width" options={['narrow', 'normal', 'wide']} value={style.width} onChange={(v) => (style.width = v as typeof style.width)} />
+		</div>
+		<p class="mt-1 text-sm text-base-content/60">Page width is how wide text and sections may get on a big screen; phones are unaffected.</p>
+
+		<!-- How the choices look. Inline styles, because the radius and shadow tokens in app.css
+		     are worked out once for the whole page and can't follow variables set on this box. -->
+		<div
+			class="mt-4 border border-base-300 p-4"
+			style="{styleSample}; background: {colors.background}; color: {colors.text}; font-family: var(--site-font-body); font-size: var(--site-text-size); border-radius: calc(1rem * var(--site-corners))"
+			aria-label="Style sample"
+		>
+			<p class="text-2xl font-semibold" style="font-family: var(--site-font-heading); color: {colors.heading}">A calm space for you</p>
+			<div class="mt-3 bg-white p-3" style="border-radius: calc(1rem * var(--site-corners)); box-shadow: 0 1px 3px 0 rgb(0 0 0 / calc(0.1 * var(--site-shadow))), 0 1px 2px -1px rgb(0 0 0 / calc(0.1 * var(--site-shadow)))">
+				<p>Body text looks like this. Sessions last an hour.</p>
+				<span class="mt-3 inline-block px-5 py-2 text-sm font-medium" style="border-radius: var(--site-button-radius); background: {colors.primary}; color: {readableTextOn(colors.primary)}">Book</span>
+			</div>
+		</div>
+		{@render saveButton('style', 'Save style')}
 	</form>
 </div>

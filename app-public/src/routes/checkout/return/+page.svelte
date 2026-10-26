@@ -25,7 +25,7 @@
 			Your booking is confirmed. A receipt was sent to <strong>{data.order.email}</strong>.
 		</p>
 
-		<div class="mt-8 rounded-box border border-charcoal/10 bg-white/60 p-6 text-left">
+		<div class="mt-8 rounded-2xl border border-charcoal/10 bg-white/60 p-6 text-left">
 			<h2 class="font-serif text-xl">Your order</h2>
 			<ul class="mt-4 space-y-3">
 				{#each data.order.lines ?? [] as line}
@@ -50,7 +50,7 @@
 
 		{#if data.order.passes?.length}
 			<!-- Bundles bought: their codes (also in the confirmation email). -->
-			<div class="mt-6 rounded-box border border-sage/40 bg-sage/10 p-6 text-left">
+			<div class="mt-6 rounded-2xl border border-sage/40 bg-sage/10 p-6 text-left">
 				<h2 class="font-serif text-xl">Your {data.order.passes.length === 1 ? 'code' : 'codes'}</h2>
 				<p class="mt-1 text-sm text-charcoal/70">Enter a code in the basket when you book — the sessions it includes are then already paid for.</p>
 				{#each data.order.passes as pass (pass.id)}
@@ -70,7 +70,7 @@
 			</div>
 		{/if}
 
-		<a class="btn mt-8 rounded-full border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href={links.booking}>Book another</a>
+		<a class="btn mt-8 rounded-button border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href={links.booking}>Book another</a>
 	{:else if data.state === 'processing'}
 		<h1 class="font-serif text-4xl">Processing your payment…</h1>
 		<p class="mt-3 text-charcoal/70">
@@ -82,10 +82,10 @@
 	{:else if data.state === 'canceled' || data.state === 'failed'}
 		<h1 class="font-serif text-4xl">Payment not completed</h1>
 		<p class="mt-3 text-charcoal/70">Your payment didn't go through — no money was captured. Please try again.</p>
-		<a class="btn mt-8 rounded-full border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href={links.basket}>Back to your basket</a>
+		<a class="btn mt-8 rounded-button border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href={links.basket}>Back to your basket</a>
 	{:else}
 		<h1 class="font-serif text-4xl">Nothing to see here</h1>
 		<p class="mt-3 text-charcoal/70">This link is missing a payment reference.</p>
-		<a class="btn mt-8 rounded-full border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href={links.booking}>Back to the shop</a>
+		<a class="btn mt-8 rounded-button border-0 px-8 text-primary-content" style="background-color: var(--color-primary, #8a9a7b);" href={links.booking}>Back to the shop</a>
 	{/if}
 </section>

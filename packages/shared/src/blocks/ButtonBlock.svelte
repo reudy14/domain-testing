@@ -25,7 +25,7 @@
 <div class="flex {alignmentClasses[data.alignment] || 'justify-center'}">
 	<a
 		href={data.href || '#'}
-		class="btn {variantClasses[data.variant] || 'btn-primary'} {sizeClasses[data.size] || ''}"
+		class="btn rounded-button {variantClasses[data.variant] || 'btn-primary'} {sizeClasses[data.size] || ''}"
 		style={data.color ? `background-color: ${data.color}; border-color: ${data.color};` : ''}
 	>
 		{data.label || 'Button'}

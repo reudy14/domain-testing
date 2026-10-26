@@ -52,7 +52,7 @@
 			<button
 					type="button"
 					onclick={prev}
-					class="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-[rgba(255,236,224,1)] hover:text-[#93384a] bg-[rgba(255,219,197,0.8)]"
+					class="w-10 h-10 rounded-button flex items-center justify-center transition-colors hover:bg-[rgba(255,236,224,1)] hover:text-[#93384a] bg-[rgba(255,219,197,0.8)]"
 					aria-label="Previous slide"
 				>
 					<svg viewBox="0 0 7.3 13" class="w-2 h-3" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -75,7 +75,7 @@
             <button
                 type="button"
                 onclick={next}
-                class="w-10 h-10 rounded-full flex items-center justify-center transition-colors hover:bg-[rgba(255,236,224,1)] hover:text-[#93384a] bg-[rgba(255,219,197,0.8)]"
+                class="w-10 h-10 rounded-button flex items-center justify-center transition-colors hover:bg-[rgba(255,236,224,1)] hover:text-[#93384a] bg-[rgba(255,219,197,0.8)]"
                 aria-label="Next slide"
             >
                 <svg viewBox="0 0 7.3 13" class="w-2 h-3" fill="none" stroke="currentColor" stroke-width="1.5">
