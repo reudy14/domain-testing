@@ -469,7 +469,7 @@
 					<label class="mt-2 @container block">
 						<span class="flex flex-col gap-1 @sm:flex-row @sm:items-center @sm:gap-3">
 							<span class="shrink-0 text-sm font-medium @sm:w-28">Step</span>
-							<select class="select select-sm w-full flex-1" name="gridMinutes" bind:value={draft.gridMinutes}>
+							<select class="select select-sm w-full @sm:flex-1" name="gridMinutes" bind:value={draft.gridMinutes}>
 								{#each GRID_STEP_OPTIONS as step (step)}<option value={step}>Every {step} min</option>{/each}
 							</select>
 						</span>
