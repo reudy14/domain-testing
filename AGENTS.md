@@ -146,6 +146,7 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
   - Section card: `rounded-box bg-base-100 p-5 shadow` with an `h2.text-2xl.font-bold` title (see Site design / globals).
   - Form field: `<label class="fieldset"><span class="fieldset-legend">Label</span><input class="input w-full" /></label>`; hints in `<span class="label">`.
   - Setting rows in editors: `SegmentedControl` (choices) and `ColorField` (colours) — label column on the left, like the block Background picker.
+  - Images: always `$lib/admin/editors/ImagePicker.svelte` (choose, drag in or paste an image; address and alt text). It uploads to `media` through `/api/upload`; `withUrl={false}` + `altHint=""` + the `id` from `onChange` where a field stores a media relation (Services & products). Store only `url`/`alt` from `onChange` elsewhere.
   - Create/edit forms open in `$lib/admin/Modal.svelte`; destructive submits use `confirmSubmit()` from `$lib/admin/confirm` (returning `false` from a handler does not cancel).
   - Server actions wrap PocketBase writes in `attempt()` from `$lib/server/actions` so failures show as an error banner, not a 500.
   - Editors with unsaved state use `use:enhance` + `warnOnUnsavedChanges()`.

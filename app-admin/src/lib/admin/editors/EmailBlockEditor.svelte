@@ -2,7 +2,7 @@
 	import type { EmailBlock, EmailBlockType } from '$lib/types';
 	import { emailBlockLabels } from '$lib/admin/emailBlockDefaults';
 	import RichTextEditor from './RichTextEditor.svelte';
-	import ImageUploader from './ImageUploader.svelte';
+	import ImagePicker from './ImagePicker.svelte';
 	import SegmentedControl from './SegmentedControl.svelte';
 	import ColorField from './ColorField.svelte';
 
@@ -36,7 +36,7 @@
 			<p class="mt-2 text-sm text-base-content/60">Use placeholders like <code>{'{{customer_first_name}}'}</code> — see the list above.</p>
 		{:else if block.type === 'image'}
 			<div class="space-y-4">
-				<ImageUploader url={block.data.url} alt={block.data.alt} onChange={(image) => updateData(image)} />
+				<ImagePicker url={block.data.url} alt={block.data.alt} onChange={(image) => updateData({ url: image.url, alt: image.alt })} />
 				<SegmentedControl label="Width" options={[100, 75, 50, 25]} value={Number(block.data.width) || 100} onChange={(v) => updateData({ width: v })} formatLabel={(v) => `${v}%`} />
 				<SegmentedControl label="Alignment" options={['left', 'center', 'right']} value={block.data.alignment || 'center'} onChange={(v) => updateData({ alignment: v })} />
 				<label class="fieldset">
