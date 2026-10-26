@@ -320,19 +320,18 @@
 				<span class="fieldset-legend">Lengths and prices</span>
 				<div class="space-y-2">
 					{#each draft.durations as row, i}
-						<!-- One line on a phone too: the inputs shrink, the "1 h 30 min" reading stays to their right. -->
-						<div class="flex items-center gap-2">
-							<label class="input min-w-0 flex-1 sm:w-36 sm:flex-none">
+						<div class="flex flex-wrap items-center gap-2">
+							<label class="input w-36">
 								<input type="number" min="5" max="720" step="5" name="durationMinutes" required aria-label="Length in minutes" bind:value={row.minutes} />
 								<span class="label">min</span>
 							</label>
-							<label class="input min-w-0 flex-1 sm:w-40 sm:flex-none">
+							<label class="input w-40">
 								<input type="number" min="0" step="0.01" name="durationPrice" required aria-label="Price for this length" bind:value={row.price} />
 								<span class="label">{data.currency}</span>
 							</label>
-							<span class="w-16 shrink-0 text-xs leading-tight text-base-content/60 sm:w-auto sm:text-sm">{Number(row.minutes) >= 5 ? formatDuration(Number(row.minutes)) : ''}</span>
+							{#if Number(row.minutes) >= 5}<span class="text-sm text-base-content/60">{formatDuration(Number(row.minutes))}</span>{/if}
 							{#if draft.durations.length > 1}
-								<button class="btn btn-ghost btn-sm btn-square shrink-0" type="button" aria-label="Remove this length" onclick={() => draft.durations.splice(i, 1)}>✕</button>
+								<button class="btn btn-ghost btn-sm" type="button" aria-label="Remove this length" onclick={() => draft.durations.splice(i, 1)}>✕</button>
 							{/if}
 						</div>
 					{/each}
