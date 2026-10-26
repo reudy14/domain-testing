@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
+	import { fly, slide } from 'svelte/transition';
 	import ImageUploader from '$lib/admin/editors/ImageUploader.svelte';
 	import { PRIVACY_PAGE_SLUG } from '$lib/admin/privacyTemplate';
 	import { shopLinks } from '$lib/types';
@@ -38,6 +40,16 @@
 
 	const pageBySlug = (slug: string) => data.pages.find((page) => page.slug === slug);
 
+	// Only addresses like "/book" are checked: the CTA may also point to "/" or another site.
+	function ctaProblem() {
+		const slug = header.ctaButton.href?.trim().match(/^\/([^/?#]+)\/?$/)?.[1];
+		if (!slug) return '';
+		const page = pageBySlug(slug);
+		if (!page) return `There is no page with the slug “${slug}”.`;
+		if (!page.published) return `“${page.title}” isn’t published yet.`;
+		return '';
+	}
+
 	// The page the basket links lead to: the basket page, else the CTA's address when that is a page here.
 	function basketProblem() {
 		const slug = shopLinks(header).basket.replace(/^\/|\/$/g, '');
@@ -51,8 +63,20 @@
 
 	const isHex = (value: unknown) => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
 
+	// "Saved." goes away by itself after a moment; an error stays until the next save.
+	let statusShown = $state('');
+	$effect(() => {
+		if (!form?.section || !form.message) return;
+		statusShown = form.section;
+		if (!form.ok) return;
+		const timer = setTimeout(() => (statusShown = ''), 2500);
+		return () => clearTimeout(timer);
+	});
+	const motion = (ms: number) => (browser && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : ms);
+
 	const submit: SubmitFunction = ({ formData }) => {
 		saving = String(formData.get('section'));
+		statusShown = '';
 		return async ({ update }) => {
 			// Re-run loads so the admin theme picks up saved colours immediately.
 			await update({ reset: false });
@@ -64,9 +88,21 @@
 <svelte:head><title>Site design | CMS</title></svelte:head>
 
 {#snippet status(section: string)}
-	{#if form?.section === section && form.message}
-		<div class="alert mt-4 py-2 text-sm" class:alert-success={form.ok} class:alert-error={!form.ok} role="status">{form.message}</div>
+	{#if statusShown === section && form?.section === section && form.message}
+		<div class="alert mt-4 py-2 text-sm" class:alert-success={form.ok} class:alert-error={!form.ok} role="status" in:fly={{ y: 8, duration: motion(200) }} out:slide={{ duration: motion(350) }}>
+			{form.message}
+		</div>
 	{/if}
+{/snippet}
+
+{#snippet info(text: string)}
+	<span class="tooltip tooltip-right font-sans font-normal before:max-w-48" data-tip={text}>
+		<button class="btn btn-circle btn-ghost btn-xs text-base-content/60" type="button" aria-label={text}>
+			<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+				<circle cx="12" cy="12" r="9" /><path stroke-linecap="round" d="M12 11v5M12 8h.01" />
+			</svg>
+		</button>
+	</span>
 {/snippet}
 
 {#snippet saveButton(section: string, label: string)}
@@ -91,6 +127,14 @@
 		<h2 class="mb-4 text-2xl font-bold">Header</h2>
 		<h3 class="mb-2 font-bold">Logo</h3>
 		<ImageUploader url={header.logo?.url} alt={header.logo?.alt} onChange={(image) => (header.logo = image)} />
+		<h3 class="mt-6 mb-2 font-bold">Home page</h3>
+		<select class="select w-full" aria-label="Home page" bind:value={header.homePage}>
+			<option value="">— Select a page —</option>
+			{#each data.pages as page (page.id)}
+				<option value={page.slug}>{page.title} [{page.slug}]</option>
+			{/each}
+		</select>
+		<p class="mt-1 text-sm text-base-content/60">The page that "/" will redirect to.</p>
 		<h3 class="mt-6 font-bold">Navigation</h3>
 		{#each header.navLinks || [] as link, i}
 			<div class="my-2 grid grid-cols-[1fr_1fr_auto] gap-2">
@@ -100,24 +144,18 @@
 			</div>
 		{/each}
 		<button class="btn btn-sm mt-1" type="button" onclick={addHeaderLink}>Add link</button>
-		<h3 class="mt-6 mb-2 font-bold">CTA button</h3>
+		<h3 class="mt-6 mb-2 flex items-center gap-1 font-bold">CTA button {@render info('Hero buttons without a link and “Book another” after paying go here too.')}</h3>
 		<div class="grid grid-cols-2 gap-2">
 			<input class="input w-full" aria-label="Button label" bind:value={header.ctaButton.label} placeholder="Label" />
 			<input class="input w-full" aria-label="Button address" bind:value={header.ctaButton.href} placeholder="/book" />
 		</div>
-		<p class="mt-1 text-sm text-base-content/60">Hero buttons without an address and “Book another” after paying lead here too.</p>
-		<h3 class="mt-6 mb-2 font-bold">Basket page <span class="font-normal text-base-content/50">(optional)</span></h3>
-		<input class="input w-full" aria-label="Basket page" bind:value={header.basketPage} placeholder="Same as the CTA button" />
-		<p class="mt-1 text-sm text-base-content/60">The slug of the page where people pay, e.g. <code>basket</code>: the basket in the header and “view basket” in the shop lead there. Leave it empty if the CTA button’s page has the Checkout block.</p>
+		{#if ctaProblem()}<p class="mt-1 text-sm font-semibold">⚠ {ctaProblem()}</p>{/if}
+		<h3 class="mt-6 mb-2 flex items-center gap-1 font-bold">
+			Basket page <span class="font-normal text-base-content/50">(optional)</span>
+			{@render info('Slug of the page with the Checkout block. Empty = the CTA button’s page.')}
+		</h3>
+		<input class="input w-full" aria-label="Basket page" bind:value={header.basketPage} placeholder="e.g. basket" />
 		{#if basketProblem()}<p class="mt-1 text-sm font-semibold">⚠ {basketProblem()}</p>{/if}
-		<h3 class="mt-6 mb-2 font-bold">Home page</h3>
-		<select class="select w-full" aria-label="Home page" bind:value={header.homePage}>
-			<option value="">— Select a page —</option>
-			{#each data.pages as page (page.id)}
-				<option value={page.slug}>{page.title} [{page.slug}]</option>
-			{/each}
-		</select>
-		<p class="mt-1 text-sm text-base-content/60">The page that "/" will redirect to.</p>
 		{@render saveButton('header', 'Save header')}
 	</form>
 
