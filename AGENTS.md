@@ -34,7 +34,7 @@ app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 │   │   ├── orders/           # Order list + booking-email status/resend
 │   │   ├── customers/        # Customer personal data (GDPR): search, export, correct, erase, retention settings
 │   │   ├── emails/           # Block-based booking email editor (live preview, test send)
-│   │   ├── globals/          # Header/footer/colors editor (menu label: Site design)
+│   │   ├── globals/          # Header/footer/colors/style editor (menu label: Site design)
 │   │   ├── backup/           # Export/import UI (calls api/export, api/import)
 │   │   ├── preview/          # Draft preview via sessionStorage (same-origin)
 │   │   └── api/              # upload, export, import, slots (Shop block times in /preview) endpoints
@@ -141,7 +141,9 @@ To add an email block type: add to `EmailBlockType` in `packages/shared/src/type
 - **Shop / payments**: all basket, slot-hold, Stripe and order logic lives in the PocketBase hooks (JSVM: synchronous, each handler `require()`s the lib; see the header comment). The public app must stay unprivileged — no superuser login, no Stripe secret key; its routes only proxy to `/api/shop/*` and manage the `basket_id` cookie (`app-public/src/lib/server/shop.ts`). Booking emails are rendered and sent by the public app from data the webhook hook returns (`OrderEmailData`, `sendOrderEmailsFromData`); keep `orderEmailData()` in the hook and `loadOrderEmailData()` in `packages/shared/src/server/email` returning the same shape. Local testing uses `stripe-mock` (`STRIPE_API_BASE`, local compose only).
 
 ### Styling
-- **Public site**: Custom theme via `@theme` in `app.css` — colors: `warm`, `charcoal`, `sage`, `sage-dark`, `terracotta`. Fonts: `DM Sans` (body), `Playfair Display` (headings).
+- **Public site**: Custom theme via `@theme` in `app.css` — colors: `warm`, `charcoal`, `sage`, `sage-dark`, `terracotta`. Fonts: `font-sans` (body), `font-serif` (headings), chosen in Site design → Style (default DM Sans / Playfair Display).
+  - **Site design → Style** (`style` global: fonts, corners, text size, shadows, page width) becomes `--site-*` variables (`siteStyleVars` in `$shared/theme`) that the `@theme` tokens in both `app.css` files scale. So in public-site markup use the tokens — `rounded-xl`/`rounded-2xl`/`rounded-card`/`rounded-panel`, `shadow-sm`…`shadow-xl`, `max-w-3xl`/`6xl`/`7xl` — never `rounded-[2rem]` or an arbitrary `shadow-[…]`, which ignore the settings. Buttons, chips and icon buttons are `rounded-button` (a pill when Round, square when Sharp); only dots, avatars and badges stay `rounded-full`.
+  - Fonts are bundled `@fontsource-variable/*` packages, imported in each app's `src/lib/fonts.ts` and listed in `SITE_FONTS`; a new one goes in all three places.
 - **Admin area**: DaisyUI **5** (no `form-control` / `label-text` / `*-bordered` — those are v4). Colours come from Site design via `$shared/theme`, rendered as a `<style>` in `<head>` (SSR, no flash): the admin gets only DaisyUI primary (= site Primary) and secondary (= site Accent) with auto-contrast text; `/preview` and the public site get all site colour variables. Never use `text-primary`/`text-secondary` for text — a light brand colour is unreadable as text; mark state with a tint/bar instead. Conventions:
   - Section card: `rounded-box bg-base-100 p-5 shadow` with an `h2.text-2xl.font-bold` title (see Site design / globals).
   - Form field: `<label class="fieldset"><span class="fieldset-legend">Label</span><input class="input w-full" /></label>`; hints in `<span class="label">`.

@@ -360,3 +360,23 @@ export const defaultColors: ColorsGlobal = {
 	primary: '#8a9a7b',
 	accent: '#c9825f'
 };
+
+/** Site design → Style. Fonts are ids from SITE_FONTS in theme.ts. */
+export type StyleGlobal = {
+	headingFont: string;
+	bodyFont: string;
+	corners: 'sharp' | 'soft' | 'round';
+	textSize: 'small' | 'normal' | 'large';
+	shadows: 'none' | 'soft' | 'strong';
+	width: 'narrow' | 'normal' | 'wide';
+};
+
+// The site's look before these settings existed.
+export const defaultStyle: StyleGlobal = {
+	headingFont: 'playfair-display',
+	bodyFont: 'dm-sans',
+	corners: 'round',
+	textSize: 'normal',
+	shadows: 'soft',
+	width: 'normal'
+};

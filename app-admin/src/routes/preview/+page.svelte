@@ -22,8 +22,8 @@
 
 <svelte:head>
 	<title>Preview</title>
-	<!-- Full site colours so the draft looks like the public site. -->
-	{@html rootStyleTag(siteThemeVars(data.colors))}
+	<!-- Full site colours and style so the draft looks like the public site. -->
+	{@html rootStyleTag(siteThemeVars(data.colors, data.style))}
 </svelte:head>
 
 {#if blocks.length}

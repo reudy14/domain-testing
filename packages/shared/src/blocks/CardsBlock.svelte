@@ -19,7 +19,7 @@
 	<div class="mt-6 grid gap-6 grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
 		{#each data.items || [] as card, i (i)}
 			<!-- Cards are white whatever the block's colours, so they use the site's own text colour. -->
-			<div class="relative overflow-hidden rounded-[1.25rem] bg-white text-[color-mix(in_srgb,var(--color-text,#2c2c2c)_85%,transparent)] shadow-[0_1px_6px_rgba(0,0,0,0.08)] transition-shadow {card.href ? 'hover:shadow-lg' : ''}">
+			<div class="relative overflow-hidden rounded-card bg-white text-[color-mix(in_srgb,var(--color-text,#2c2c2c)_85%,transparent)] shadow-sm transition-shadow {card.href ? 'hover:shadow-lg' : ''}">
 				{#if !numbered && card.imageUrl}
 					<img class="block aspect-[4/3] w-full object-cover" src={card.imageUrl} alt={card.imageAlt || ''} />
 				{/if}

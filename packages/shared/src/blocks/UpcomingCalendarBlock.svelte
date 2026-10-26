@@ -65,13 +65,13 @@
 	</div>
 
 	{#if visibleEvents.length === 0}
-		<div class="mx-auto max-w-2xl rounded-[2rem] border border-sage/20 bg-white/70 p-8 text-center shadow-sm">
+		<div class="mx-auto max-w-2xl rounded-panel border border-sage/20 bg-white/70 p-8 text-center shadow-sm">
 			<p class="text-charcoal/70">No upcoming events are available for the selected categories.</p>
 		</div>
 	{:else}
 		<div class="isolate grid gap-8 lg:grid-cols-2">
 			{#each months as month}
-				<div class="relative z-0 overflow-visible rounded-[2rem] border border-sage/15 bg-white/80 p-3 shadow-sm sm:p-5 backdrop-blur hover:z-[9000] focus-within:z-[9000]">
+				<div class="relative z-0 overflow-visible rounded-panel border border-sage/15 bg-white/80 p-3 shadow-sm sm:p-5 backdrop-blur hover:z-[9000] focus-within:z-[9000]">
 					<h3 class="font-display mb-5 text-center text-3xl text-charcoal">{month.label}</h3>
 					<div class="mb-2 grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase tracking-wide text-charcoal/45">
 						{#each weekdays as weekday}<div>{weekday}</div>{/each}

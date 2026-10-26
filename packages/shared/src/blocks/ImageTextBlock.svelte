@@ -8,7 +8,7 @@
 
 <section use:scrollReveal class="reveal mx-auto max-w-6xl px-6 py-14 md:py-20">
 	<div class="grid items-center gap-10 md:grid-cols-2">
-		<div class:md:order-2={data.imagePosition === 'right'} class="overflow-hidden rounded-[2rem] bg-sage/10 shadow-sm">
+		<div class:md:order-2={data.imagePosition === 'right'} class="overflow-hidden rounded-panel bg-sage/10 shadow-sm">
 			{#if data.url}
 				<img class="aspect-[4/5] w-full object-cover" src={data.url} alt={data.alt || ''} />
 			{:else}

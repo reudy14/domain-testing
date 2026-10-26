@@ -64,7 +64,7 @@
 		<div class="flex shrink-0 items-center gap-2 md:gap-3">
 			{#if hasItems}
 				<a
-					class="relative flex items-center gap-2 rounded-full border border-charcoal/10 px-3 py-2 text-sm font-semibold text-charcoal/80 transition hover:border-sage hover:text-sage-dark md:px-4"
+					class="relative flex items-center gap-2 rounded-button border border-charcoal/10 px-3 py-2 text-sm font-semibold text-charcoal/80 transition hover:border-sage hover:text-sage-dark md:px-4"
 					href={links.basket}
 					aria-label="View your basket ({basket.count})"
 				>
@@ -74,10 +74,10 @@
 				</a>
 			{/if}
 			{#if header.ctaButton?.label}
-				<a class="cta btn hidden rounded-full border-0 px-6 hover:opacity-90 md:inline-flex" href={links.booking}>{header.ctaButton.label}</a>
+				<a class="cta btn hidden rounded-button border-0 px-6 hover:opacity-90 md:inline-flex" href={links.booking}>{header.ctaButton.label}</a>
 			{/if}
 			<button
-				class="grid h-10 w-10 place-items-center rounded-full text-charcoal/80 transition hover:bg-charcoal/5 md:hidden"
+				class="grid h-10 w-10 place-items-center rounded-button text-charcoal/80 transition hover:bg-charcoal/5 md:hidden"
 				type="button"
 				aria-label="Open menu"
 				aria-haspopup="dialog"
@@ -98,7 +98,7 @@
 	<div class="flex h-full flex-col">
 		<div class="flex items-center justify-between border-b border-charcoal/10 px-6 py-4">
 			<span class="font-serif text-xl font-bold text-charcoal">Menu</span>
-			<button class="grid h-10 w-10 place-items-center rounded-full text-charcoal/80 transition hover:bg-charcoal/5" type="button" aria-label="Close menu" onclick={closeMenu}>
+			<button class="grid h-10 w-10 place-items-center rounded-button text-charcoal/80 transition hover:bg-charcoal/5" type="button" aria-label="Close menu" onclick={closeMenu}>
 				<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
 					<path stroke-linecap="round" d="M6 6l12 12M18 6L6 18" />
 				</svg>
@@ -129,7 +129,7 @@
 
 		{#if header.ctaButton?.label}
 			<div class="border-t border-charcoal/10 p-6">
-				<a class="cta btn btn-block rounded-full border-0 hover:opacity-90" href={links.booking}>{header.ctaButton.label}</a>
+				<a class="cta btn btn-block rounded-button border-0 hover:opacity-90" href={links.booking}>{header.ctaButton.label}</a>
 			</div>
 		{/if}
 	</div>
