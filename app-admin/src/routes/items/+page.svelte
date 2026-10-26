@@ -305,8 +305,9 @@
 
 		<div class="fieldset">
 			<span class="fieldset-legend">Image</span>
-			<ImagePicker url={draft.imageUrl} withUrl={false} altHint="" bind:uploading onChange={(image) => (draft = { ...draft, image: image.id ?? draft.image, imageUrl: image.url })} />
-			<span class="label whitespace-normal">The shop uses the name as the image’s alt text.</span>
+			<ImagePicker url={draft.imageUrl} withUrl={false} altHint="" bind:uploading onChange={(image) => (draft = { ...draft, image: image.id ?? draft.image, imageUrl: image.url })}>
+				<p>The shop uses the name as the image’s alt text.</p>
+			</ImagePicker>
 		</div>
 
 		<label class="label mt-2 cursor-pointer gap-3 text-base-content">

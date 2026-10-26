@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import { altFromFileName, uploadMedia } from '$lib/pb';
 
 	type ImageValue = { url: string; alt: string; id?: string };
@@ -17,6 +17,7 @@
 		withUrl = true,
 		altHint = 'Describes the image for people who can’t see it, and for search engines',
 		uploading = $bindable(false),
+		children,
 		onChange = (value: ImageValue) => {}
 	} = $props<{
 		url?: string;
@@ -27,6 +28,8 @@
 		altHint?: string;
 		/** True while a file uploads (bind it to hold off a form's Save). */
 		uploading?: boolean;
+		/** Extra notes beside the box when there are no fields to show. */
+		children?: Snippet;
 		onChange?: (value: ImageValue) => void;
 	}>();
 
@@ -119,58 +122,71 @@
 <!-- Paste is caught here, from whichever button or field inside has focus. -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="@container" onpaste={onPaste}>
-	<div class="grid gap-4 @md:grid-cols-[minmax(0,13rem)_1fr]">
-		<button
-			type="button"
-			class="relative flex h-36 w-full flex-col items-center justify-center overflow-hidden rounded-box border-2 border-dashed p-2 transition-colors hover:border-primary focus-visible:border-primary focus-visible:outline-none {dragging ? 'border-primary bg-primary/10' : url ? 'border-base-300 bg-base-200' : 'border-base-300'}"
-			aria-label={url ? 'Replace image: choose a file, drop one here, or paste one' : 'Add image: choose a file, drop one here, or paste one'}
-			aria-busy={uploading}
-			onclick={() => uploading || fileInput?.click()}
-			ondragenter={(e) => { e.preventDefault(); dragging = true; }}
-			ondragover={(e) => e.preventDefault()}
-			ondragleave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) dragging = false; }}
-			ondrop={onDrop}
-		>
-			{#if uploading}
-				<span class="loading loading-spinner loading-lg text-primary"></span>
-				<span class="mt-2 text-sm text-base-content/60">Uploading…</span>
-			{:else if url}
-				<img class="max-h-full max-w-full rounded object-contain" src={url} alt="" />
-			{:else}
-				<svg class="mb-2 size-8 text-base-content/40" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0 0 21.75 19.5V4.5A1.5 1.5 0 0 0 20.25 3H3.75A1.5 1.5 0 0 0 2.25 4.5v15A1.5 1.5 0 0 0 3.75 21Zm10.5-11.25h.008v.008h-.008V9.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
-				</svg>
-				<span class="text-center text-sm font-medium text-base-content/70">{dragging ? 'Drop to upload' : 'Choose, drop or paste an image'}</span>
-				<span class="text-xs text-base-content/40">JPG, PNG, WebP, GIF, SVG</span>
-			{/if}
-		</button>
-
-		<div class="min-w-0">
-			<div class="flex flex-wrap gap-2">
-				<button class="btn btn-sm" type="button" disabled={uploading} onclick={() => fileInput?.click()}>{url ? 'Replace…' : 'Choose file…'}</button>
-				{#if canReadClipboard}
-					<button class="btn btn-sm" type="button" disabled={uploading} onclick={pasteFromButton} title="Upload the image you copied">Paste</button>
-				{/if}
-				{#if url}
-					<button class="btn btn-ghost btn-sm text-error" type="button" disabled={uploading} onclick={remove}>Remove image</button>
+	<div class="grid gap-x-5 gap-y-3 @md:grid-cols-[13rem_minmax(0,1fr)] @md:items-start">
+		<div class="space-y-2">
+			<div class="group relative">
+				<button
+					type="button"
+					class="relative flex h-40 w-full flex-col items-center justify-center overflow-hidden rounded-box p-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {dragging ? 'border-2 border-dashed border-primary bg-primary/10' : url ? 'border border-base-300 bg-base-200' : 'border-2 border-dashed border-base-300 hover:border-primary'}"
+					aria-label={url ? 'Replace image: choose a file, drop one here, or paste one' : 'Add image: choose a file, drop one here, or paste one'}
+					aria-busy={uploading}
+					onclick={() => uploading || fileInput?.click()}
+					ondragenter={(e) => { e.preventDefault(); dragging = true; }}
+					ondragover={(e) => e.preventDefault()}
+					ondragleave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) dragging = false; }}
+					ondrop={onDrop}
+				>
+					{#if uploading}
+						<span class="loading loading-spinner loading-lg text-primary"></span>
+						<span class="mt-2 text-sm text-base-content/60">Uploading…</span>
+					{:else if url && !dragging}
+						<img class="max-h-full max-w-full rounded object-contain" src={url} alt="" />
+						<span class="absolute inset-0 flex items-center justify-center bg-black/55 p-4 text-center text-sm font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-has-[:focus-visible]:opacity-100">Click, drop or paste to replace</span>
+					{:else}
+						<svg class="mb-2 size-8 text-base-content/40" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0 0 21.75 19.5V4.5A1.5 1.5 0 0 0 20.25 3H3.75A1.5 1.5 0 0 0 2.25 4.5v15A1.5 1.5 0 0 0 3.75 21Zm10.5-11.25h.008v.008h-.008V9.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+						</svg>
+						<span class="text-center text-sm font-medium text-base-content/70">{dragging ? 'Drop to upload' : 'Click, drop or paste an image'}</span>
+						<span class="text-xs text-base-content/40">JPG, PNG, WebP, GIF, SVG</span>
+					{/if}
+				</button>
+				{#if url && !uploading}
+					<button class="btn btn-circle btn-sm absolute top-2 right-2 border-base-300 bg-base-100 text-error shadow-sm" type="button" aria-label="Remove image" title="Remove image" onclick={remove}>
+						<svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+					</button>
 				{/if}
 			</div>
-			<p class="mt-1 text-xs text-base-content/50">Or drag an image onto the box, or click the box and press Ctrl+V.</p>
-
-			{#if withUrl}
-				<label class="fieldset">
-					<span class="fieldset-legend">Image URL</span>
-					<input class="input w-full" value={url} placeholder="https://…" oninput={(e) => onChange({ url: e.currentTarget.value, alt, id: '' })} />
-				</label>
-			{/if}
-			{#if altHint}
-				<label class="fieldset">
-					<span class="fieldset-legend">Alt text</span>
-					<input class="input w-full" value={alt} bind:this={altInput} oninput={(e) => onChange({ url, alt: e.currentTarget.value })} />
-					<span class="label whitespace-normal">{altHint}</span>
-				</label>
-			{/if}
+			<div class="flex gap-2">
+				<button class="btn btn-sm flex-1" type="button" disabled={uploading} onclick={() => fileInput?.click()}>{url ? 'Replace…' : 'Choose file…'}</button>
+				{#if canReadClipboard}
+					<button class="btn btn-sm flex-1" type="button" disabled={uploading} onclick={pasteFromButton} title="Upload the image you copied">Paste</button>
+				{/if}
+			</div>
 		</div>
+
+		{#if withUrl || altHint}
+			<div class="min-w-0">
+				{#if altHint}
+					<label class="fieldset pt-0">
+						<span class="fieldset-legend pt-0">Alt text</span>
+						<input class="input w-full" value={alt} bind:this={altInput} oninput={(e) => onChange({ url, alt: e.currentTarget.value })} />
+						<span class="label whitespace-normal">{altHint}</span>
+					</label>
+				{/if}
+				{#if withUrl}
+					<label class="fieldset {altHint ? '' : 'pt-0'}">
+						<span class="fieldset-legend {altHint ? '' : 'pt-0'}">Image URL</span>
+						<input class="input input-sm w-full text-base-content/70" value={url} placeholder="https://…" oninput={(e) => onChange({ url: e.currentTarget.value, alt, id: '' })} />
+						<span class="label whitespace-normal">Filled in by an upload, or the address of an image elsewhere</span>
+					</label>
+				{/if}
+			</div>
+		{:else}
+			<div class="space-y-2 text-sm text-base-content/60 @md:self-center">
+				<p>Click the box to choose a file, drag an image onto it, or click it and press Ctrl+V to paste.</p>
+				{@render children?.()}
+			</div>
+		{/if}
 	</div>
 
 	{#if error}
