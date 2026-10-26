@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
+	import type { PassPart } from '$lib/types';
 	import { formatDateTime, toZonedDatetimeInput } from '$lib/calendar';
 	import { confirmSubmit } from '$lib/admin/confirm';
 	import Modal from '$lib/admin/Modal.svelte';
@@ -96,13 +97,48 @@
 	{#if !data.bundles.length}<div class="alert" role="status">No bundles yet — add one under Services & products (type “Bundle / voucher”).</div>{/if}
 
 	<div class="rounded-box bg-base-100 p-5 shadow">
-		<form method="GET" class="mb-4 flex flex-wrap gap-2">
-			<input class="input w-80 max-w-full" type="search" name="q" placeholder="Code, email, name or bundle" aria-label="Search codes" value={data.q} />
+		<form method="GET" class="mb-4 flex gap-2">
+			<input class="input min-w-0 flex-1 sm:w-80 sm:flex-none" type="search" name="q" placeholder="Code, email, name or bundle" aria-label="Search codes" value={data.q} />
 			<button class="btn" type="submit">Search</button>
 			{#if data.q}<a class="btn btn-ghost" href="/passes">Show all</a>{/if}
 		</form>
 
-		<div class="overflow-x-auto">
+		{#snippet buyer(pass: (typeof passes)[number])}
+			<span class="block">{pass.email || (pass.anonymisedAt ? 'Anonymised' : pass.order ? '—' : 'Issued here')}</span>
+			{#if pass.recipientName}<span class="block text-sm text-base-content/60">for {pass.recipientName}</span>{/if}
+		{/snippet}
+
+		{#snippet leftToBook(pass: (typeof passes)[number])}
+			{#each bookable(pass) as part (`${part.item}|${part.minutes}`)}
+				<span class="block">{part.left}/{part.count} {partLabel(part)}{part.held ? ` · ${part.held} in a basket` : ''}</span>
+			{/each}
+		{/snippet}
+
+		<!-- Phones and tablets: one card per code (seven columns didn't fit). -->
+		<ul class="-mx-5 divide-y divide-base-200 border-t border-base-200 lg:hidden">
+			{#each passes as pass (pass.id)}
+				{@const s = passStatus(pass)}
+				<li class="px-5 py-4">
+					<div class="flex items-start gap-3">
+						<div class="min-w-0 flex-1">
+							<div class="flex flex-wrap items-center gap-2">
+								<span class="font-mono font-semibold tracking-wider">{pass.code}</span>
+								<span class="badge {s.badge}">{s.label}</span>
+							</div>
+							<span class="mt-1 block font-medium break-words">{pass.name}</span>
+							<div class="mt-1 text-sm break-words">{@render buyer(pass)}</div>
+							<div class="mt-2 text-sm text-base-content/70">{@render leftToBook(pass)}</div>
+							<span class="mt-1 block text-sm text-base-content/60">Expires {pass.expiresAt ? dateOnly(pass.expiresAt) : 'never'}</span>
+						</div>
+						<button class="btn btn-sm shrink-0" type="button" onclick={() => manage(pass)}>Manage</button>
+					</div>
+				</li>
+			{:else}
+				<li class="py-10 text-center text-base-content/60">{data.q ? 'No codes match that search.' : 'No codes yet — they appear here when a bundle is bought.'}</li>
+			{/each}
+		</ul>
+
+		<div class="hidden overflow-x-auto lg:block">
 			<table class="table">
 				<thead><tr><th>Code</th><th>Bundle</th><th>Bought by / for</th><th>Left to book</th><th>Expires</th><th>Status</th><th></th></tr></thead>
 				<tbody>
@@ -111,15 +147,8 @@
 						<tr>
 							<td class="font-mono font-semibold tracking-wider whitespace-nowrap">{pass.code}</td>
 							<td>{pass.name}</td>
-							<td>
-								<span class="block">{pass.email || (pass.anonymisedAt ? 'Anonymised' : pass.order ? '—' : 'Issued here')}</span>
-								{#if pass.recipientName}<span class="block text-sm text-base-content/60">for {pass.recipientName}</span>{/if}
-							</td>
-							<td>
-								{#each bookable(pass) as part (`${part.item}|${part.minutes}`)}
-									<span class="block whitespace-nowrap">{part.left}/{part.count} {partLabel(part)}{part.held ? ` · ${part.held} in a basket` : ''}</span>
-								{/each}
-							</td>
+							<td>{@render buyer(pass)}</td>
+							<td class="whitespace-nowrap">{@render leftToBook(pass)}</td>
 							<td class="whitespace-nowrap">{pass.expiresAt ? dateOnly(pass.expiresAt) : 'Never'}</td>
 							<td><span class="badge {s.badge}">{s.label}</span></td>
 							<td class="text-right"><button class="btn btn-sm" type="button" onclick={() => manage(pass)}>Manage</button></td>
@@ -143,22 +172,40 @@
 			{managing.created ? `Created ${formatDateTime(managing.created, data.timezone)}` : ''}{managing.order ? ` · order ${managing.order}` : ' · issued here'}
 		</p>
 
-		<table class="table table-sm mt-3">
-			<thead><tr><th>Part</th><th>Used</th><th>In a basket</th><th>Left</th><th class="text-right">Share of the price</th></tr></thead>
-			<tbody>
-				{#each managing.parts as part (`${part.item}|${part.minutes}`)}
-					<tr>
-						<td>{part.count}× {partLabel(part)}</td>
-						{#if part.redeemable}
-							<td>{part.used}</td><td>{part.held}</td><td>{part.left}</td>
-						{:else}
-							<td colspan="3" class="text-base-content/60">Handed over with the purchase</td>
-						{/if}
-						<td class="text-right">{money.format(part.value)}{part.count > 1 ? ` (${money.format(part.value / part.count)} each)` : ''}</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
+		{#snippet share(part: PassPart)}{money.format(part.value)}{part.count > 1 ? ` (${money.format(part.value / part.count)} each)` : ''}{/snippet}
+
+		<!-- Phones: one row per part (five columns didn't fit). -->
+		<ul class="mt-3 divide-y divide-base-200 sm:hidden">
+			{#each managing.parts as part (`${part.item}|${part.minutes}`)}
+				<li class="flex items-start justify-between gap-3 py-2 text-sm">
+					<span class="min-w-0">
+						<span class="block font-medium">{part.count}× {partLabel(part)}</span>
+						<span class="block text-base-content/60">{part.redeemable ? `${part.left} left · ${part.used} used${part.held ? ` · ${part.held} in a basket` : ''}` : 'Handed over with the purchase'}</span>
+					</span>
+					<span class="shrink-0 text-right">{@render share(part)}</span>
+				</li>
+			{/each}
+		</ul>
+
+		<!-- Hidden through a wrapper: the table's own "table" class also sets display: table, which beats "hidden". -->
+		<div class="mt-3 hidden sm:block">
+			<table class="table table-sm">
+				<thead><tr><th>Part</th><th>Used</th><th>In a basket</th><th>Left</th><th class="text-right">Share of the price</th></tr></thead>
+				<tbody>
+					{#each managing.parts as part (`${part.item}|${part.minutes}`)}
+						<tr>
+							<td>{part.count}× {partLabel(part)}</td>
+							{#if part.redeemable}
+								<td>{part.used}</td><td>{part.held}</td><td>{part.left}</td>
+							{:else}
+								<td colspan="3" class="text-base-content/60">Handed over with the purchase</td>
+							{/if}
+							<td class="text-right">{@render share(part)}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 		<p class="mt-1 text-xs text-base-content/60">The share of the price is what each part is worth for a partial refund (refund in Stripe, then mark the booking’s order refunded to give its place back).</p>
 
 		<form method="POST" action="?/expiry" use:enhance={submitManage} class="mt-4 flex flex-wrap items-end gap-2">
