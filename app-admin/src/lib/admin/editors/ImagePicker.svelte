@@ -167,16 +167,16 @@
 		</div>
 
 		{#if withUrl || altHint}
-			<div class="min-w-0 space-y-3">
+			<div class="min-w-0">
 				{#if altHint}
-					<label class="flex flex-col gap-1 @sm:flex-row @sm:items-center @sm:gap-3">
-						<span class="w-24 shrink-0 text-sm font-medium">Alt text</span>
+					<label class="fieldset pt-0">
+						<span class="fieldset-legend pt-0">Alt text</span>
 						<input class="input w-full" value={alt} placeholder={altHint} title={altHint} bind:this={altInput} oninput={(e) => onChange({ url, alt: e.currentTarget.value })} />
 					</label>
 				{/if}
 				{#if withUrl}
-					<label class="flex flex-col gap-1 @sm:flex-row @sm:items-center @sm:gap-3">
-						<span class="w-24 shrink-0 text-sm font-medium">Image URL</span>
+					<label class="fieldset {altHint ? '' : 'pt-0'}">
+						<span class="fieldset-legend {altHint ? '' : 'pt-0'}">Image URL</span>
 						<input class="input w-full text-base-content/70" value={url} placeholder="Filled in by an upload, or https://…" oninput={(e) => onChange({ url: e.currentTarget.value, alt, id: '' })} />
 					</label>
 				{/if}
