@@ -30,7 +30,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	if (isLoginRoute && isAuthed && event.request.method === 'GET') {
-		throw redirect(303, '/pages');
+		throw redirect(303, '/');
 	}
 
 	const response = await resolve(event);

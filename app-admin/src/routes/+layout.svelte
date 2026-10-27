@@ -23,6 +23,10 @@
 	// user-facing names; hrefs keep the original route names.
 	const navGroups = [
 		{
+			title: 'Studio',
+			links: [{ href: '/', label: 'Dashboard' }]
+		},
+		{
 			title: 'Website',
 			links: [
 				{ href: '/pages', label: 'Pages' },
@@ -80,7 +84,7 @@
 				<label for="admin-nav" class="btn btn-square btn-ghost" aria-label="Open menu">
 					<svg xmlns="http://www.w3.org/2000/svg" class="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
 				</label>
-				<a class="ml-1 text-lg font-bold tracking-tight" href="/pages">Massage CMS</a>
+				<a class="ml-1 text-lg font-bold tracking-tight" href="/">Massage CMS</a>
 			</header>
 			<main class="mx-auto w-full max-w-7xl flex-1 p-4 md:p-8">
 				{@render children()}
@@ -90,7 +94,7 @@
 		<div class="drawer-side z-40">
 			<label for="admin-nav" class="drawer-overlay" aria-label="Close menu"></label>
 			<aside class="flex min-h-full w-64 flex-col border-r border-base-300 bg-base-100">
-				<a class="block px-6 pt-6 pb-4 text-lg font-bold tracking-tight" href="/pages">Massage CMS</a>
+				<a class="block px-6 pt-6 pb-4 text-lg font-bold tracking-tight" href="/">Massage CMS</a>
 				<nav class="flex-1" aria-label="Main">
 					<ul class="menu w-full gap-0.5 px-3">
 						{#each navGroups as group (group.title)}

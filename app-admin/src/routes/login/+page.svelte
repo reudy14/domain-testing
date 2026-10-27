@@ -1,6 +1,7 @@
 <script lang="ts">
 	let { form } = $props();
 	let submitting = $state(false);
+	let showPassword = $state(false);
 </script>
 
 <svelte:head><title>Sign in | CMS</title></svelte:head>
@@ -23,10 +24,16 @@
 						<!-- svelte-ignore a11y_autofocus -->
 						<input class="input w-full" name="email" type="email" autocomplete="username" defaultValue={form?.email ?? ''} required autofocus />
 					</label>
-					<label class="flex flex-col gap-1">
-						<span class="fieldset-legend p-0">Password</span>
-						<input class="input w-full" name="password" type="password" autocomplete="current-password" required />
-					</label>
+					<div class="flex flex-col gap-1">
+						<label class="fieldset-legend p-0" for="password">Password</label>
+						<!-- DaisyUI's input wrapper: the field and the Show button share one box. -->
+						<div class="input w-full pr-1">
+							<input class="grow" id="password" name="password" type={showPassword ? 'text' : 'password'} autocomplete="current-password" required />
+							<button class="btn btn-ghost btn-xs" type="button" aria-controls="password" aria-pressed={showPassword} onclick={() => (showPassword = !showPassword)}>
+								{showPassword ? 'Hide' : 'Show'}
+							</button>
+						</div>
+					</div>
 				</fieldset>
 				<button class="btn btn-primary w-full" type="submit" disabled={submitting}>
 					{#if submitting}<span class="loading loading-spinner loading-sm"></span>{/if}

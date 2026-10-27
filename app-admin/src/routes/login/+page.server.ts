@@ -19,7 +19,7 @@ export const actions: Actions = {
 			return fail(400, { email, message: 'Invalid email or password.' });
 		}
 
-		throw redirect(303, '/pages');
+		throw redirect(303, '/');
 	},
 	logout: async ({ locals }) => {
 		locals.pb.authStore.clear();
