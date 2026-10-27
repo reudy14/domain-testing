@@ -124,7 +124,7 @@
 	<p class="text-base-content/60">The header, footer, colors and style shared by every page of the site.</p>
 </div>
 
-<div class="grid gap-6 xl:grid-cols-3">
+<div class="grid gap-6 xl:grid-cols-2 2xl:grid-cols-4">
 	<form class="flex flex-col rounded-box bg-base-100 p-5 shadow" method="POST" action="?/save" use:enhance={submit}>
 		<input type="hidden" name="id" value={data.header.id} />
 		<input type="hidden" name="section" value="header" />
