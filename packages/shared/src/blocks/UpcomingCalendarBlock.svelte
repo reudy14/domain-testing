@@ -71,7 +71,7 @@
 	{:else}
 		<div class="isolate grid gap-8 lg:grid-cols-2">
 			{#each months as month}
-				<div class="relative z-0 overflow-visible rounded-panel border border-sage/15 bg-white/80 p-3 shadow-sm sm:p-5 backdrop-blur hover:z-[9000] focus-within:z-[9000]">
+				<div class="relative z-0 overflow-visible rounded-panel border border-sage/15 bg-white/90 p-3 shadow-sm sm:p-5 hover:z-[9000] focus-within:z-[9000]">
 					<h3 class="font-display mb-5 text-center text-3xl text-charcoal">{month.label}</h3>
 					<div class="mb-2 grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase tracking-wide text-charcoal/45">
 						{#each weekdays as weekday}<div>{weekday}</div>{/each}

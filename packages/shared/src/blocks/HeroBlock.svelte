@@ -18,12 +18,12 @@
 			{data.heading || 'Welcome to our studio'}
 		</h1>
 		{#if data.subheading}
-			<p class="animate-fade-in mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-fg-subheading/70 md:text-xl" style="animation-delay: 0.15s;">
+			<p class="animate-fade-in mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-fg-subheading/70 md:text-xl" style="animation-delay: 0.1s;">
 				{data.subheading}
 			</p>
 		{/if}
 		{#if data.buttonLabel}
-			<div class="animate-fade-in mt-10" style="animation-delay: 0.3s;">
+			<div class="animate-fade-in mt-10" style="animation-delay: 0.2s;">
 				<a class="btn rounded-button border-0 bg-sage px-10 py-3 text-lg text-primary-content shadow-lg transition hover:bg-sage-dark hover:shadow-xl" href={data.buttonUrl || shopLinks(page.data.header).booking}>
 					{data.buttonLabel}
 				</a>
