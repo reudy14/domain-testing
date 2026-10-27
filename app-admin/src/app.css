@@ -167,12 +167,13 @@ h4 {
 }
 
 /* ── Scroll-reveal animations ── */
+/* Kept short: blocks fading in while someone scrolls are what slows scrolling down. */
 .reveal {
 	opacity: 0;
-	transform: translateY(30px);
+	transform: translateY(16px);
 	transition:
-		opacity 0.7s cubic-bezier(0.25, 0.1, 0.25, 1),
-		transform 0.7s cubic-bezier(0.25, 0.1, 0.25, 1);
+		opacity 0.4s cubic-bezier(0.25, 0.1, 0.25, 1),
+		transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 .reveal-visible {
@@ -183,8 +184,8 @@ h4 {
 /* ── Hero fade-in stagger ── */
 .animate-fade-in {
 	opacity: 0;
-	transform: translateY(20px);
-	animation: fadeInUp 0.8s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+	transform: translateY(12px);
+	animation: fadeInUp 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
 }
 
 @keyframes fadeInUp {
@@ -197,6 +198,30 @@ h4 {
 /* ── Smooth scroll ── */
 html {
 	scroll-behavior: smooth;
+}
+
+/* No animations on devices that can't keep up (scrollReveal.ts adds .plain-motion
+   to <html>) or for people whose device asks for less motion. */
+html.plain-motion .reveal,
+html.plain-motion .animate-fade-in {
+	opacity: 1;
+	transform: none;
+	transition: none;
+	animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.reveal,
+	.animate-fade-in {
+		opacity: 1;
+		transform: none;
+		transition: none;
+		animation: none;
+	}
+
+	html {
+		scroll-behavior: auto;
+	}
 }
 
 /* Visual editor (RichTextEditor): roughly how the site shows text, sized for the sidebar. */

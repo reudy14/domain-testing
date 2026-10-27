@@ -40,7 +40,7 @@
 	</svg>
 {/snippet}
 
-<header class="sticky top-0 z-40 border-b border-charcoal/5 bg-warm/90 backdrop-blur">
+<header class="sticky top-0 z-40 border-b border-charcoal/5 bg-warm/95">
 	<div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 md:gap-4 md:py-4">
 		<a class="flex min-w-0 items-center gap-3" href="/" aria-label="Home">
 			{#if header.logo?.url}
