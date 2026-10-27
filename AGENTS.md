@@ -25,7 +25,7 @@ app-admin/                    # SvelteKit admin app (serves admin.<domain>)
 │   │   └── server/           # Re-exports from $shared/server + admin helpers (actions.ts, pages.ts, slots.ts)
 │   ├── routes/
 │   │   ├── +layout.svelte    # Root layout (admin shell: grouped sidebar; bare on /login and /preview)
-│   │   ├── +page.svelte      # Dashboard (income, hours worked/booked, coming up); figures from $lib/server/dashboard.ts. Login lands here
+│   │   ├── +page.svelte      # Dashboard (income + chart, hours, utilisation, customers, codes owed, what sells, needs attention); figures from $lib/server/dashboard.ts. Login lands here
 │   │   ├── login/            # Admin login
 │   │   ├── pages/            # Page CRUD + block editor
 │   │   ├── calendar/         # Event CRUD (menu label: Events)
