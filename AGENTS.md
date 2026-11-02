@@ -1,4 +1,4 @@
-# Massage Studio Website CMS — Agent Guidelines
+# Studio Website CMS — Agent Guidelines
 
 ## Stack
 
@@ -73,6 +73,7 @@ app-public/                   # SvelteKit public app (serves *.<domain>)
 └── package.json
 pocketbase/pb_migrations/     # JS migrations, mounted at /pb_migrations; applied on PocketBase start
 pocketbase/pb_hooks/          # JS hooks, mounted at /pb_hooks: the shop API (/api/shop/*) + hold-sweeping cron
+backups/                      # Demo site export (fictional dance studio), imported in admin → Backup
 docker-compose.yml            # app-admin + app-public + pocketbase + caddy services
 Caddyfile                     # Subdomain-based routing
 ```

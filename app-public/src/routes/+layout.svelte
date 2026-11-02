@@ -33,6 +33,6 @@
 	{@html rootStyleTag(siteThemeVars(data.colors, data.style))}
 </svelte:head>
 
-<Header header={data.header} />
+<Header header={data.header} siteName={data.footer?.businessName} />
 <main>{@render children()}</main>
 <Footer footer={data.footer} />

@@ -8,7 +8,7 @@
 
 <div class="grid min-h-screen place-items-center bg-base-200 p-4">
 	<div class="w-full max-w-sm">
-		<p class="mb-6 text-center text-lg font-bold tracking-tight">Massage CMS</p>
+		<p class="mb-6 text-center text-lg font-bold tracking-tight">Studio CMS</p>
 		<form class="card bg-base-100 shadow-xl" method="POST" action="?/login" onsubmit={() => (submitting = true)}>
 			<div class="card-body gap-4">
 				<div>

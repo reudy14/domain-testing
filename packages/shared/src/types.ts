@@ -84,7 +84,7 @@ export type FooterGlobal = {
 };
 
 export const defaultHeader: HeaderGlobal = {
-	logo: { url: '', alt: 'Massage studio logo' },
+	logo: { url: '', alt: 'Studio logo' },
 	navLinks: [
 		{ label: 'Home', href: '/' },
 		{ label: 'About', href: '/about' },
@@ -105,7 +105,7 @@ export function shopLinks(header?: Partial<HeaderGlobal> | null) {
 
 export const defaultFooter: FooterGlobal = {
 	businessName: 'Demo Studio',
-	tagline: 'Warm, restorative massage therapy for everyday wellbeing.',
+	tagline: 'A short sentence about your studio.',
 	address: '',
 	phone: '',
 	email: '',

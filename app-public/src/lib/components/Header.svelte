@@ -5,7 +5,17 @@
 	import { getBasketContext } from '$lib/basket.svelte';
 	import { DEFAULT_CURRENCY, formatPrice } from '$shared/calendar';
 
-	let { header } = $props<{ header: HeaderGlobal }>();
+	let { header, siteName = '' } = $props<{ header: HeaderGlobal; siteName?: string }>();
+
+	/** Stands in for the logo until one is chosen in Site design: "Demo Studio" → "DS". */
+	let initials = $derived(
+		siteName
+			.split(/\s+/)
+			.filter(Boolean)
+			.slice(0, 2)
+			.map((word: string) => word[0].toUpperCase())
+			.join('')
+	);
 
 	const basket = getBasketContext();
 	let hasItems = $derived(basket.count > 0);
@@ -46,9 +56,9 @@
 			{#if header.logo?.url}
 				<img class="h-10 w-10 shrink-0 rounded-full object-cover md:h-12 md:w-12" src={header.logo.url} alt={header.logo.alt || ''} />
 			{:else}
-				<span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sage text-lg font-bold text-primary-content md:h-12 md:w-12">DS</span>
+				<span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sage text-lg font-bold text-primary-content md:h-12 md:w-12">{initials}</span>
 			{/if}
-			<span class="truncate font-serif text-lg font-bold md:text-xl">Demo Studio</span>
+			<span class="truncate font-serif text-lg font-bold md:text-xl">{siteName}</span>
 		</a>
 
 		<nav class="hidden items-center gap-7 md:flex" aria-label="Main navigation">

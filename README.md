@@ -1,6 +1,6 @@
-# Massage Studio Website CMS
+# Studio Website CMS
 
-A full-stack SvelteKit CMS for a single-operator massage studio. PocketBase provides auth, database records, and image storage. The public site is warm and minimal; the admin UI uses DaisyUI components.
+A full-stack SvelteKit CMS for a single-operator studio. PocketBase provides auth, database records, and image storage. The public site is warm and minimal; the admin UI uses DaisyUI components.
 
 ## Stack
 
