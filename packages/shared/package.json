@@ -19,7 +19,7 @@
 	"dependencies": {
 		"@stripe/stripe-js": "^9.12.1",
 		"nodemailer": "^10.0.12",
-		"pocketbase": "^0.26.9"
+		"pocketbase": "^0.28.2"
 	},
 	"devDependencies": {
 		"@types/nodemailer": "^8.0.2"
