@@ -47,9 +47,7 @@
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSize": 2000000
-        }
+        "maxSize": 2000000
       },
       {
         "id": "bool_published",
@@ -103,9 +101,7 @@
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSize": 1000000
-        }
+        "maxSize": 1000000
       },
       {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
       {"id": "autodate_updated", "name": "updated", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": true}
@@ -279,9 +275,7 @@
         "required": false,
         "presentable": false,
         "unique": false,
-        "options": {
-          "maxSize": 200000
-        }
+        "maxSize": 200000
       },
       {
         "id": "bool_eventpub",
@@ -388,7 +382,7 @@
       { "id": "sel_basketstat0", "name": "status", "type": "select", "system": false, "required": true, "presentable": false, "unique": false, "maxSelect": 1, "values": ["active", "completed", "abandoned"] },
       { "id": "date_basketexp0", "name": "expiresAt", "type": "date", "system": false, "required": true, "presentable": false, "unique": false, "options": { "min": "", "max": "" } },
       { "id": "text_basketemai", "name": "email", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 254, "pattern": "" } },
-      { "id": "json_basketcust", "name": "customerDetails", "type": "json", "system": false, "required": false, "presentable": false, "unique": false, "options": { "maxSize": 100000 } },
+      { "id": "json_basketcust", "name": "customerDetails", "type": "json", "system": false, "required": false, "presentable": false, "unique": false, "maxSize": 100000 },
       { "id": "text_basketstrip", "name": "stripePaymentIntentId", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 200, "pattern": "" } },
       { "id": "rel_basketpass01", "name": "pass", "type": "relation", "system": false, "required": false, "presentable": false, "hidden": false, "collectionId": "pbc_passes00001", "cascadeDelete": false, "minSelect": 0, "maxSelect": 1 },
       {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
@@ -449,7 +443,7 @@
       { "id": "text3208210256", "name": "id", "type": "text", "system": true, "required": true, "presentable": false, "hidden": false, "primaryKey": true, "autogeneratePattern": "[a-z0-9]{15}", "min": 15, "max": 15, "pattern": "^[a-z0-9]+$" },
       { "id": "rel_orderbasket0", "name": "basket", "type": "relation", "system": false, "required": true, "presentable": false, "unique": false, "collectionId": "pbc_baskets0001", "cascadeDelete": false, "minSelect": 0, "maxSelect": 1, "displayFields": null },
       { "id": "text_orderemail0", "name": "email", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 254, "pattern": "" } },
-      { "id": "json_ordercustde", "name": "customerDetails", "type": "json", "system": false, "required": false, "presentable": false, "unique": false, "options": { "maxSize": 100000 } },
+      { "id": "json_ordercustde", "name": "customerDetails", "type": "json", "system": false, "required": false, "presentable": false, "unique": false, "maxSize": 100000 },
       { "id": "num_ordertotal01", "name": "total", "type": "number", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": 0, "max": null } },
       { "id": "sel_orderstatus0", "name": "status", "type": "select", "system": false, "required": true, "presentable": false, "unique": false, "maxSelect": 1, "values": ["pending", "paid", "refunded"] },
       { "id": "text_orderstripe0", "name": "stripePaymentIntentId", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 200, "pattern": "" } },
@@ -515,7 +509,7 @@
       { "id": "text3208210256", "name": "id", "type": "text", "system": true, "required": true, "presentable": false, "hidden": false, "primaryKey": true, "autogeneratePattern": "[a-z0-9]{15}", "min": 15, "max": 15, "pattern": "^[a-z0-9]+$" },
       { "id": "text_etplkey0001", "name": "key", "type": "text", "system": false, "required": true, "presentable": true, "unique": true, "options": { "min": null, "max": 80, "pattern": "" } },
       { "id": "text_etplsubject", "name": "subject", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 300, "pattern": "" } },
-      { "id": "json_etplblocks0", "name": "blocks", "type": "json", "system": false, "required": false, "presentable": false, "unique": false, "options": { "maxSize": 2000000 } },
+      { "id": "json_etplblocks0", "name": "blocks", "type": "json", "system": false, "required": false, "presentable": false, "unique": false, "maxSize": 2000000 },
       { "id": "text_etplrecips0", "name": "recipients", "type": "text", "system": false, "required": false, "presentable": false, "unique": false, "options": { "min": null, "max": 500, "pattern": "" } },
       { "id": "bool_etplenabled", "name": "enabled", "type": "bool", "system": false, "required": false, "presentable": false, "unique": false, "options": {} },
       {"id": "autodate_created", "name": "created", "type": "autodate", "system": false, "hidden": false, "presentable": false, "onCreate": true, "onUpdate": false},
