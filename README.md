@@ -78,15 +78,13 @@ The app containers use two PocketBase URLs:
 
 ## PocketBase setup
 
-1. Open `http://db.localhost:8080/_/`.
-2. Create the first PocketBase admin user when prompted.
-3. Import `pb_schema.json` from the PocketBase admin UI collection settings/import flow. This file uses the newer PocketBase `fields` schema format; if PocketBase still reports `Invalid collections configuration`, create the three collections manually using the fields below.
-4. Create starter records:
-   - `pages`: slug `home`, title `Home`, `published: true`, and a blocks JSON array.
-   - `globals`: key `header`, data matching the header JSON in the project prompt.
-   - `globals`: key `footer`, data matching the footer JSON in the project prompt.
+A fresh install, once the stack is up (written for the PocketBase 0.40 dashboard):
 
-If the `globals` records do not exist, the app falls back to safe defaults and the admin globals page will create them.
+1. **Create the first superuser.** PocketBase prints a one-time install link in its log (`docker compose logs pocketbase`): `http://0.0.0.0:8090/_/#/pbinstall/<token>`. Open it with `http://0.0.0.0:8090` replaced by the address you reach PocketBase at, e.g. `http://db.localhost:8080/_/#/pbinstall/<token>`.
+2. **Import the schema.** In the dashboard: **Settings → Import collections → Load from JSON file**, choose `pb_schema.json`, and **tick "Merge with the existing collections"**. It is off by default, and without it the import deletes every collection that isn't in the file, including `users` (so nobody but superusers could sign in to the admin). Review, then **Confirm and import**. `PUT /api/collections/import` with `"deleteMissing": false` does the same.
+3. **Add content.** Sign in to the admin app and import a site from `backups/` under **Backup → Import** (see `backups/README.md`), or start from empty: pages are created under **Pages**, and **Site design** creates its own records the first time it is opened.
+
+The migrations in `pocketbase/pb_migrations/` already ran when PocketBase first started (before the collections existed, so they skipped); the imported `pb_schema.json` is the end state they lead to. On that first start the privacy cron also logs `[privacy] retention at startup failed: … no rows in result set`, because the collections don't exist yet; it is harmless and gone from the next start.
 
 ### Switching PocketBase image (existing installs)
 
@@ -100,6 +98,16 @@ docker compose up -d
 ```
 
 Fresh installs need nothing: a new volume is created with the right owner.
+
+### Upgrading to PocketBase 0.40 (existing installs)
+
+PocketBase went from 0.23.12 to 0.40.6 (same image, same port and user, so nothing above changes). On its first start 0.40 upgrades `pb_data` in place, and that can't be undone by going back to the old image: **back up `pb_data` first**, and to roll back, restore that backup. Coming from the spectado image, do the `chown` above too.
+
+What changed for this project:
+
+- **JSON field limits.** PocketBase's default limit for JSON fields fell to 1MB in 0.29, and six of ours had relied on it (their limits were under `options` in `pb_schema.json`, which PocketBase ignores). Migration `1793400000_json_field_limits.js` sets them explicitly (page and email blocks 2MB, site design 1MB, …). Real pages are far below that.
+- **New dashboard** at `db.…/_/` (rewritten in 0.37); the setup steps above describe it.
+- Downloads now send a quoted filename (`filename="photo.jpg"`); nothing here depends on it.
 
 ### Migrations
 
@@ -134,7 +142,7 @@ Commerce collections (see the Stripe section above for context):
 - `passes` — bundle/voucher codes: `code` text (unique, 8 characters, shown as `ABCD-2345`), `item` relation→items (the bundle), `order` relation→orders (empty when issued in the admin), `name` text, `parts` json (snapshot: `[{ item, name, minutes, count, value }]`, `value` = the part's share of the price), `email` text (buyer), `recipientName` / `message` text, `expiresAt` date, `status` select `active|void`, `anonymisedAt` date. What's used is never stored — see *Bundles and codes*
 - `email_templates` — `key` text (unique: `customer_confirmation` | `client_alert`), `subject` text, `blocks` json, `recipients` text, `enabled` bool
 
-> **Schema format note:** `pb_schema.json` targets PocketBase 0.23+ using the `fields` array (not the legacy `schema` array). Field config (`collectionId`, `cascadeDelete`, `maxSelect`, `values`, number `min`/`max`/`onlyInt`) belongs at the field top level — 0.23 silently ignores anything nested under `options`, so the older number/text fields that still use `options` get no min/max on a fresh install. Importing the whole file via the PocketBase admin UI or `PUT /api/collections/import` creates or updates all collections in one pass.
+> **Schema format note:** `pb_schema.json` targets PocketBase 0.23+ using the `fields` array (not the legacy `schema` array). Field config (`collectionId`, `cascadeDelete`, `maxSelect`, `values`, number `min`/`max`/`onlyInt`) belongs at the field top level — 0.23 silently ignores anything nested under `options`, so the older number/text fields that still use `options` get no min/max on a fresh install (the JSON fields' `maxSize` has been moved up; see *Upgrading to PocketBase 0.40*). Importing the whole file via the PocketBase admin UI or `PUT /api/collections/import` creates or updates all collections in one pass; keep *Merge with the existing collections* ticked (`deleteMissing: false`), or `users` is deleted.
 
 ## Authentication
 

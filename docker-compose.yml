@@ -8,7 +8,7 @@ services:
     # and finds /pb_migrations and /pb_hooks next to /pb_data by default.
     # Data written by the old root-run image (spectado/pocketbase, now gone)
     # must be chown'ed once — see the README's "Switching PocketBase image".
-    image: docker.io/elestio/pocketbase:v0.23.12@sha256:e8c375d4fd50c4ee2f2922361392ba7c6b16c4d5df39bfc7cf2372af2bc3305e
+    image: docker.io/elestio/pocketbase:v0.40.6@sha256:936756ccefb13cedaf2e7c49745412455bc81f2d1a511132f4012e411b970437
     container_name: massage-pocketbase
     restart: unless-stopped
     # Internal only — accessed via the caddy reverse proxy
