@@ -18,7 +18,7 @@
 {$CADDY_SCHEME}://db.{$DOMAIN}:8080 {
 	# PocketBase admin UI lives at /_/ — redirect bare root there.
 	redir / /_/{path}
-	reverse_proxy pocketbase:80
+	reverse_proxy pocketbase:8090
 }
 
 {$CADDY_SCHEME}://www.{$DOMAIN}:8080, {$CADDY_SCHEME}://*.{$DOMAIN}:8080 {

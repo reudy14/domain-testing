@@ -73,7 +73,7 @@ Subsequent builds reuse the npm cache declared in each app's `Dockerfile`.
 
 The app containers use two PocketBase URLs:
 
-- `POCKETBASE_INTERNAL_URL=http://pocketbase:80` for server-side SvelteKit calls from the app containers when using the included `spectado/pocketbase` image.
+- `POCKETBASE_INTERNAL_URL=http://pocketbase:8090` for server-side SvelteKit calls from the app containers (the `elestio/pocketbase` image listens on 8090).
 - `PUBLIC_POCKETBASE_URL=http://db.${DOMAIN}:8080` for browser-side admin uploads and public file URLs. Points to the Caddy reverse proxy so browsers reach PocketBase via the `db` subdomain.
 
 ## PocketBase setup
@@ -87,6 +87,19 @@ The app containers use two PocketBase URLs:
    - `globals`: key `footer`, data matching the footer JSON in the project prompt.
 
 If the `globals` records do not exist, the app falls back to safe defaults and the admin globals page will create them.
+
+### Switching PocketBase image (existing installs)
+
+The PocketBase image changed from `spectado/pocketbase:0.23.12` (removed from Docker Hub) to `elestio/pocketbase:v0.23.12`. It is the same PocketBase version, so the schema, migrations and hooks are unchanged, but the new image runs as a non-root `pocketbase` user (uid 100) and listens on port 8090. Files the old image wrote are owned by root, and PocketBase refuses to start on them (`attempt to write a readonly database`). Fix the ownership once, before the first start on the new image:
+
+```sh
+docker compose stop pocketbase
+# back up first: the volume is <project>_pocketbase (see `docker volume ls`)
+docker compose run --rm --no-deps --user root --entrypoint chown pocketbase -R pocketbase:pocketbase /pb_data
+docker compose up -d
+```
+
+Fresh installs need nothing: a new volume is created with the right owner.
 
 ### Migrations
 

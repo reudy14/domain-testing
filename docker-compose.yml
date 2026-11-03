@@ -3,12 +3,17 @@ services:
     # Pinned: schema (pb_schema.json) and migrations target this version's
     # format/JS API. Upgrade deliberately — read the PocketBase changelog,
     # back up pb_data, then bump the tag and test migrations locally.
-    image: docker.io/spectado/pocketbase:0.23.12
+    # Digest-pinned too, so a re-pushed tag can't change what runs.
+    # This image runs as a non-root `pocketbase` user (uid 100) on port 8090
+    # and finds /pb_migrations and /pb_hooks next to /pb_data by default.
+    # Data written by the old root-run image (spectado/pocketbase, now gone)
+    # must be chown'ed once — see the README's "Switching PocketBase image".
+    image: docker.io/elestio/pocketbase:v0.23.12@sha256:e8c375d4fd50c4ee2f2922361392ba7c6b16c4d5df39bfc7cf2372af2bc3305e
     container_name: massage-pocketbase
     restart: unless-stopped
     # Internal only — accessed via the caddy reverse proxy
     expose:
-      - "80"
+      - "8090"
     volumes:
       - pocketbase:/pb_data
       # Versioned schema changes; PocketBase applies pending ones on start.
@@ -33,7 +38,7 @@ services:
       - pocketbase
     environment:
       PORT: 3001
-      POCKETBASE_INTERNAL_URL: http://pocketbase:80
+      POCKETBASE_INTERNAL_URL: http://pocketbase:8090
       # Browser-facing URLs. They must match the address bar exactly, or
       # SvelteKit rejects logins/forms ("Cross-site POST form submissions are
       # forbidden"). Behind a TLS proxy: URL_SCHEME=https and URL_PORT= (empty).
@@ -64,7 +69,7 @@ services:
       - pocketbase
     environment:
       PORT: 3000
-      POCKETBASE_INTERNAL_URL: http://pocketbase:80
+      POCKETBASE_INTERNAL_URL: http://pocketbase:8090
       PUBLIC_POCKETBASE_URL: ${URL_SCHEME:-http}://db.${DOMAIN:-localhost}${URL_PORT-:8080}
       ORIGIN: ${URL_SCHEME:-http}://www.${DOMAIN:-localhost}${URL_PORT-:8080}
       # No PocketBase or Stripe secrets here: shop writes happen in PocketBase
