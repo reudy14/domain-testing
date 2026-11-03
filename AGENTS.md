@@ -3,7 +3,7 @@
 ## Stack
 
 - **SvelteKit 2** (SSR, Svelte 5 runes mode) — all `.svelte` files use `$state`, `$derived`, `$props()` etc.
-- **PocketBase** — server pinned to **0.23.12** (`docker-compose.yml`), REST API via the `pocketbase` SDK (v0.26). Auth, DB, and image storage. Bump the server version deliberately (changelog, backup, test migrations).
+- **PocketBase** — server pinned to **0.23.12** (`docker-compose.yml`, image `elestio/pocketbase`, digest-pinned; runs as non-root uid 100 on port 8090), REST API via the `pocketbase` SDK (v0.26). Auth, DB, and image storage. Bump the server version deliberately (changelog, backup, test migrations).
 - **Tailwind CSS v4** + **DaisyUI 5** — utility-first CSS with DaisyUI components for admin; custom theme for the public site.
 - **Docker Compose** — four services: `app-admin`, `app-public`, `pocketbase`, and `caddy` (reverse proxy).
 
@@ -83,7 +83,7 @@ Caddyfile                     # Subdomain-based routing
 Caddy routes by `Host` header — no path stripping:
 
 - `admin.{$DOMAIN}:8080` → `app-admin:3001` (admin app)
-- `db.{$DOMAIN}:8080` → `pocketbase:80` (redirects `/` to `/_/`)
+- `db.{$DOMAIN}:8080` → `pocketbase:8090` (redirects `/` to `/_/`)
 - `www.{$DOMAIN}:8080`, `*.{$DOMAIN}:8080` → `app-public:3000` (public app)
 
 For local dev, `DOMAIN` defaults to `localhost`, so Caddy serves `admin.localhost:8080`, `db.localhost:8080`, `www.localhost:8080`. Caddy's `.localhost` handling works without DNS or hosts-file changes.
@@ -194,7 +194,7 @@ cd app-public && npm run build
 - `DOMAIN` — base domain for subdomain routing. Defaults to `localhost` for local dev. Set in `docker-compose.yml` or `.env`.
 - `URL_SCHEME` (default `http`), `URL_PORT` (default `:8080`; set it empty for no port) — build every browser-facing URL below as `<scheme>://<sub>.<DOMAIN><port>`. They must match the address bar exactly: a mismatched `ORIGIN` makes SvelteKit reject form POSTs (admin login) with "Cross-site POST form submissions are forbidden". Behind a TLS reverse proxy: `URL_SCHEME=https`, `URL_PORT=`. (podman-compose 1.5 can't do nested `${A:-${B}}` defaults, hence two flat variables.)
 - `PUBLIC_POCKETBASE_URL` — public-facing PocketBase URL (`<scheme>://db.${DOMAIN}<port>`). Set in `docker-compose.yml`.
-- `POCKETBASE_INTERNAL_URL` — internal Docker network URL (`http://pocketbase:80`). Set in `docker-compose.yml`.
+- `POCKETBASE_INTERNAL_URL` — internal Docker network URL (`http://pocketbase:8090`). Set in `docker-compose.yml`.
 - `ORIGIN` — SvelteKit origin for SSR. Differs per app: `<scheme>://admin.${DOMAIN}<port>` (admin), `<scheme>://www.${DOMAIN}<port>` (public).
 - `PUBLIC_SITE_URL` — public site URL used by the admin app for cross-subdomain preview links (`<scheme>://www.${DOMAIN}<port>`).
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`, `EMAIL_FROM_NAME` — Brevo SMTP relay for booking emails (both apps). Empty `SMTP_HOST` = log emails instead of sending.
